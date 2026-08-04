@@ -1493,7 +1493,7 @@ GraphSpectrumPlot._drawHarmonicLines = function (
   HEIGHT,
   OFFSET,
 ) {
-  const stroke = "rgba(0,255,0,0.66)";
+  const stroke = "rgba(30,144,255,0.85)";
 
   if (fundamentalFrequency <= maximalFrequency) {
     const label = `${fundamentalFrequency.toFixed(1)}Hz (${Math.round(fundamentalFrequency * 60)}rpm)`;
@@ -1506,7 +1506,7 @@ GraphSpectrumPlot._drawHarmonicLines = function (
       HEIGHT,
       OFFSET,
       stroke,
-      1,
+      2,
     );
   }
 
@@ -1526,7 +1526,7 @@ GraphSpectrumPlot._drawHarmonicLines = function (
       HEIGHT,
       OFFSET + 15,
       stroke,
-      1,
+      2,
     );
   }
 };
