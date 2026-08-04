@@ -27,7 +27,7 @@ function checkCraftConfigMatch(logCraftName, promptOnMismatch) {
 
   if (logCraftName.trim().toLowerCase() === configCraftName.trim().toLowerCase()) {
     appStore.statusCraftNameStatus = "match";
-    appStore.statusCraftNameTooltip = `Loaded configuration ("${configCraftName}") matches this flight log's craft.`;
+    appStore.statusCraftNameTooltip = `Loaded configuration ${configCraftName} matches this flight log's craft.`;
     return;
   }
 
