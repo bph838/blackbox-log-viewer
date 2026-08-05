@@ -304,7 +304,14 @@
                     @click="onAskAi"
                   />
                   <span class="text-xs text-dimmed">Will use:</span>
-                  <USelect v-model="modelModel" :items="modelOptions" size="xs" :disabled="isPending" class="w-52" />
+                  <USelect
+                    v-model="modelModel"
+                    :items="modelOptions"
+                    :ui="{ content: 'z-[300]' }"
+                    size="xs"
+                    :disabled="isPending"
+                    class="w-52"
+                  />
                 </div>
                 <p v-if="aiError" class="text-xs text-error">{{ aiError }}</p>
               </div>
