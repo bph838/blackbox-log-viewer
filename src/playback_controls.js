@@ -1,4 +1,5 @@
 import { throttle } from "throttle-debounce";
+import { nextTick } from "vue";
 import pinia from "./pinia_instance.js";
 import { useLogStore } from "./stores/log.js";
 import { useGraphStore, GRAPH_MIN_ZOOM, GRAPH_MAX_ZOOM } from "./stores/graph.js";
@@ -99,12 +100,17 @@ export function updateCanvasSize() {
   const logStore = useLogStore(pinia);
   const canvas = graphStore.canvasRefs?.canvas;
 
+  // Size and paint the seek bar as soon as there's a video/graph area to measure,
+  // even before a flight log exists to give it a time range to plot.
+  if (canvas && graphStore.seekBar) {
+    graphStore.seekBar.resize(canvas.offsetWidth, 50);
+  }
+
   if (graphStore.graph && canvas) {
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
 
     graphStore.graph.resize(width, height);
-    graphStore.seekBar.resize(canvas.offsetWidth, 50);
     if (logStore.flightLog.hasGpsData()) {
       graphStore.mapGrapher.resize(width, height);
     }
@@ -335,4 +341,7 @@ export function videoLoaded() {
   logStore.hasVideo = true;
   setGraphState(GRAPH_STATE_PAUSED);
   invalidateGraph();
+  // Wait a tick so the has-video CSS class (and the layout it reveals) has been
+  // applied before measuring the canvas to size/paint the seek bar.
+  nextTick(() => updateCanvasSize());
 }

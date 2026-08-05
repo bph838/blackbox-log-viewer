@@ -15,7 +15,7 @@
     </div>
 
     <!-- Action buttons row -->
-    <div v-if="logStore.hasLog" class="toolbar-actions">
+    <div v-if="logStore.hasLog || logStore.hasVideo" class="toolbar-actions">
       <div class="flex items-center gap-1">
         <UButton
           variant="ghost"
@@ -32,6 +32,8 @@
           label="Video"
           icon="i-lucide-video"
           size="xs"
+          :disabled="!logStore.hasLog"
+          title="Requires a flight log"
           @click="$emit('export-video')"
         />
         <UButton
@@ -48,6 +50,8 @@
           label="CSV"
           icon="i-lucide-file-spreadsheet"
           size="xs"
+          :disabled="!logStore.hasLog"
+          title="Requires a flight log"
           @click="$emit('export-csv')"
         />
         <UButton
@@ -56,6 +60,8 @@
           label="GPX"
           icon="i-lucide-map-pin"
           size="xs"
+          :disabled="!logStore.hasLog"
+          title="Requires a flight log"
           @click="$emit('export-gpx')"
         />
         <USeparator orientation="vertical" class="h-4" />
