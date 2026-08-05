@@ -53,7 +53,7 @@ export function buildPromptText(options) {
   let text =
     "You are helping tune the PID controller of an RC helicopter flight controller running Rotorflight " +
     "(forked from Betaflight). Attached is a step response graph generated from a blackbox log, showing " +
-    "setpoint-vs-gyro tracking (Roll in red, Pitch in blue, Yaw in yellow) for the 0-500ms period after a " +
+    "setpoint-vs-gyro tracking (Roll in red, Pitch in teal, Yaw in yellow) for the 0-500ms period after a " +
     "stick input, with 1.0 on the y-axis representing perfect tracking.\n\n" +
     `Current flight controller configuration extracted from the log:\n${options.configSummary}\n\n` +
     `User instructions: ${instructions}\n\n` +

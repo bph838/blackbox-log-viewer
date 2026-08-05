@@ -25,9 +25,9 @@ const STEP_RESPONSE_MARGIN = 10,
     yaw: "#ffffb3",
   },
   STEP_RESPONSE_AXIS_COLORS_CAPTURE = {
-     roll: "#fb0000",
-    pitch: "#0000fb",
-    yaw: "#fbfb00",
+     roll: "#fb8072",
+    pitch: "#8dd3c7",
+    yaw: "#ffffb3",
   },
   STEP_RESPONSE_AXIS_LABELS = {
     roll: "Roll",
