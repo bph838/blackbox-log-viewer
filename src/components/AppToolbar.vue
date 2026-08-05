@@ -55,6 +55,7 @@
           @click="$emit('export-csv')"
         />
         <UButton
+          v-if="logStore.hasGps"
           variant="ghost"
           color="neutral"
           label="GPX"
