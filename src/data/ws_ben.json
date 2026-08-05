@@ -715,21 +715,21 @@
                 "height": 1,
                 "fields": [
                     {
-                        "name": "motor[0]",
-                        "smoothing": 5000,
+                        "name": "headspeed",
+                        "smoothing": 0,
                         "curve": {
                             "power": 1,
                             "MinMax": {
                                 "min": 0,
-                                "max": 100
+                                "max": 2047
                             }
                         },
                         "default": {
-                            "smoothing": 5000,
+                            "smoothing": 0,
                             "power": 1,
                             "MinMax": {
                                 "min": 0,
-                                "max": 100
+                                "max": 2047
                             }
                         },
                         "color": "#fb8072",
