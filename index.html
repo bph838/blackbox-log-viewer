@@ -10,27 +10,15 @@
 
     <link rel="stylesheet" href="src/css/main.css" />
 
-    <!-- Google Analytics -->
-    <script>
-      if (
-        location.hostname !== "localhost" &&
-        location.hostname !== "127.0.0.1"
-      ) {
-        var gaScript = document.createElement("script");
-        gaScript.async = true;
-        gaScript.src =
-          "https://www.googletagmanager.com/gtag/js?id=G-WG19CSNRQX";
-        document.head.appendChild(gaScript);
+    <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-WG19CSNRQX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
 
-        window.dataLayer = window.dataLayer || [];
-        function gtag() {
-          dataLayer.push(arguments);
-        }
-        gtag("js", new Date());
-
-        gtag("config", "G-WG19CSNRQX");
-      }
-    </script>
+    gtag('config', 'G-WG19CSNRQX');
+  </script>
   </head>
 
   <body>
