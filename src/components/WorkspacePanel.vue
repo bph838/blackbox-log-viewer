@@ -24,7 +24,7 @@
           name="i-lucide-save"
           class="size-4 opacity-40 hover:opacity-100 cursor-pointer"
           title="Save current graph setup to this workspace"
-          @click.stop.prevent="emit('save-workspace', item.wsId, item.wsTitle)"
+          @click.stop.prevent="onSaveClick(item)"
         />
       </template>
     </UDropdownMenu>
@@ -33,6 +33,7 @@
 
 <script setup>
 import { computed } from "vue";
+import { useToast } from "@nuxt/ui/composables";
 import { useWorkspaceStore } from "../stores/workspace.js";
 
 const emit = defineEmits([
@@ -42,6 +43,27 @@ const emit = defineEmits([
 ]);
 
 const workspaceStore = useWorkspaceStore();
+const toast = useToast();
+
+function onSaveClick(item) {
+  emit("save-workspace", item.wsId, item.wsTitle);
+
+  const saved = toast.add({
+    title: "Workspace saved",
+    icon: "i-lucide-check",
+    color: "primary",
+    duration: 1000,
+  });
+
+  function dismiss() {
+    toast.remove(saved.id);
+    document.removeEventListener("click", dismiss);
+  }
+
+  // Register after this click finishes bubbling so it doesn't dismiss itself immediately.
+  setTimeout(() => document.addEventListener("click", dismiss), 0);
+  setTimeout(() => document.removeEventListener("click", dismiss), 2000);
+}
 
 const activeEntry = computed(() => {
   const configs = workspaceStore.workspaceGraphConfigs;
