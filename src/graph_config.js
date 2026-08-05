@@ -1659,9 +1659,16 @@ GraphConfig.getExampleGraphConfigs = function (flightLog, graphNames) {
     });
   }
   if (flightLog.isFieldEnabled().RPM) {
+    const rotorSpeedFields = ["headspeed"];
+    if (flightLog.getMainFieldIndexByName("motorSpeed") !== undefined) {
+      rotorSpeedFields.push("motorSpeed");
+    }
+    if (flightLog.getMainFieldIndexByName("tailSpeed") !== undefined) {
+      rotorSpeedFields.push("tailSpeed");
+    }
     EXAMPLE_GRAPHS.push({
       label: "Rotor Speeds",
-      fields: ["headspeed"],
+      fields: rotorSpeedFields,
     });
   }
   if (flightLog.isFieldEnabled().SERVO) {

@@ -119,6 +119,8 @@ const FRIENDLY_FIELD_NAMES = {
   'servo[5]': 'Servo Tail',
 
   headspeed: 'Headspeed',
+  motorSpeed: 'Motor Speed',
+  tailSpeed: 'Tail Speed',
 
   govP: 'Gov P',
   govI: 'Gov I',
@@ -2002,6 +2004,8 @@ FlightLogFieldPresenter.decodeFieldToFriendly = function (
       return `${flightLog.accRawToGs(value).toFixed(2 + highResolutionAddPrecision)} g`
 
     case 'headspeed':
+    case 'motorSpeed':
+    case 'tailSpeed':
       return `${value.toFixed(0)} rpm (${(value / 60).toFixed(1)} Hz)`
 
     case 'Vbat':

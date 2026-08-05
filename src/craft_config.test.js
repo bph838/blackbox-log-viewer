@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { emptyParsedCraftConfig, parseGearRatio, parseCraftConfigText } from "./craft_config.js";
+import {
+  emptyParsedCraftConfig,
+  parseGearRatio,
+  parseCraftConfigText,
+  resolveGearRatios,
+} from "./craft_config.js";
 
 describe("parseGearRatio", () => {
   it("parses an <a>,<b> setting value into the b/a multiplier", () => {
@@ -13,6 +18,24 @@ describe("parseGearRatio", () => {
     expect(parseGearRatio("15,137,2")).toBeNull();
     expect(parseGearRatio("abc,137")).toBeNull();
     expect(parseGearRatio("0,137")).toBeNull();
+  });
+});
+
+describe("resolveGearRatios", () => {
+  it("returns both ratios when both are finite numbers", () => {
+    expect(resolveGearRatios(137 / 15, 4.66)).toEqual({ main: 137 / 15, tail: 4.66 });
+  });
+
+  it("returns null (all-or-nothing) when either ratio is missing", () => {
+    expect(resolveGearRatios(null, 4.66)).toBeNull();
+    expect(resolveGearRatios(137 / 15, null)).toBeNull();
+    expect(resolveGearRatios(null, null)).toBeNull();
+  });
+
+  it("returns null when either ratio is not a finite number", () => {
+    expect(resolveGearRatios(undefined, 4.66)).toBeNull();
+    expect(resolveGearRatios(NaN, 4.66)).toBeNull();
+    expect(resolveGearRatios(137 / 15, Infinity)).toBeNull();
   });
 });
 

@@ -715,24 +715,66 @@
                 "height": 1,
                 "fields": [
                     {
-                        "name": "motor[0]",
-                        "smoothing": 5000,
+                        "name": "headspeed",
+                        "smoothing": 0,
                         "curve": {
                             "power": 1,
                             "MinMax": {
                                 "min": 0,
-                                "max": 100
+                                "max": 2047
                             }
                         },
                         "default": {
-                            "smoothing": 5000,
+                            "smoothing": 0,
                             "power": 1,
                             "MinMax": {
                                 "min": 0,
-                                "max": 100
+                                "max": 2047
                             }
                         },
                         "color": "#fb8072",
+                        "lineWidth": 1
+                    },
+                    {
+                        "name": "tailSpeed",
+                        "smoothing": 0,
+                        "curve": {
+                            "power": 1,
+                            "MinMax": {
+                                "min": 0,
+                                "max": 8618.947368421052
+                            }
+                        },
+                        "default": {
+                            "smoothing": 0,
+                            "power": 1,
+                            "MinMax": {
+                                "min": 0,
+                                "max": 8618.947368421052
+                            }
+                        },
+                        "color": "#8dd3c7",
+                        "lineWidth": 1
+                    },
+                    {
+                        "name": "motorSpeed",
+                        "smoothing": 0,
+                        "curve": {
+                            "power": 1,
+                            "MinMax": {
+                                "min": 0,
+                                "max": 18695.93333333333
+                            }
+                        },
+                        "default": {
+                            "smoothing": 0,
+                            "power": 1,
+                            "MinMax": {
+                                "min": 0,
+                                "max": 18695.93333333333
+                            }
+                        },
+                        "color": "#ffffb3",
                         "lineWidth": 1
                     }
                 ]

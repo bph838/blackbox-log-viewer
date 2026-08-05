@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import { setActivePinia, createPinia } from "pinia";
 import { FlightLogFieldPresenter } from "./flightlog_fields_presenter.js";
 import {
   FIRMWARE_TYPE_ROTORFLIGHT,
@@ -6,6 +7,29 @@ import {
   adjustFieldDefsList,
   DEBUG_MODE,
 } from "./flightlog_fielddefs.js";
+
+describe("motorSpeed/tailSpeed friendly names and formatting", () => {
+  beforeAll(() => {
+    setActivePinia(createPinia());
+  });
+
+  it("labels motorSpeed and tailSpeed the same way headspeed already is", () => {
+    expect(FlightLogFieldPresenter.fieldNameToFriendly("motorSpeed")).toBe("Motor Speed");
+    expect(FlightLogFieldPresenter.fieldNameToFriendly("tailSpeed")).toBe("Tail Speed");
+  });
+
+  it("formats motorSpeed/tailSpeed tooltips as rpm (Hz), same as headspeed", () => {
+    expect(FlightLogFieldPresenter.decodeFieldToFriendly(null, "headspeed", 3000)).toBe(
+      "3000 rpm (50.0 Hz)",
+    );
+    expect(FlightLogFieldPresenter.decodeFieldToFriendly(null, "motorSpeed", 27400)).toBe(
+      "27400 rpm (456.7 Hz)",
+    );
+    expect(FlightLogFieldPresenter.decodeFieldToFriendly(null, "tailSpeed", 14000)).toBe(
+      "14000 rpm (233.3 Hz)",
+    );
+  });
+});
 
 // Rotorflight debug modes (governor, TTA, cross-coupling, etc.) previously fell back to raw
 // "debug[N]" labels because their friendly names were never added. These checks drive the same
