@@ -1,5 +1,5 @@
 <template>
-  <UModal v-model:open="open" :ui="{ content: 'sm:max-w-5xl' }">
+  <UModal v-model:open="open" :ui="{ content: 'sm:max-w-5xl modal' }">
     <template #header>
       <div class="flex items-center justify-between w-full gap-3 flex-wrap">
         <div class="flex items-center gap-2 flex-wrap">
@@ -258,7 +258,7 @@
                   :class="
                     turn.role === 'user'
                       ? 'text-xs bg-elevated self-end max-w-[85%] ml-auto'
-                      : 'bg-primary/10 prose prose-sm dark:prose-invert max-w-none'
+                      : 'bg-primary/10 prose prose-sm dark:prose-invert max-w-none tuning-log-ai-turn'
                   "
                 >
                   <template v-if="turn.role === 'user'">{{ turn.content }}</template>
@@ -266,7 +266,7 @@
                 </div>
                 <div
                   v-if="streamingText"
-                  class="rounded p-2 bg-primary/10 prose prose-sm dark:prose-invert max-w-none animate-pulse"
+                  class="rounded p-2 bg-primary/10 prose prose-sm dark:prose-invert max-w-none tuning-log-ai-turn animate-pulse"
                   v-html="renderMarkdown(streamingText)"
                 />
               </div>
@@ -836,6 +836,34 @@ function formatCost(usd) {
 }
 
 .tuning-log-config-list li:nth-child(even) {
+  background: var(--ui-bg-elevated);
+}
+
+/* Tables in the AI's markdown response - the typography plugin's default table styling (a faint
+   bottom border per row) is too subtle against this dialog's background, so give tables a visible
+   grid, shaded header, and zebra striping instead. */
+.tuning-log-ai-turn :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  font-size: 0.8rem;
+  overflow: hidden;
+  border-radius: 0.375rem;
+}
+
+.tuning-log-ai-turn :deep(th),
+.tuning-log-ai-turn :deep(td) {
+  border: 1px solid var(--ui-border);
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+}
+
+.tuning-log-ai-turn :deep(th) {
+  background: var(--ui-bg-elevated);
+  font-weight: 600;
+}
+
+.tuning-log-ai-turn :deep(tbody tr:nth-child(even)) {
   background: var(--ui-bg-elevated);
 }
 </style>
