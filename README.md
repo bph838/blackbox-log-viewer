@@ -1,15 +1,9 @@
 # Rotorflight Blackbox Explorer
 
-[![Latest version](https://img.shields.io/github/v/release/betaflight/blackbox-log-viewer)](https://github.com/betaflight/blackbox-log-viewer/releases)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=betaflight_blackbox-log-viewer&metric=alert_status)](https://sonarcloud.io/dashboard?id=betaflight_blackbox-log-viewer)
-[![Build](https://img.shields.io/github/actions/workflow/status/betaflight/blackbox-log-viewer/deploy.yml?branch=master)](https://github.com/betaflight/blackbox-log-viewer/actions/workflows/deploy.yml)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Join us on Discord!](https://img.shields.io/discord/868013470023548938)](https://discord.gg/n4E6ak4u3c)
-
 
 ![Main explorer interface](screenshots/main-interface.jpg)
 
-This tool allows you to open logs recorded by Betaflight's Blackbox feature in
+This tool allows you to open logs recorded by Rotorflights's Blackbox feature in
 your web browser. You can seek through the log to examine graphed values at each
 timestep. If you have a flight video, you can load that in as well and it'll be
 played behind the log. You can export the graphs as a WebM video to share with
@@ -24,19 +18,14 @@ would.
 
 ### Latest stable version
 
-For the latest stable released version visit https://blackbox.betaflight.com/
+For the latest stable released version visit https://app.benhooper.com
 
-### Unstable testing versions
-
-The latest master build is always available at https://master.blackbox.betaflight.com/
-
-**Be aware that these versions are intended for testing / feedback only, and may be buggy or broken. Caution is advised when using these versions.**
 
 ### Install the app to be used in offline mode
 
 Follow the procedure to install PWA on your platform. For example on MacOS chrome:
-![Url bar PWA install](screenshots/url-bar.webp)
-![PWA install dialog](screenshots/pwa-install-dialog.webp)
+![Url bar PWA install](screenshots/installapp.jpg)
+![PWA install dialog](screenshots/installapp1.jpg)
 
 ## Usage
 
