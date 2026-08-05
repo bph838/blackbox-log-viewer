@@ -34,6 +34,10 @@ export const ThemeColors = {
     return this.getCSSVariable("--graph-background");
   },
 
+  getSeekbarBackground: function () {
+    return this.getCSSVariable("--seekbar-background");
+  },
+
   getGraphGrid: function () {
     return this.getCSSVariable("--graph-grid");
   },

@@ -2,7 +2,7 @@ import { ThemeColors } from "./theme_colors";
 
 // Theme-aware color functions
 function getBackgroundStyle() {
-  return ThemeColors.getGraphBackground();
+  return ThemeColors.getSeekbarBackground();
 }
 
 function getEventBarStyle() {
