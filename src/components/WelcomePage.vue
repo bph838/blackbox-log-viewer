@@ -1,5 +1,5 @@
 <template>
-  <div v-if="!logStore.hasLog" class="welcome-page">
+  <div v-if="!logStore.hasLog && !logStore.hasVideo" class="welcome-page">
     <!-- Hero -->
     <div class="hero">
       <img :src="logoSrc" alt="Rotorflight" class="hero-logo" />

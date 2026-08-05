@@ -658,6 +658,8 @@ html.has-log .app-navbar {
 .app-navbar {
   display: none;
   position: fixed;
+  top: 0;
+  left: 0;
   width: 100%;
 }
 
