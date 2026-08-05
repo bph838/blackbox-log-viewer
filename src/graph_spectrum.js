@@ -134,7 +134,7 @@ export function FlightLogAnalyser(flightLog, canvas, analyserCanvas) {
           fftData = GraphSpectrumCalc.dataLoadFrequencyVsThrottle();
           break;
         case SPECTRUM_TYPE.FREQ_VS_RPM:
-          fftData = GraphSpectrumCalc.dataLoadFrequencyVsRpm();
+          fftData = GraphSpectrumCalc.dataLoadFrequencyVsHeadspeed();
           break;
         case SPECTRUM_TYPE.PSD_VS_THROTTLE:
           fftData = GraphSpectrumCalc.dataLoadPowerSpectralDensityVsThrottle();

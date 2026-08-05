@@ -14,6 +14,7 @@ const FIELD_THROTTLE_NAME = ["rcCommands[3]"],
     "eRPM[6]",
     "eRPM[7]",
   ],
+  FIELD_HEADSPEED_NAMES = ["headspeed"],
   FREQ_VS_THR_CHUNK_TIME_MS = 300,
   FREQ_VS_THR_WINDOW_DIVISOR = 6,
   MAX_ANALYSER_LENGTH = 300 * 1000 * 1000, // 5min
@@ -396,17 +397,19 @@ GraphSpectrumCalc.dataLoadPowerSpectralDensityVsThrottle = function () {
   return this._dataLoadPowerSpectralDensityVsX(FIELD_THROTTLE_NAME, 0, 100);
 };
 
-GraphSpectrumCalc.dataLoadFrequencyVsRpm = function () {
-  const fftData = this._dataLoadFrequencyVsX(FIELD_RPM_NAMES, 0);
-  fftData.vsRange.max *= 3.333 / this._motorPoles;
-  fftData.vsRange.min *= 3.333 / this._motorPoles;
+GraphSpectrumCalc.dataLoadFrequencyVsHeadspeed = function () {
+  const fftData = this._dataLoadFrequencyVsX(FIELD_HEADSPEED_NAMES, 0);
+  const hzFactor = this._getRotationalSpeedHzFactor(FIELD_HEADSPEED_NAMES);
+  fftData.vsRange.max *= hzFactor;
+  fftData.vsRange.min *= hzFactor;
   return fftData;
 };
 
 GraphSpectrumCalc.dataLoadPowerSpectralDensityVsRpm = function () {
   const fftData = this._dataLoadPowerSpectralDensityVsX(FIELD_RPM_NAMES, 0);
-  fftData.vsRange.max *= 3.333 / this._motorPoles;
-  fftData.vsRange.min *= 3.333 / this._motorPoles;
+  const hzFactor = this._getRotationalSpeedHzFactor(FIELD_RPM_NAMES);
+  fftData.vsRange.max *= hzFactor;
+  fftData.vsRange.min *= hzFactor;
   return fftData;
 };
 
@@ -529,6 +532,21 @@ GraphSpectrumCalc._getFlightSamplesFreq = function (scaled = true) {
   };
 };
 
+/**
+ * Raw-value-to-Hz factor for a rotational-speed vs-axis, or null for a non-rotational one (e.g.
+ * throttle). eRPM is electrical RPM (needs motor_poles to become a mechanical rotation rate);
+ * headspeed is already logged in real RPM.
+ */
+GraphSpectrumCalc._getRotationalSpeedHzFactor = function (vsFieldNames) {
+  if (vsFieldNames === FIELD_RPM_NAMES) {
+    return 3.333 / this._motorPoles;
+  }
+  if (vsFieldNames === FIELD_HEADSPEED_NAMES) {
+    return 1 / 60;
+  }
+  return null;
+};
+
 GraphSpectrumCalc._getVsIndexes = function (vsFieldNames) {
   const fieldIndexes = [];
   for (const fieldName of vsFieldNames) {
@@ -561,6 +579,7 @@ GraphSpectrumCalc._getFlightSamplesFreqVsX = function (
   const vsValues = new Array(vsIndexes.length)
     .fill(null)
     .map(() => new Float64Array(frameCount));
+  const rotationalHzFactor = this._getRotationalSpeedHzFactor(vsFieldNames);
 
   let samplesCount = 0;
   for (const chunk of allChunks) {
@@ -576,10 +595,10 @@ GraphSpectrumCalc._getFlightSamplesFreqVsX = function (
       for (let i = 0; i < vsIndexes.length; i++) {
         const vsFieldIx = vsIndexes[i];
         let value = chunk.frames[frameIndex][vsFieldIx];
-        if (vsFieldNames === FIELD_RPM_NAMES) {
-          const maxRPM = (MAX_RPM_HZ_VALUE * this._motorPoles) / 3.333;
-          if (value > maxRPM) {
-            value = maxRPM;
+        if (rotationalHzFactor !== null) {
+          const maxRawValue = MAX_RPM_HZ_VALUE / rotationalHzFactor;
+          if (value > maxRawValue) {
+            value = maxRawValue;
           } else if (value < 0) {
             value = 0;
           }
@@ -619,8 +638,8 @@ GraphSpectrumCalc._getFlightSamplesFreqVsX = function (
     }
   }
 
-  // Use small top margin for RPM axis only. Because it has bad axis view for throttle
-  if (vsFieldNames === FIELD_RPM_NAMES) {
+  // Use small top margin for rotational-speed axes only (RPM/headspeed). Because it has bad axis view for throttle
+  if (rotationalHzFactor !== null) {
     maxValue += ((maxValue - minValue) * RPM_AXIS_TOP_MARGIN_PERCENT) / 100;
   }
 
