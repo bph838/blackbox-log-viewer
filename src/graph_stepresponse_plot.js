@@ -18,6 +18,11 @@ const STEP_RESPONSE_MARGIN = 10,
     pitch: "#8dd3c7",
     yaw: "#ffffb3",
   },
+  STEP_RESPONSE_AXIS_COLORS_CAPTURE = {
+     roll: "#fb0000",
+    pitch: "#8dd3c7",
+    yaw: "#ffffb3",
+  },
   STEP_RESPONSE_AXIS_LABELS = {
     roll: "Roll",
     pitch: "Pitch",
@@ -136,6 +141,14 @@ StepResponsePlot._drawGraph = function (canvasCtx) {
     return;
   }
 
+  // A solid background (used by captureImage()) fills the canvas edge-to-edge so the exported
+  // PNG has no transparent margin around the plot area - the translucent gradient used elsewhere
+  // only needs to cover the plot interior, since it sits over the rest of the app's UI.
+  if (this._solidBackground) {
+    canvasCtx.fillStyle = "rgb(20,20,20)";
+    canvasCtx.fillRect(0, 0, canvasCtx.canvas.width, canvasCtx.canvas.height);
+  }
+
   canvasCtx.save();
   canvasCtx.translate(MARGIN_LEFT, MARGIN);
 
@@ -155,8 +168,7 @@ StepResponsePlot._drawGraph = function (canvasCtx) {
 
 StepResponsePlot._drawBackground = function (canvasCtx, WIDTH, HEIGHT) {
   if (this._solidBackground) {
-    canvasCtx.fillStyle = "rgb(20,20,20)";
-    canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+    // Already filled edge-to-edge in _drawGraph().
     return;
   }
 
@@ -234,14 +246,16 @@ StepResponsePlot._formatPID = function (axis) {
 
 StepResponsePlot._drawAxisResponse = function (canvasCtx, axis, WIDTH, HEIGHT, axisIndex) {
   const axisData = this._data[axis];
-  const color = STEP_RESPONSE_AXIS_COLORS[axis];
+  const color = (this._solidBackground ? STEP_RESPONSE_AXIS_COLORS_CAPTURE : STEP_RESPONSE_AXIS_COLORS)[axis];
   const pidLabel = this._formatPID(axis);
   const rowY = 12 + axisIndex * 17;
 
   if (!axisData || axisData.windowCount === 0) {
     this._drawLabel(
       canvasCtx,
-      pidLabel || `${STEP_RESPONSE_AXIS_LABELS[axis]}: no data`,
+      this._solidBackground
+        ? `${STEP_RESPONSE_AXIS_LABELS[axis]}${pidLabel ? ` ${pidLabel}` : ": no data"}`
+        : pidLabel || `${STEP_RESPONSE_AXIS_LABELS[axis]}: no data`,
       WIDTH - 4,
       rowY,
       "right",
@@ -270,7 +284,11 @@ StepResponsePlot._drawAxisResponse = function (canvasCtx, axis, WIDTH, HEIGHT, a
   canvasCtx.stroke();
 
   const status = axisData.valid ? "" : " (low confidence)";
-  const label = (pidLabel || STEP_RESPONSE_AXIS_LABELS[axis]) + status;
+  // The Tuning Log's captured image has no Roll/Pitch/Yaw toggle row to lean on (unlike the live
+  // panel), so lead with the axis name there to keep the lines identifiable.
+  const label = this._solidBackground
+    ? `${STEP_RESPONSE_AXIS_LABELS[axis]}${pidLabel ? ` ${pidLabel}` : ""}${status}`
+    : (pidLabel || STEP_RESPONSE_AXIS_LABELS[axis]) + status;
   this._drawLabel(canvasCtx, label, WIDTH - 4, rowY, "right", "top", color);
 };
 
