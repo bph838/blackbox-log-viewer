@@ -13,6 +13,12 @@ const STEP_RESPONSE_MARGIN = 10,
   STEP_RESPONSE_CAPTURE_HEIGHT = 800,
   STEP_RESPONSE_CAPTURE_LINEWIDTH = 4,
   STEP_RESPONSE_CAPTURE_FONTSIZE = "14",
+  // Roll/Pitch/Yaw legend text in the captured image, larger than the grid's tick labels so the
+  // three lines are easy to tell apart at a glance.
+  STEP_RESPONSE_CAPTURE_LEGEND_FONTSIZE = "21",
+  // Tall enough that adjacent legend rows don't overlap at the 21pt legend font size (its
+  // rendered line height is ~30px), plus a little extra breathing room between rows.
+  STEP_RESPONSE_CAPTURE_LEGEND_ROW_HEIGHT = 38,
   STEP_RESPONSE_AXIS_COLORS = {
     roll: "#fb8072",
     pitch: "#8dd3c7",
@@ -20,8 +26,8 @@ const STEP_RESPONSE_MARGIN = 10,
   },
   STEP_RESPONSE_AXIS_COLORS_CAPTURE = {
      roll: "#fb0000",
-    pitch: "#8dd3c7",
-    yaw: "#ffffb3",
+    pitch: "#0000fb",
+    yaw: "#fbfb00",
   },
   STEP_RESPONSE_AXIS_LABELS = {
     roll: "Roll",
@@ -248,7 +254,8 @@ StepResponsePlot._drawAxisResponse = function (canvasCtx, axis, WIDTH, HEIGHT, a
   const axisData = this._data[axis];
   const color = (this._solidBackground ? STEP_RESPONSE_AXIS_COLORS_CAPTURE : STEP_RESPONSE_AXIS_COLORS)[axis];
   const pidLabel = this._formatPID(axis);
-  const rowY = 12 + axisIndex * 17;
+  const rowY = 12 + axisIndex * (this._solidBackground ? STEP_RESPONSE_CAPTURE_LEGEND_ROW_HEIGHT : 17);
+  const legendFontSize = this._solidBackground ? STEP_RESPONSE_CAPTURE_LEGEND_FONTSIZE : undefined;
 
   if (!axisData || axisData.windowCount === 0) {
     this._drawLabel(
@@ -261,6 +268,7 @@ StepResponsePlot._drawAxisResponse = function (canvasCtx, axis, WIDTH, HEIGHT, a
       "right",
       "top",
       color,
+      legendFontSize,
     );
     return;
   }
@@ -289,7 +297,7 @@ StepResponsePlot._drawAxisResponse = function (canvasCtx, axis, WIDTH, HEIGHT, a
   const label = this._solidBackground
     ? `${STEP_RESPONSE_AXIS_LABELS[axis]}${pidLabel ? ` ${pidLabel}` : ""}${status}`
     : (pidLabel || STEP_RESPONSE_AXIS_LABELS[axis]) + status;
-  this._drawLabel(canvasCtx, label, WIDTH - 4, rowY, "right", "top", color);
+  this._drawLabel(canvasCtx, label, WIDTH - 4, rowY, "right", "top", color, legendFontSize);
 };
 
 StepResponsePlot._drawMousePosition = function (canvasCtx) {
@@ -371,10 +379,10 @@ StepResponsePlot._labelFontSize = function () {
     : this._drawingParams.fontSizeLabel;
 };
 
-StepResponsePlot._drawLabel = function (canvasCtx, text, X, Y, align, baseline, color) {
+StepResponsePlot._drawLabel = function (canvasCtx, text, X, Y, align, baseline, color, fontSizePt) {
   canvasCtx.save();
 
-  canvasCtx.font = `${this._labelFontSize()}pt Verdana, Arial, sans-serif`;
+  canvasCtx.font = `${fontSizePt || this._labelFontSize()}pt Verdana, Arial, sans-serif`;
   canvasCtx.fillStyle = color || "rgba(255,255,255,0.9)";
   canvasCtx.textAlign = align || "center";
   canvasCtx.textBaseline = baseline || "alphabetic";
