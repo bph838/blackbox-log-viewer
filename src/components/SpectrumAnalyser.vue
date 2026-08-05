@@ -105,7 +105,7 @@ const spectrumTypeOptions = [
   { label: "Freq. vs Headspeed", value: "2" },
   { label: "Power Spectral Density", value: "3" },
   { label: "PSD vs Throttle", value: "4" },
-  { label: "PSD vs RPM", value: "5" },
+  { label: "PSD vs Headspeed", value: "5" },
   { label: "Error vs Setpoint", value: "6" },
 ];
 
