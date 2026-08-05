@@ -102,7 +102,7 @@ const importInput = ref(null);
 const spectrumTypeOptions = [
   { label: "Frequency", value: "0" },
   { label: "Freq. vs Throttle", value: "1" },
-  { label: "Freq. vs RPM", value: "2" },
+  { label: "Freq. vs Headspeed", value: "2" },
   { label: "Power Spectral Density", value: "3" },
   { label: "PSD vs Throttle", value: "4" },
   { label: "PSD vs RPM", value: "5" },
