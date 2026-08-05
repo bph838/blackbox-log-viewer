@@ -30,6 +30,7 @@
   --graph-text: rgba(255, 255, 255, 0.9);
   --graph-text-secondary: rgba(255, 255, 255, 0.65);
   --graph-axis: rgba(255, 255, 255, 0.5);
+  --seekbar-background: #eaf4fb;
 
   /* UI Element Colors - Light Mode */
   --border-color: #cccccc;
@@ -61,6 +62,7 @@
   --graph-text: rgba(255, 255, 255, 0.95);
   --graph-text-secondary: rgba(255, 255, 255, 0.75);
   --graph-axis: rgba(255, 255, 255, 0.6);
+  --seekbar-background: var(--graph-background);
 
   --border-color: #404040;
   --button-text: #000;
