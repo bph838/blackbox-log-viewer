@@ -849,21 +849,29 @@ function formatCost(usd) {
   font-size: 0.8rem;
   overflow: hidden;
   border-radius: 0.375rem;
+  border: 1px solid var(--ui-border-accented);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .tuning-log-ai-turn :deep(th),
 .tuning-log-ai-turn :deep(td) {
-  border: 1px solid var(--ui-border);
-  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--ui-border-accented);
+  padding: 0.4rem 0.7rem;
   text-align: left;
 }
 
 .tuning-log-ai-turn :deep(th) {
-  background: var(--ui-bg-elevated);
-  font-weight: 600;
+  background: var(--ui-bg-accented);
+  color: var(--ui-text-highlighted);
+  font-weight: 700;
+  border-bottom: 2px solid var(--ui-primary);
 }
 
 .tuning-log-ai-turn :deep(tbody tr:nth-child(even)) {
   background: var(--ui-bg-elevated);
+}
+
+.tuning-log-ai-turn :deep(tbody tr:hover) {
+  background: var(--ui-bg-accented);
 }
 </style>
