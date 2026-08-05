@@ -4,16 +4,6 @@ import { useSettingsStore } from "./stores/settings.js";
 import { estimateBlackBoxRate } from "./tools.js";
 
 const FIELD_THROTTLE_NAME = ["rcCommands[3]"],
-  FIELD_RPM_NAMES = [
-    "eRPM[0]",
-    "eRPM[1]",
-    "eRPM[2]",
-    "eRPM[3]",
-    "eRPM[4]",
-    "eRPM[5]",
-    "eRPM[6]",
-    "eRPM[7]",
-  ],
   FIELD_HEADSPEED_NAMES = ["headspeed"],
   FREQ_VS_THR_CHUNK_TIME_MS = 300,
   FREQ_VS_THR_WINDOW_DIVISOR = 6,
@@ -36,14 +26,12 @@ export const GraphSpectrumCalc = {
   },
   _flightLog: null,
   _sysConfig: null,
-  _motorPoles: null,
   _pointsPerSegmentPSD: 64,
 };
 
 GraphSpectrumCalc.initialize = function (flightLog, sysConfig) {
   this._flightLog = flightLog;
   this._sysConfig = sysConfig;
-  this._motorPoles = flightLog.getSysConfig()["motor_poles"];
 
   const { rate, configuredRate, actualRate } = estimateBlackBoxRate(
     flightLog,
@@ -405,9 +393,9 @@ GraphSpectrumCalc.dataLoadFrequencyVsHeadspeed = function () {
   return fftData;
 };
 
-GraphSpectrumCalc.dataLoadPowerSpectralDensityVsRpm = function () {
-  const fftData = this._dataLoadPowerSpectralDensityVsX(FIELD_RPM_NAMES, 0);
-  const hzFactor = this._getRotationalSpeedHzFactor(FIELD_RPM_NAMES);
+GraphSpectrumCalc.dataLoadPowerSpectralDensityVsHeadspeed = function () {
+  const fftData = this._dataLoadPowerSpectralDensityVsX(FIELD_HEADSPEED_NAMES, 0);
+  const hzFactor = this._getRotationalSpeedHzFactor(FIELD_HEADSPEED_NAMES);
   fftData.vsRange.max *= hzFactor;
   fftData.vsRange.min *= hzFactor;
   return fftData;
@@ -534,13 +522,9 @@ GraphSpectrumCalc._getFlightSamplesFreq = function (scaled = true) {
 
 /**
  * Raw-value-to-Hz factor for a rotational-speed vs-axis, or null for a non-rotational one (e.g.
- * throttle). eRPM is electrical RPM (needs motor_poles to become a mechanical rotation rate);
- * headspeed is already logged in real RPM.
+ * throttle). Headspeed is logged in real RPM, so the factor is just RPM -> Hz.
  */
 GraphSpectrumCalc._getRotationalSpeedHzFactor = function (vsFieldNames) {
-  if (vsFieldNames === FIELD_RPM_NAMES) {
-    return 3.333 / this._motorPoles;
-  }
   if (vsFieldNames === FIELD_HEADSPEED_NAMES) {
     return 1 / 60;
   }
