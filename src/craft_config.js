@@ -31,6 +31,18 @@ export function parseGearRatio(rawValue) {
 }
 
 /**
+ * Applies the all-or-nothing gear-ratio gate: both the main and tail rotor gear ratios must be
+ * present/parseable numbers, or neither computed field (motorSpeed/tailSpeed) is produced.
+ */
+export function resolveGearRatios(mainRotorGearRatio, tailRotorGearRatio) {
+  if (!Number.isFinite(mainRotorGearRatio) || !Number.isFinite(tailRotorGearRatio)) {
+    return null;
+  }
+
+  return { main: mainRotorGearRatio, tail: tailRotorGearRatio };
+}
+
+/**
  * Parses the text of a Rotorflight/Betaflight CLI "dump all" or "diff all" export.
  *
  * `set key = value` lines populate `settings` (keyed lowercase). Every other bare CLI command

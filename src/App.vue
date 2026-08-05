@@ -176,10 +176,16 @@ const settingsStore = useSettingsStore();
 const workspaceStore = useWorkspaceStore();
 const craftConfigStore = useCraftConfigStore();
 
-// Re-check the currently displayed log against the craft config whenever it's loaded/cleared
-// (without prompting on a mismatch - that's only for when a *log* is newly opened).
+// Re-check the currently displayed log against the craft config whenever it's loaded/cleared,
+// or its gear ratios change (e.g. a corrected dump reloaded under the same craft name) - without
+// prompting on a mismatch, that's only for when a *log* is newly opened.
 watch(
-  () => [craftConfigStore.hasConfig, craftConfigStore.craftName],
+  () => [
+    craftConfigStore.hasConfig,
+    craftConfigStore.craftName,
+    craftConfigStore.mainRotorGearRatio,
+    craftConfigStore.tailRotorGearRatio,
+  ],
   () => recheckCraftConfigMatch(),
 );
 

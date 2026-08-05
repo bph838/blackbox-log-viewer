@@ -5,38 +5,59 @@ import { useAppStore } from "./stores/app.js";
 import { useCraftConfigStore } from "./stores/craftConfig.js";
 import { formatTime, stringLoopTime } from "./tools.js";
 import { FIRMWARE_TYPE_ROTORFLIGHT } from "./flightlog_fielddefs.js";
+import { resolveGearRatios } from "./craft_config.js";
 
 /**
  * Compare the flight log's craft name against the loaded craft config (if any), and set the
  * status bar's match/mismatch indicator and tooltip accordingly. On a mismatch, optionally also
  * offer (via a confirm dialog) to load a different config file - this should only happen when a
  * *log* was just opened, not when the *config* changes underneath an already-open log.
+ *
+ * Also syncs the matched craft's gear ratios into the flight log, which enables/disables the
+ * motorSpeed/tailSpeed computed fields derived from headspeed. If that addition/removal changes
+ * the flight log's field list, re-adapt the current graph config (so a workspace-saved graph
+ * referencing motorSpeed/tailSpeed regains the field) and force a redraw.
  */
 function checkCraftConfigMatch(logCraftName, promptOnMismatch) {
   const appStore = useAppStore(pinia);
   const craftConfigStore = useCraftConfigStore(pinia);
+  const logStore = useLogStore(pinia);
+  const graphStore = useGraphStore(pinia);
 
   appStore.statusCraftNameStatus = null;
   appStore.statusCraftNameTooltip = "";
 
-  if (!craftConfigStore.hasConfig || !logCraftName || !craftConfigStore.craftName) {
-    return;
-  }
+  const nameMatches =
+    craftConfigStore.hasConfig &&
+    !!logCraftName &&
+    !!craftConfigStore.craftName &&
+    logCraftName.trim().toLowerCase() === craftConfigStore.craftName.trim().toLowerCase();
 
-  const configCraftName = craftConfigStore.craftName;
-
-  if (logCraftName.trim().toLowerCase() === configCraftName.trim().toLowerCase()) {
+  if (nameMatches) {
     appStore.statusCraftNameStatus = "match";
-    appStore.statusCraftNameTooltip = `Loaded configuration ${configCraftName} matches this flight log's craft.`;
-    return;
+    appStore.statusCraftNameTooltip = `Loaded configuration ${craftConfigStore.craftName} matches this flight log's craft.`;
+  } else if (craftConfigStore.hasConfig && logCraftName && craftConfigStore.craftName) {
+    appStore.statusCraftNameStatus = "mismatch";
+    appStore.statusCraftNameTooltip = `Loaded configuration is for "${craftConfigStore.craftName}", but this flight log is for "${logCraftName}".`;
+
+    if (promptOnMismatch !== false) {
+      appStore.craftNameMismatchMessage = appStore.statusCraftNameTooltip;
+      appStore.craftNameMismatchDialogOpen = true;
+    }
   }
 
-  appStore.statusCraftNameStatus = "mismatch";
-  appStore.statusCraftNameTooltip = `Loaded configuration is for "${configCraftName}", but this flight log is for "${logCraftName}".`;
+  const gearRatios = nameMatches
+    ? resolveGearRatios(craftConfigStore.mainRotorGearRatio, craftConfigStore.tailRotorGearRatio)
+    : null;
 
-  if (promptOnMismatch !== false) {
-    appStore.craftNameMismatchMessage = appStore.statusCraftNameTooltip;
-    appStore.craftNameMismatchDialogOpen = true;
+  const result = logStore.flightLog?.setCraftGearRatios(gearRatios);
+
+  if (result?.fieldsChanged && graphStore.graphConfig) {
+    graphStore.activeGraphConfig?.adaptGraphs(logStore.flightLog, graphStore.graphConfig);
+  }
+  if (result?.valuesChanged) {
+    graphStore.graph?.refreshGraphConfig();
+    graphStore.invalidateGraph?.();
   }
 }
 

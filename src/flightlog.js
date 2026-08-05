@@ -47,7 +47,7 @@ function verifyChunkIndexes(_chunks) {
  * Window based smoothing of fields is offered.
  */
 export function FlightLog(logData) {
-  const ADDITIONAL_COMPUTED_FIELD_COUNT = 21 /** attitude + PID_SUM + PID_ERROR + RCCOMMAND_SCALED + GPS coord, distance, azimuth, trajectory tilt angle **/
+  const ADDITIONAL_COMPUTED_FIELD_COUNT = 23 /** attitude + PID_SUM + PID_ERROR + RCCOMMAND_SCALED + GPS coord, distance, azimuth, trajectory tilt angle + motor/tail rotor speed **/
   let logIndex = 0
   const logIndexes = new FlightLogIndex(logData)
   const parser = new FlightLogParser(logData)
@@ -57,6 +57,8 @@ export function FlightLog(logData) {
     numMotors = false
   let fieldNames = [],
     fieldNameToIndex = {}
+  // { main, tail } gear ratio multipliers from a matched craft config, or null - see setCraftGearRatios
+  let craftGearRatios = null
   const chunkCache = new FIFOCache(2)
   // Map from field indexes to smoothing window size in microseconds
   let fieldSmoothing = {},
@@ -277,6 +279,12 @@ export function FlightLog(logData) {
       if (fieldNames.includes('GPS_velned[0]')) {
         fieldNames.push('gpsTrajectoryTiltAngle')
       }
+    }
+
+    // Keep this condition structurally identical to the guard in computeFrameFields - both must
+    // agree on whether motorSpeed/tailSpeed exist, or the frame layout and fieldNames disagree.
+    if (craftGearRatios && fieldNames.includes('headspeed')) {
+      fieldNames.push('motorSpeed', 'tailSpeed')
     }
   }
 
@@ -594,6 +602,38 @@ export function FlightLog(logData) {
     }
   }
 
+  const gearRatiosEqual = (a, b) =>
+    a === b || (a !== null && b !== null && a.main === b.main && a.tail === b.tail)
+
+  /**
+   * Set (or clear, with null) the craft's main/tail rotor gear ratios, enabling (or disabling) the
+   * motorSpeed/tailSpeed computed fields derived from headspeed. Rebuilds the field list and clears
+   * the chunk/smoothed caches whenever anything actually changes.
+   *
+   * Returns { fieldsChanged, valuesChanged } so the caller knows whether it needs to re-adapt graph
+   * configs (fieldsChanged) and/or force a redraw (valuesChanged).
+   */
+  this.setCraftGearRatios = function (ratios) {
+    const normalized =
+      ratios && Number.isFinite(ratios.main) && Number.isFinite(ratios.tail)
+        ? { main: ratios.main, tail: ratios.tail }
+        : null
+
+    if (gearRatiosEqual(craftGearRatios, normalized)) {
+      return { fieldsChanged: false, valuesChanged: false }
+    }
+
+    const hadFields = fieldNameToIndex.motorSpeed !== undefined
+    craftGearRatios = normalized
+    buildFieldNames()
+    const hasFields = fieldNameToIndex.motorSpeed !== undefined
+
+    chunkCache.clear()
+    smoothedCache.clear()
+
+    return { fieldsChanged: hadFields !== hasFields, valuesChanged: true }
+  }
+
   /**
    * Compute attitude (roll, pitch, heading) from IMU quaternion or gyro+acc fallback.
    * Writes 3 fields to destFrame starting at fieldIndex.
@@ -803,6 +843,18 @@ export function FlightLog(logData) {
   }
 
   /**
+   * Compute main rotor-derived motor and tail rotor speeds from headspeed and the craft's gear ratios.
+   * Writes 2 fields to destFrame starting at fieldIndex.
+   * Returns updated fieldIndex.
+   */
+  const computeMotorTailSpeed = (srcFrame, destFrame, fieldIndex, headspeedIndex, gearRatios) => {
+    const headspeed = srcFrame[headspeedIndex]
+    destFrame[fieldIndex++] = headspeed * gearRatios.main
+    destFrame[fieldIndex++] = headspeed * gearRatios.tail
+    return fieldIndex
+  }
+
+  /**
    * Resolve field indices from fieldNameToIndex for computed field injection.
    * Sets arrays to false when the primary field is absent.
    */
@@ -913,6 +965,8 @@ export function FlightLog(logData) {
       axisPID,
       numSatIndex: fieldNameToIndex['GPS_numSat'],
       flightModeFlagsIndex: fieldNameToIndex['flightModeFlags'],
+      headspeedIndex: fieldNameToIndex['headspeed'],
+      craftGearRatios,
       sysConfig: this.getSysConfig(),
       disabledFields: this.isFieldDisabled(),
     }
@@ -968,6 +1022,18 @@ export function FlightLog(logData) {
 
     if (ctx.gpsVelNED) {
       fieldIndex = computeTrajectoryTilt(srcFrame, destFrame, fieldIndex, ctx.gpsVelNED)
+    }
+
+    // Keep this condition structurally identical to the guard in addComputedFieldNames - both must
+    // agree on whether motorSpeed/tailSpeed exist, or the frame layout and fieldNames disagree.
+    if (ctx.craftGearRatios && ctx.headspeedIndex !== undefined) {
+      fieldIndex = computeMotorTailSpeed(
+        srcFrame,
+        destFrame,
+        fieldIndex,
+        ctx.headspeedIndex,
+        ctx.craftGearRatios,
+      )
     }
 
     destFrame.splice(fieldIndex)
