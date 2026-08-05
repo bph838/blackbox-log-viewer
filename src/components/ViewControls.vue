@@ -89,6 +89,7 @@
         @click="$emit('toggle-step-response')"
       />
       <UButton
+        v-if="logStore.hasGps"
         variant="ghost"
         :color="mapActive ? 'primary' : 'neutral'"
         icon="i-lucide-map-pin"
@@ -103,6 +104,10 @@
 </template>
 
 <script setup>
+import { useLogStore } from "../stores/log.js";
+
+const logStore = useLogStore();
+
 defineProps({
   headerActive: { type: Boolean, default: false },
   tableActive: { type: Boolean, default: false },
