@@ -767,7 +767,9 @@ export function FlightLog(logData) {
       }
       destFrame[fieldIndex++] =
         rcCommand[AXIS.YAW + 1] !== undefined
-          ? this.rcCommandRawToThrottle(srcFrame[rcCommand[AXIS.YAW + 1]])
+          ? sysConfig.firmwareType === FIRMWARE_TYPE_ROTORFLIGHT
+            ? this.rcCommandRawToCollectivePercent(srcFrame[rcCommand[AXIS.YAW + 1]])
+            : this.rcCommandRawToThrottle(srcFrame[rcCommand[AXIS.YAW + 1]])
           : 0
     }
     return fieldIndex
@@ -1649,6 +1651,16 @@ FlightLog.prototype.ThrottleTorcCommandRaw = function (value) {
     (value / 100) * (this.getSysConfig().maxthrottle - this.getSysConfig().minthrottle) +
     this.getSysConfig().minthrottle
   )
+}
+
+/**
+ * Rotorflight's throttle axis is the collective stick, raw-logged over sysConfig.collectiveRange
+ * (typically centered on 0, e.g. [-500, 500]) rather than the minthrottle/maxthrottle PWM range
+ * used by a quad's motor throttle - so it needs its own min/max, not rcCommandRawToThrottle's.
+ */
+FlightLog.prototype.rcCommandRawToCollectivePercent = function (value) {
+  const [collectiveMin, collectiveMax] = this.getSysConfig().collectiveRange ?? [-500, 500]
+  return Math.min(Math.max(((value - collectiveMin) / (collectiveMax - collectiveMin)) * 100.0, 0.0), 100.0)
 }
 
 FlightLog.prototype.rcMotorRawToPctPhysical = function (value) {
