@@ -31,6 +31,17 @@ export function parseGearRatio(rawValue) {
 }
 
 /**
+ * Rotorflight's firmware defaults both main_rotor_gear_ratio and tail_rotor_gear_ratio to a
+ * direct-drive 1:1 (see motorConfig_t in the firmware). `diff all` (unlike `dump all`) only
+ * prints settings that differ from their default, so a craft dump with no line for a ratio is a
+ * valid, complete config - it just means that ratio is still 1:1 - not that the ratio is unknown.
+ * Resolve a missing setting to that same 1:1 default rather than treating it as missing data.
+ */
+export function resolveConfiguredGearRatio(rawValue) {
+  return rawValue === undefined ? 1 : parseGearRatio(rawValue);
+}
+
+/**
  * Applies the all-or-nothing gear-ratio gate: both the main and tail rotor gear ratios must be
  * present/parseable numbers, or neither computed field (motorSpeed/tailSpeed) is produced.
  */

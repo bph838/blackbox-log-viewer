@@ -4,6 +4,7 @@ import {
   parseGearRatio,
   parseCraftConfigText,
   resolveGearRatios,
+  resolveConfiguredGearRatio,
 } from "./craft_config.js";
 
 describe("parseGearRatio", () => {
@@ -18,6 +19,23 @@ describe("parseGearRatio", () => {
     expect(parseGearRatio("15,137,2")).toBeNull();
     expect(parseGearRatio("abc,137")).toBeNull();
     expect(parseGearRatio("0,137")).toBeNull();
+  });
+});
+
+describe("resolveConfiguredGearRatio", () => {
+  it("defaults a missing setting to the firmware's 1:1 direct-drive default", () => {
+    // `diff all` omits settings still at their default, so an absent key is a valid 1:1 config,
+    // not missing data - unlike a present-but-malformed value, which still resolves to null.
+    expect(resolveConfiguredGearRatio(undefined)).toBe(1);
+  });
+
+  it("parses a present setting value normally", () => {
+    expect(resolveConfiguredGearRatio("15,137")).toBeCloseTo(137 / 15);
+  });
+
+  it("still returns null for a present but malformed value", () => {
+    expect(resolveConfiguredGearRatio("abc,137")).toBeNull();
+    expect(resolveConfiguredGearRatio("0,137")).toBeNull();
   });
 });
 
