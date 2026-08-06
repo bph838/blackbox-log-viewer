@@ -10,27 +10,6 @@
       >
         <!-- Left column -->
         <div class="flex flex-col gap-4">
-          <!-- Mixer Settings -->
-          <UiBox title="Mixer Settings">
-            <SettingRow label="Custom" help="Select custom craft display">
-              <USwitch v-model="customMixBool" size="sm" />
-            </SettingRow>
-            <div v-if="local.customMix" class="flex items-center gap-4 mt-2">
-              <USelect
-                v-model="local.mixerConfiguration"
-                :items="mixerOptions"
-                :ui="{ content: 'z-[300]' }"
-                size="sm"
-                class="flex-1"
-              />
-              <img
-                :src="`./images/motor_order/${mixerImageName}.svg`"
-                class="w-16 h-16 object-contain"
-                :alt="mixerName"
-              />
-            </div>
-          </UiBox>
-
           <!-- Stick Settings -->
           <UiBox title="Stick Settings">
             <SettingRow label="Units" help="Display actual units on stick display">
@@ -344,7 +323,6 @@ import { ref, watch, computed, toRaw } from "vue";
 import UiBox from "./UiBox.vue";
 import SettingRow from "./SettingRow.vue";
 import PercentInput from "./PercentInput.vue";
-import { mixerList } from "../user_settings_data.js";
 import { useSettingsStore } from "../stores/settings.js";
 import { FLIGHT_LOG_GOVSTATES, FLIGHT_LOG_AIRBORNE_STATES } from "../flightlog_fielddefs.js";
 import AI_MODELS from "../data/ai_models.json";
@@ -394,25 +372,6 @@ watch(open, (val) => {
     local.value = cloneSettings();
     autoTrimEventOptions.value = buildAutoTrimEventOptions();
   }
-});
-
-// customMix is truthy object or null — expose as boolean for USwitch
-const customMixBool = computed({
-  get: () => !!local.value.customMix,
-  set: (val) => { local.value.customMix = val ? {} : null; },
-});
-
-// Mixer helpers
-const mixerOptions = mixerList.map((m, i) => ({ label: m.name, value: i + 1 }));
-
-const mixerImageName = computed(() => {
-  const idx = (local.value.mixerConfiguration || 3) - 1;
-  return mixerList[idx]?.image ?? "custom";
-});
-
-const mixerName = computed(() => {
-  const idx = (local.value.mixerConfiguration || 3) - 1;
-  return mixerList[idx]?.name ?? "Custom";
 });
 
 // Option data
