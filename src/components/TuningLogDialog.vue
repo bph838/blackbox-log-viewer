@@ -51,7 +51,11 @@
         </div>
 
         <!-- Log body: sidebar + main panel -->
-        <div v-else class="flex gap-3 min-h-[28rem] max-h-[65vh]">
+        <!-- Fixed (not min/max) height: entries vary a lot in content length (AI advice, notes,
+             config), and if the box grew/shrank per entry, the centered modal would re-center
+             around a different height each time - shifting the step response image on screen and
+             making it hard to compare between entries. -->
+        <div v-else class="flex gap-3 h-[65vh]">
           <div class="w-56 shrink-0 flex flex-col border rounded-md border-default overflow-hidden">
             <div class="flex items-center justify-between px-2 py-1.5 border-b border-default text-xs font-medium">
               <span>Entries</span>
@@ -736,6 +740,17 @@ function scrollToBottomIfStuck() {
 }
 
 watch(streamingText, scrollToBottomIfStuck);
+
+// Switching entries should always land back at the top (where the step response image is), not
+// wherever the previous entry happened to be scrolled to - otherwise comparing entries can leave
+// the image scrolled out of view.
+watch(selectedEntryId, () => {
+  stickToBottom.value = false;
+  nextTick(() => {
+    const el = scrollContainerEl.value;
+    if (el) el.scrollTop = 0;
+  });
+});
 
 function onAskAi() {
   const entry = currentEntry.value;
