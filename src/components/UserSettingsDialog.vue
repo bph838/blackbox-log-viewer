@@ -109,19 +109,6 @@
                 label="Transparency"
               />
             </div>
-            <SettingRow label="Lap Timer" help="Show the lap timer">
-              <USwitch v-model="local.drawLapTimer" size="sm" />
-            </SettingRow>
-            <div v-if="local.drawLapTimer" class="ml-6">
-              <PercentInput
-                v-model="local.laptimer.transparency"
-                label="Transparency"
-              />
-              <p class="text-xs text-dimmed mt-1">
-                Set a "start time" bookmark at the beginning of the log/video
-                plus additional bookmarks to mark the start of each lap.
-              </p>
-            </div>
           </UiBox>
 
              <!-- Overlay Positions (collapsible) -->
@@ -428,9 +415,6 @@ const positionRows = computed(() => {
   ];
   if (local.value.drawWatermark) {
     rows.push({ label: "Watermark", obj: local.value.watermark, topKey: "top", leftKey: "left", sizeKey: "size" });
-  }
-  if (local.value.drawLapTimer) {
-    rows.push({ label: "Lap timer", obj: local.value.laptimer, topKey: "top", leftKey: "left" });
   }
   return rows;
 });
