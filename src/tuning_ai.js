@@ -190,6 +190,16 @@ function sendMessages(options, messages, onResult, onError) {
       skills: skillIds.map((skillId) => ({ type: "custom", skill_id: skillId, version: "latest" })),
     };
     requestParams.betas = ["code-execution-2025-08-25", "skills-2025-10-02"];
+    // This app only renders the model's text blocks - there's no file transfer or download
+    // mechanism, so any file the code-execution container writes is unreachable and effectively
+    // lost. Skills must still answer entirely in chat text rather than treating a written file as
+    // their deliverable.
+    requestParams.system =
+      "This is a chat-only interface with no file download or transfer capability - any file " +
+      "written to the code execution container is permanently inaccessible to the user. Never " +
+      "treat a saved/exported file as your deliverable. Always give your complete answer directly " +
+      "as chat text/markdown in your response, even if that means writing out a long answer " +
+      "instead of a file.";
   }
 
   let stream;
