@@ -82,6 +82,78 @@
               />
             </SettingRow>
           </UiBox>
+
+           <!-- Video Overlay -->
+          <UiBox title="Video Overlay">
+            <SettingRow label="Watermark" help="Show the watermark">
+              <USwitch v-model="local.drawWatermark" size="sm" />
+            </SettingRow>
+            <div v-if="local.drawWatermark" class="flex flex-col gap-2 mt-2 ml-6">
+              <div class="flex items-center gap-3">
+                <label class="text-sm">Logo</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  class="text-sm"
+                  @change="onLogoChange"
+                />
+              </div>
+              <img
+                v-if="local.watermark.logo"
+                :src="local.watermark.logo"
+                class="w-24 h-16 object-contain border rounded border-default"
+                alt="Watermark logo"
+              />
+              <PercentInput
+                v-model="local.watermark.transparency"
+                label="Transparency"
+              />
+            </div>
+            <SettingRow label="Lap Timer" help="Show the lap timer">
+              <USwitch v-model="local.drawLapTimer" size="sm" />
+            </SettingRow>
+            <div v-if="local.drawLapTimer" class="ml-6">
+              <PercentInput
+                v-model="local.laptimer.transparency"
+                label="Transparency"
+              />
+              <p class="text-xs text-dimmed mt-1">
+                Set a "start time" bookmark at the beginning of the log/video
+                plus additional bookmarks to mark the start of each lap.
+              </p>
+            </div>
+          </UiBox>
+
+             <!-- Overlay Positions (collapsible) -->
+          <UiBox title="Overlay Positions">
+            <details>
+              <summary class="text-xs cursor-pointer text-dimmed hover:text-default select-none">
+                Adjust position and size of overlays
+              </summary>
+              <div class="grid grid-cols-[4.5rem_repeat(3,auto)] gap-x-1 gap-y-1.5 items-center text-xs mt-3">
+                <template v-for="row in positionRows" :key="row.label">
+                  <span class="text-dimmed truncate">{{ row.label }}</span>
+                  <div class="flex items-center gap-0.5">
+                    <span class="text-dimmed w-6">Top</span>
+                    <UInputNumber :model-value="pv(row.obj[row.topKey])" :min="0" :max="100" :step="1" :format-options="{ useGrouping: false }" size="xs" orientation="vertical" :ui="{ root: 'w-12' }" @update:model-value="row.obj[row.topKey] = `${$event}%`" />
+                    <span class="text-dimmed">%</span>
+                  </div>
+                  <div class="flex items-center gap-0.5">
+                    <span class="text-dimmed w-6">Left</span>
+                    <UInputNumber :model-value="pv(row.obj[row.leftKey])" :min="0" :max="100" :step="1" :format-options="{ useGrouping: false }" size="xs" orientation="vertical" :ui="{ root: 'w-12' }" @update:model-value="row.obj[row.leftKey] = `${$event}%`" />
+                    <span class="text-dimmed">%</span>
+                  </div>
+                  <div v-if="row.sizeKey" class="flex items-center gap-0.5">
+                    <span class="text-dimmed w-6">{{ row.sizeLabel || 'Size' }}</span>
+                    <UInputNumber :model-value="pv(row.obj[row.sizeKey])" :min="0" :max="100" :step="1" :format-options="{ useGrouping: false }" size="xs" orientation="vertical" :ui="{ root: 'w-12' }" @update:model-value="row.obj[row.sizeKey] = `${$event}%`" />
+                    <span class="text-dimmed">%</span>
+                  </div>
+                  <div v-else />
+                </template>
+              </div>
+            </details>
+          </UiBox>
+
         </div>
 
         <!-- Right column -->
@@ -229,78 +301,9 @@
               <USwitch v-model="local.mapTrailAltitudeColored" size="sm" />
             </SettingRow>
           </UiBox>
-          -->
+          -->    
 
-          <!-- Video Overlay -->
-          <UiBox title="Video Overlay">
-            <SettingRow label="Watermark" help="Show the watermark">
-              <USwitch v-model="local.drawWatermark" size="sm" />
-            </SettingRow>
-            <div v-if="local.drawWatermark" class="flex flex-col gap-2 mt-2 ml-6">
-              <div class="flex items-center gap-3">
-                <label class="text-sm">Logo</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  class="text-sm"
-                  @change="onLogoChange"
-                />
-              </div>
-              <img
-                v-if="local.watermark.logo"
-                :src="local.watermark.logo"
-                class="w-24 h-16 object-contain border rounded border-default"
-                alt="Watermark logo"
-              />
-              <PercentInput
-                v-model="local.watermark.transparency"
-                label="Transparency"
-              />
-            </div>
-            <SettingRow label="Lap Timer" help="Show the lap timer">
-              <USwitch v-model="local.drawLapTimer" size="sm" />
-            </SettingRow>
-            <div v-if="local.drawLapTimer" class="ml-6">
-              <PercentInput
-                v-model="local.laptimer.transparency"
-                label="Transparency"
-              />
-              <p class="text-xs text-dimmed mt-1">
-                Set a "start time" bookmark at the beginning of the log/video
-                plus additional bookmarks to mark the start of each lap.
-              </p>
-            </div>
-          </UiBox>
-
-          <!-- Overlay Positions (collapsible) -->
-          <UiBox title="Overlay Positions">
-            <details>
-              <summary class="text-xs cursor-pointer text-dimmed hover:text-default select-none">
-                Adjust position and size of overlays
-              </summary>
-              <div class="grid grid-cols-[4.5rem_repeat(3,auto)] gap-x-1 gap-y-1.5 items-center text-xs mt-3">
-                <template v-for="row in positionRows" :key="row.label">
-                  <span class="text-dimmed truncate">{{ row.label }}</span>
-                  <div class="flex items-center gap-0.5">
-                    <span class="text-dimmed w-6">Top</span>
-                    <UInputNumber :model-value="pv(row.obj[row.topKey])" :min="0" :max="100" :step="1" :format-options="{ useGrouping: false }" size="xs" orientation="vertical" :ui="{ root: 'w-12' }" @update:model-value="row.obj[row.topKey] = `${$event}%`" />
-                    <span class="text-dimmed">%</span>
-                  </div>
-                  <div class="flex items-center gap-0.5">
-                    <span class="text-dimmed w-6">Left</span>
-                    <UInputNumber :model-value="pv(row.obj[row.leftKey])" :min="0" :max="100" :step="1" :format-options="{ useGrouping: false }" size="xs" orientation="vertical" :ui="{ root: 'w-12' }" @update:model-value="row.obj[row.leftKey] = `${$event}%`" />
-                    <span class="text-dimmed">%</span>
-                  </div>
-                  <div v-if="row.sizeKey" class="flex items-center gap-0.5">
-                    <span class="text-dimmed w-6">{{ row.sizeLabel || 'Size' }}</span>
-                    <UInputNumber :model-value="pv(row.obj[row.sizeKey])" :min="0" :max="100" :step="1" :format-options="{ useGrouping: false }" size="xs" orientation="vertical" :ui="{ root: 'w-12' }" @update:model-value="row.obj[row.sizeKey] = `${$event}%`" />
-                    <span class="text-dimmed">%</span>
-                  </div>
-                  <div v-else />
-                </template>
-              </div>
-            </details>
-          </UiBox>
+       
         </div>
       </div>
     </template>
