@@ -521,6 +521,12 @@ function BlackboxLogViewer() {
       { passive: false },
     );
 
+    document.getElementById("log-graph").addEventListener("click", function () {
+      if (playbackStore.isPlaying) {
+        setGraphState(GRAPH_STATE_PAUSED);
+      }
+    });
+
     document.addEventListener("keydown", createKeydownHandler({
       hasGraph: () => graph != null,
       graphStore, logStore, playbackStore, workspaceStore, appStore,
