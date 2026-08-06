@@ -223,12 +223,13 @@
             </div>
           </UiBox>
 
-          <!-- Map Settings -->
+          <!-- Map Settings (hidden for now, may be needed again later)
           <UiBox title="Map Settings">
             <SettingRow label="ACT" help="Use Altitude Colored Trail (slower at loading/changing logs)">
               <USwitch v-model="local.mapTrailAltitudeColored" size="sm" />
             </SettingRow>
           </UiBox>
+          -->
 
           <!-- Video Overlay -->
           <UiBox title="Video Overlay">
