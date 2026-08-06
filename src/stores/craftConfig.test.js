@@ -44,6 +44,18 @@ describe("useCraftConfigStore", () => {
     expect(store.tailRotorGearRatio).toBeCloseTo(4.66);
   });
 
+  it("defaults a gear ratio omitted from a `diff all` dump to the firmware's 1:1", async () => {
+    const store = useCraftConfigStore();
+    // `diff all` only prints settings that differ from default, so a direct-drive main rotor
+    // (left at the firmware default of 1:1) has no `main_rotor_gear_ratio` line at all.
+    const text = "set tail_rotor_gear_ratio = 1,4.66";
+
+    await store.loadFile(fileFromText(text));
+
+    expect(store.mainRotorGearRatio).toBe(1);
+    expect(store.tailRotorGearRatio).toBeCloseTo(4.66);
+  });
+
   it("clears the loaded config", async () => {
     const store = useCraftConfigStore();
     await store.loadFile(fileFromText("set name = \"My Heli\""));

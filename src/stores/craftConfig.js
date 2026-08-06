@@ -4,7 +4,7 @@ import { PrefStorage } from "../pref_storage.js";
 import {
   emptyParsedCraftConfig,
   parseCraftConfigText,
-  parseGearRatio,
+  resolveConfiguredGearRatio,
 } from "../craft_config.js";
 
 const prefs = new PrefStorage();
@@ -23,11 +23,12 @@ export const useCraftConfigStore = defineStore("craftConfig", () => {
 
   // Motor RPM = main rotor RPM * this ratio, per `set main_rotor_gear_ratio = <a>,<b>` (ratio is
   // b/a). Tail rotor RPM = main rotor RPM * this ratio, per `set tail_rotor_gear_ratio = <a>,<b>`.
+  // A setting absent from the dump defaults to the firmware's 1:1 - see resolveConfiguredGearRatio.
   const mainRotorGearRatio = computed(() =>
-    parseGearRatio(parsed.value.settings.main_rotor_gear_ratio),
+    resolveConfiguredGearRatio(parsed.value.settings.main_rotor_gear_ratio),
   );
   const tailRotorGearRatio = computed(() =>
-    parseGearRatio(parsed.value.settings.tail_rotor_gear_ratio),
+    resolveConfiguredGearRatio(parsed.value.settings.tail_rotor_gear_ratio),
   );
 
   function persist() {
