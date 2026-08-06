@@ -161,7 +161,7 @@
             </ul>
           </div>
 
-          <div class="flex-1 min-w-0 flex flex-col gap-2 overflow-y-auto pr-1">
+          <div ref="scrollContainerEl" class="flex-1 min-w-0 flex flex-col gap-2 overflow-y-auto pr-1" @scroll="onScrollContainerScroll">
             <div class="flex items-center justify-between gap-2 flex-wrap">
               <h4 class="font-medium text-sm">{{ mainTitle }}</h4>
               <div class="flex items-center gap-1 flex-wrap">
@@ -337,7 +337,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import HelpIcon from "./HelpIcon.vue";
@@ -714,9 +714,36 @@ function renderMarkdown(text) {
   return DOMPurify.sanitize(marked.parse(String(text ?? "")));
 }
 
+// Auto-scroll to follow the AI response as it streams in, but only while the user hasn't
+// scrolled away from the bottom themselves - once they scroll up to read something else, leave
+// the view where they put it until they scroll back down.
+const scrollContainerEl = ref(null);
+const stickToBottom = ref(true);
+const AUTO_SCROLL_THRESHOLD_PX = 48;
+
+function onScrollContainerScroll() {
+  const el = scrollContainerEl.value;
+  if (!el) return;
+  stickToBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight <= AUTO_SCROLL_THRESHOLD_PX;
+}
+
+function scrollToBottomIfStuck() {
+  if (!stickToBottom.value) return;
+  nextTick(() => {
+    const el = scrollContainerEl.value;
+    if (el) el.scrollTop = el.scrollHeight;
+  });
+}
+
+watch(streamingText, scrollToBottomIfStuck);
+
 function onAskAi() {
   const entry = currentEntry.value;
   if (!entry || !entry.image) return;
+
+  // Asking a question is an explicit signal to follow the new response, even if the user had
+  // scrolled up to read earlier history.
+  stickToBottom.value = true;
 
   const settings = settingsStore.userSettings;
   const promptText = aiPromptText.value;
