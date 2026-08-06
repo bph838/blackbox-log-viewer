@@ -209,19 +209,37 @@
               </p>
             </div>
             <div class="flex flex-col gap-1">
-              <label class="text-sm">Custom Skill ID (optional)</label>
-              <UInput
-                v-model="local.aiSkillId"
-                autocomplete="off"
-                placeholder="skill_..."
-                size="sm"
-                class="w-full"
+              <label class="text-sm">Custom Skill IDs (optional)</label>
+              <div v-for="(skillId, idx) in local.aiSkillIds" :key="idx" class="flex items-center gap-2">
+                <UInput
+                  v-model="local.aiSkillIds[idx]"
+                  autocomplete="off"
+                  placeholder="skill_..."
+                  size="sm"
+                  class="w-full"
+                />
+                <UButton
+                  variant="ghost"
+                  color="error"
+                  icon="i-lucide-trash-2"
+                  size="xs"
+                  @click="local.aiSkillIds.splice(idx, 1)"
+                />
+              </div>
+              <UButton
+                variant="link"
+                color="neutral"
+                icon="i-lucide-plus"
+                label="Add skill"
+                size="xs"
+                class="self-start -ml-2"
+                @click="local.aiSkillIds.push('')"
               />
               <p class="text-xs text-dimmed">
-                ID of a custom Agent Skill already uploaded to your Anthropic account (Console
-                &rarr; Skills, or the Skills API) - not a Claude Code skill. When set, it's loaded
-                into every AI Analysis request via a code-execution container, which adds a small
-                amount of extra cost/latency. Leave blank to disable.
+                IDs of custom Agent Skills already uploaded to your Anthropic account (Console
+                &rarr; Skills, or the Skills API) - not Claude Code skills. When set, they're all
+                loaded into every AI Analysis request via a code-execution container, which adds a
+                small amount of extra cost/latency per skill. Leave empty to disable.
               </p>
             </div>
           </UiBox>
@@ -470,6 +488,7 @@ function onLogoChange(e) {
 
 function onSave() {
   const raw = JSON.parse(JSON.stringify(toRaw(local.value))); // NOSONAR
+  raw.aiSkillIds = (raw.aiSkillIds || []).map((id) => id.trim()).filter(Boolean);
   emit("save", raw);
   open.value = false;
 }
