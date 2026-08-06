@@ -9,6 +9,7 @@ const prefs = new PrefStorage();
 export const useTuningLogStore = defineStore("tuningLog", () => {
   const currentLog = ref(null);
   const aiExpertMode = ref(false);
+  const aiUseSkills = ref(true);
   const apiKeyBannerDismissed = ref(false);
 
   const hasLog = computed(() => currentLog.value !== null);
@@ -134,6 +135,11 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     prefs.set("tuningLogAiExpertMode", value);
   }
 
+  function setAiUseSkills(value) {
+    aiUseSkills.value = value;
+    prefs.set("tuningLogAiUseSkills", value);
+  }
+
   function dismissApiKeyBanner() {
     apiKeyBannerDismissed.value = true;
     prefs.set("tuningLogApiKeyBannerDismissed", true);
@@ -144,6 +150,9 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
   prefs.get("tuningLogAiExpertMode", (value) => {
     aiExpertMode.value = !!value;
   });
+  prefs.get("tuningLogAiUseSkills", (value) => {
+    aiUseSkills.value = value === undefined || value === null ? true : !!value;
+  });
   prefs.get("tuningLogApiKeyBannerDismissed", (value) => {
     apiKeyBannerDismissed.value = !!value;
   });
@@ -151,6 +160,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
   return {
     currentLog,
     aiExpertMode,
+    aiUseSkills,
     apiKeyBannerDismissed,
     hasLog,
     entries,
@@ -164,6 +174,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     importFromFile,
     exportToFile,
     setAiExpertMode,
+    setAiUseSkills,
     dismissApiKeyBanner,
   };
 });

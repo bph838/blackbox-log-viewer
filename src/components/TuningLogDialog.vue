@@ -288,6 +288,13 @@
                     text="Also review filters, rates, feedforward, TPA, I-term relax and other configuration settings for improvements - not just PID gains."
                   />
                 </label>
+                <label v-if="hasConfiguredSkills" class="flex items-center gap-2 text-xs font-normal">
+                  Use skills
+                  <USwitch v-model="useSkillsModel" size="xs" />
+                  <HelpIcon
+                    text="Load your custom Agent Skills (configured under Settings → AI Analysis Settings) into this request via a code-execution container. Adds a small amount of extra cost/latency. Applies to follow-up questions too."
+                  />
+                </label>
                 <UTextarea
                   v-model="aiPromptText"
                   :rows="2"
@@ -665,6 +672,13 @@ const expertModeModel = computed({
   set: (val) => tuningLogStore.setAiExpertMode(val),
 });
 
+const useSkillsModel = computed({
+  get: () => tuningLogStore.aiUseSkills,
+  set: (val) => tuningLogStore.setAiUseSkills(val),
+});
+
+const hasConfiguredSkills = computed(() => (settingsStore.userSettings.aiSkillIds || []).length > 0);
+
 const hasConversation = computed(() => !!currentEntry.value?.ai?.conversation?.length);
 // Keyed by entry id (not just the currently-viewed entry) so the "Thinking…" state survives
 // switching to another entry and back.
@@ -730,7 +744,7 @@ function onAskAi() {
     apiKey: settings.aiApiKey,
     model: settings.aiModel,
     effort: settings.aiEffort,
-    skillIds: settings.aiSkillIds,
+    skillIds: useSkillsModel.value ? settings.aiSkillIds : [],
     historyMessages,
     expertMode: expertModeModel.value,
     onChunk: (textSnapshot) => setStreamingText(entry.id, textSnapshot),
