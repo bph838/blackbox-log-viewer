@@ -57,7 +57,6 @@ export const defaultUserSettings = {
   autoTrimStopEvent: "airborne:LANDING",
   autoTrimOffset: 1,
   drawWatermark: false,
-  drawLapTimer: false,
   drawGradient: false,
   drawVerticalBar: true,
   graphSmoothOverride: true,
@@ -77,7 +76,6 @@ export const defaultUserSettings = {
   stepResponse: { left: "55%", top: "57%", size: "40%" },
   map: { left: "2%", top: "5%", size: "35%" },
   watermark: { left: "3%", top: "90%", size: "100%", transparency: "100%", logo: null },
-  laptimer: { left: "5%", top: "50%", transparency: "40%" },
   // AI Analysis Settings — used by the Tuning Log's "AI Analysis" feature (see tuning_ai.js).
   // aiApiKey is stored locally only, and only ever sent to api.anthropic.com.
   aiApiKey: "",
