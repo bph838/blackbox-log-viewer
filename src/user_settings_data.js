@@ -74,7 +74,7 @@ export const defaultUserSettings = {
   sticks: { left: "75%", top: "20%", size: "30%" },
   analyser: { left: "2%", top: "60%", size: "35%" },
   analyser_legend: { left: "88%", top: "7%", width: "10%" },
-  stepResponse: { left: "60%", top: "60%", size: "35%" },
+  stepResponse: { left: "55%", top: "57%", size: "40%" },
   map: { left: "2%", top: "5%", size: "35%" },
   watermark: { left: "3%", top: "90%", size: "100%", transparency: "100%", logo: null },
   laptimer: { left: "5%", top: "50%", transparency: "40%" },

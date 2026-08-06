@@ -192,6 +192,7 @@ watch(
 // Centralized CSS class binding — replaces 27 imperative html.classList calls in main.js
 watchEffect(() => {
   const cl = document.documentElement.classList;
+  cl.toggle("is-loading-file", appStore.loadingFileNames.length > 0);
   cl.toggle("has-log", logStore.hasLog);
   cl.toggle("has-video", logStore.hasVideo);
   cl.toggle("has-gps", logStore.hasGps);

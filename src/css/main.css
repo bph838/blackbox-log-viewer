@@ -12,6 +12,11 @@ a:hover {
   color: inherit;
 }
 
+html.is-loading-file,
+html.is-loading-file * {
+  cursor: wait !important;
+}
+
 /* Inline <code> (e.g. "dump all", ".json") - excludes <pre><code> blocks, which already get
    their own styling from the markdown renderer (see TuningLogDialog.vue's prose classes). */
 code:not(pre > code) {

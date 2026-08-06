@@ -6,6 +6,7 @@
       <p class="hero-subtitle">Blackbox Explorer</p>
       <p class="hero-tagline">Analyze flight logs recorded by Rotorflights's Blackbox feature.</p>      
       <p class="tag-version">{{ appStore.statusViewerVersion }}</p>
+      <p v-if="loadingFileText" class="loading-file-indicator">{{ loadingFileText }}</p>
       <LogFileInput size="lg" label="Open log file / video" @files-selected="$emit('files-selected', $event)" />
     </div>
 
@@ -92,6 +93,12 @@ const appStore = useAppStore();
 const logoSrc = computed(() =>
   appStore.darkThemeEnabled ? "/images/rf_logo_white.svg" : "/images/rf_logo_black.svg",
 );
+
+const loadingFileText = computed(() => {
+  const names = appStore.loadingFileNames;
+  if (!names.length) return "";
+  return `${names.join(", ")} ${names.length > 1 ? "are" : "is"} being loaded...`;
+});
 </script>
 
 <style scoped>
@@ -153,6 +160,13 @@ const logoSrc = computed(() =>
   font-size: 0.7rem;
   color: var(--text-secondary);
   opacity: 0.6;
+  margin: -0.5rem 0 0.75rem;
+}
+
+.loading-file-indicator {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-primary-500);
   margin: -0.5rem 0 0.75rem;
 }
 

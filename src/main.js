@@ -222,6 +222,16 @@ function BlackboxLogViewer() {
   function loadLogFile(file) {
     const reader = new FileReader();
 
+    appStore.loadingFileNames = [...appStore.loadingFileNames, file.name];
+    const stopLoadingIndicator = () => {
+      appStore.loadingFileNames = appStore.loadingFileNames.filter((name) => name !== file.name);
+    };
+
+    reader.onerror = function () {
+      stopLoadingIndicator();
+      alert(`Sorry, an error occurred while trying to read this file:\n\n${reader.error}`);
+    };
+
     reader.onload = function (e) {
       const bytes = e.target.result;
 
@@ -244,6 +254,7 @@ function BlackboxLogViewer() {
         } catch {
           graphStore.hasConfig = false;
         }
+        stopLoadingIndicator();
         return;
       }
 
@@ -252,6 +263,7 @@ function BlackboxLogViewer() {
       try {
         logStore.flightLog = new FlightLog(logStore.flightLogDataArray);
       } catch (err) {
+        stopLoadingIndicator();
         alert(
           `Sorry, an error occurred while trying to open this log:\n\n${err}`,
         );
@@ -281,6 +293,8 @@ function BlackboxLogViewer() {
       if (graph) {
         graph.setAnalyser(graphStore.hasAnalyserFullscreen);
       }
+
+      stopLoadingIndicator();
     };
 
     reader.readAsArrayBuffer(file);
