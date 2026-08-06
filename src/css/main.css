@@ -562,7 +562,10 @@ html:not(.has-stepresponse) .view-stepresponse-fullscreen {
   border-right: 1px solid var(--border-color, #e5e5e5);
 }
 
-.video-top-controls .toolbar-panel:last-child {
+/* Each panel is teleported into its own wrapper element, so :last-child would
+   match every panel individually instead of just the last one in the row.
+   Suppress the divider on the true last panel by class instead. */
+.video-top-controls .toolbar-panel.log-workspace-panel {
   border-right: none;
   margin-right: 0;
   padding-right: 0;
