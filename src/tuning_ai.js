@@ -53,7 +53,7 @@ export function buildPromptText(options) {
   let text =
     "You are helping tune the PID controller of an RC helicopter flight controller running Rotorflight " +
     "(forked from Betaflight). Attached is a step response graph generated from a blackbox log, showing " +
-    "setpoint-vs-gyro tracking (Roll in red, Pitch in teal, Yaw in yellow) for the 0-500ms period after a " +
+    "setpoint-vs-gyro tracking (Roll in red, Pitch in cyan, Yaw in yellow) for the 0-500ms period after a " +
     "stick input, with 1.0 on the y-axis representing perfect tracking.\n\n" +
     `Current flight controller configuration extracted from the log:\n${options.configSummary}\n\n` +
     `User instructions: ${instructions}\n\n` +
@@ -190,6 +190,16 @@ function sendMessages(options, messages, onResult, onError) {
       skills: skillIds.map((skillId) => ({ type: "custom", skill_id: skillId, version: "latest" })),
     };
     requestParams.betas = ["code-execution-2025-08-25", "skills-2025-10-02"];
+    // This app only renders the model's text blocks - there's no file transfer or download
+    // mechanism, so any file the code-execution container writes is unreachable and effectively
+    // lost. Skills must still answer entirely in chat text rather than treating a written file as
+    // their deliverable.
+    requestParams.system =
+      "This is a chat-only interface with no file download or transfer capability - any file " +
+      "written to the code execution container is permanently inaccessible to the user. Never " +
+      "treat a saved/exported file as your deliverable. Always give your complete answer directly " +
+      "as chat text/markdown in your response, even if that means writing out a long answer " +
+      "instead of a file.";
   }
 
   let stream;
