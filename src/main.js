@@ -37,7 +37,7 @@ import { watch } from "vue";
 
 
 function createNewBlackboxWindow(_fileToOpen) {
-  globalThis.open(globalThis.location.href, "_blank").focus();
+  globalThis.open(globalThis.location.href, "_blank", "popup");
 }
 
 function BlackboxLogViewer() {
