@@ -63,9 +63,7 @@
           <a href="https://www.rotorflight.org" target="_blank" rel="noopener noreferrer">
             <UIcon name="i-lucide-globe" class="size-3.5" /> Rotorflight
           </a>          
-          <a href="https://github.com/bph838/blackbox-log-viewer" target="_blank" rel="noopener noreferrer">
-            <UIcon name="i-lucide-github" class="size-3.5" /> Source on GitHub
-          </a>
+          
         </div>
       </div>
     </div>
