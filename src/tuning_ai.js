@@ -180,13 +180,14 @@ function sendMessages(options, messages, onResult, onError) {
     requestParams.output_config = { effort: options.effort };
   }
 
-  // A custom Agent Skill (uploaded separately to the Anthropic account via the Skills API/
-  // Console, identified by its skill_id) is loaded into a code-execution container - it isn't
-  // picked up automatically just because it exists on the account.
-  if (options.skillId) {
+  // Custom Agent Skills (uploaded separately to the Anthropic account via the Skills API/
+  // Console, identified by their skill_id) are loaded into a code-execution container - they
+  // aren't picked up automatically just because they exist on the account.
+  const skillIds = (options.skillIds || []).filter(Boolean);
+  if (skillIds.length > 0) {
     requestParams.tools = [{ type: "code_execution_20260521", name: "code_execution" }];
     requestParams.container = {
-      skills: [{ type: "custom", skill_id: options.skillId, version: options.skillVersion || "latest" }],
+      skills: skillIds.map((skillId) => ({ type: "custom", skill_id: skillId, version: "latest" })),
     };
     requestParams.betas = ["code-execution-2025-08-25", "skills-2025-10-02"];
   }
@@ -233,13 +234,13 @@ function sendMessages(options, messages, onResult, onError) {
  * Starts a new tuning-advice conversation about a single entry (its image + config summary), with
  * the rest of the tuning log's history prepended as context.
  *
- * options: { apiKey, model, effort, skillId, skillVersion, historyMessages, entry: {image,
+ * options: { apiKey, model, effort, skillIds, historyMessages, entry: {image,
  * config}, instructions, expertMode, onChunk }
  * effort, if given, is passed through as output_config.effort ('low'/'medium'/'high'/'xhigh'/
  * 'max') on models that support it - ignored otherwise.
- * skillId, if given, is the ID of a custom Agent Skill previously uploaded to this Anthropic
- * account (via the Console or Skills API) - it's loaded into a code-execution container for this
- * request. skillVersion defaults to 'latest'.
+ * skillIds, if given, are the IDs of custom Agent Skills previously uploaded to this Anthropic
+ * account (via the Console or Skills API) - they're all loaded into a shared code-execution
+ * container for this request, at version 'latest'.
  * onChunk(textSnapshot), if given, is called repeatedly as the response streams in, with the full
  * response text accumulated so far - use it to render progressively instead of waiting for the
  * whole answer.
@@ -284,11 +285,11 @@ export function analyze(options, onResult, onError) {
 /**
  * Continues an existing entry's conversation with a follow-up question.
  *
- * options: { apiKey, model, effort, skillId, skillVersion, historyMessages, messages, question,
+ * options: { apiKey, model, effort, skillIds, historyMessages, messages, question,
  * onChunk }
  * `messages` is this entry's own conversation so far (as returned by a previous analyze()/ask() call).
  * effort, if given, is passed through as output_config.effort on models that support it.
- * skillId/skillVersion behave as documented on analyze().
+ * skillIds behaves as documented on analyze().
  * onChunk(textSnapshot), if given, is called repeatedly as the response streams in, with the full
  * response text accumulated so far.
  * onResult(resultText, entryMessages, costUsd) - pass the updated entryMessages back in for the

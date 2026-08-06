@@ -730,7 +730,7 @@ function onAskAi() {
     apiKey: settings.aiApiKey,
     model: settings.aiModel,
     effort: settings.aiEffort,
-    skillId: settings.aiSkillId,
+    skillIds: settings.aiSkillIds,
     historyMessages,
     expertMode: expertModeModel.value,
     onChunk: (textSnapshot) => setStreamingText(entry.id, textSnapshot),

@@ -83,5 +83,5 @@ export const defaultUserSettings = {
   aiApiKey: "",
   aiModel: AI_MODELS.defaultModel,
   aiEffort: "high",
-  aiSkillId: "",
+  aiSkillIds: [],
 };

@@ -24,6 +24,14 @@ export const useSettingsStore = defineStore("settings", () => {
       if (item) {
         const merged = structuredClone(defaultUserSettings);
         deepMerge(merged, item);
+
+        // Migrate the old single aiSkillId string setting to the aiSkillIds array it was
+        // replaced by, unless this item was already saved under the new format.
+        if (item.aiSkillId && !item.aiSkillIds) {
+          merged.aiSkillIds = [item.aiSkillId];
+        }
+        delete merged.aiSkillId;
+
         Object.assign(userSettings, merged);
       }
     });
