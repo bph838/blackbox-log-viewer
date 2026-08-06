@@ -15,7 +15,6 @@ import { Craft3D } from "./craft_3d";
 import { Craft3DHeli, heliModelHasAttitude } from "./craft_3d_heli";
 import { FlightLogAnalyser } from "./graph_spectrum";
 import { FlightLogStepResponse } from "./graph_stepresponse";
-import { LapTimer } from "./laptimer";
 import { GraphConfig } from "./graph_config";
 import { ExpoCurve } from "./expo";
 import { leftPad, formatTime } from "./tools";
@@ -264,16 +263,6 @@ export function FlightLogGrapher(
       (Number.parseInt(options.watermark.size, 10) / 100) * watermarkLogo.height,
     );
     canvasContext.restore();
-  }
-
-  function drawLapTimer() {
-    // Update the Lap Timer
-    lapTimer.refresh(
-      windowCenterTime,
-      3600 * 1000000 /*a long time*/,
-      workspaceStore.bookmarkTimes,
-    );
-    lapTimer.drawCanvas(canvas, options);
   }
 
   let frameLabelTextWidthFrameNumber = null,
@@ -1092,11 +1081,6 @@ export function FlightLogGrapher(
       if (options.drawWatermark && watermarkLogo) {
         drawWaterMark();
       }
-
-      //Draw Lap Timer
-      if (options.drawLapTimer && lapTimer) {
-        drawLapTimer();
-      }
     }
 
     drawInOutRegion();
@@ -1344,9 +1328,6 @@ export function FlightLogGrapher(
 
   /* Create the FlightLogStepResponse object */
   stepResponse = new FlightLogStepResponse(flightLog, canvas, stepResponseCanvas);
-
-  /* Create the Lap Timer object */
-  const lapTimer = new LapTimer();
 
   //Handle dragging events
   canvas.addEventListener("mousedown", onMouseDown);
