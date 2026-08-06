@@ -341,7 +341,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from "vue";
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import HelpIcon from "./HelpIcon.vue";
@@ -525,6 +525,32 @@ function step(dir) {
 
   selectEntry(order[newPos]);
 }
+
+// Mirrors the sidebar's chevron up/down buttons, so the log can be paged through from the
+// keyboard too - but not while the key press is actually meant for a focused text field (typing
+// in Notes/AI prompt, moving a textarea cursor) or the model dropdown (native listbox navigation).
+// Bound on window rather than a template element: Reka UI's dialog moves focus to the dialog's
+// own content root when it opens (for its focus trap), which sits above everything in the body
+// slot - a listener anywhere inside the body would never see the keydown bubble through it.
+const ARROW_KEY_STEP = { ArrowUp: -1, ArrowDown: 1 };
+
+function onWindowKeydown(e) {
+  if (!open.value) return;
+
+  const dir = ARROW_KEY_STEP[e.key];
+  if (dir === undefined || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+
+  const target = e.target;
+  if (target.closest('input, textarea, select, [contenteditable="true"], [role="combobox"], [role="listbox"]')) {
+    return;
+  }
+
+  step(dir);
+  e.preventDefault();
+}
+
+onMounted(() => window.addEventListener("keydown", onWindowKeydown));
+onUnmounted(() => window.removeEventListener("keydown", onWindowKeydown));
 
 watch(open, (isOpen) => {
   createError.value = "";
