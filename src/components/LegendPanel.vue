@@ -165,6 +165,7 @@ import { useGraphStore } from "../stores/graph.js";
 import { useAppStore } from "../stores/app.js";
 import { useLogStore } from "../stores/log.js";
 import { useSettingsStore } from "../stores/settings.js";
+import { trackEvent } from "../analytics.js";
 
 const graphStore = useGraphStore();
 const appStore = useAppStore();
@@ -308,6 +309,7 @@ function toggleGrid() {
 }
 
 function openGraphConfig() {
+  trackEvent("open_graph_config");
   appStore.graphConfigDialogOpen = true;
 }
 

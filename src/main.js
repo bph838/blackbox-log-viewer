@@ -33,6 +33,7 @@ import { usePlaybackStore, GRAPH_STATE_PAUSED } from "./stores/playback.js";
 import { useWorkspaceStore } from "./stores/workspace.js";
 import { useAppStore } from "./stores/app.js";
 import { useSettingsStore } from "./stores/settings.js";
+import { trackEvent } from "./analytics.js";
 import { watch } from "vue";
 
 
@@ -276,6 +277,8 @@ function BlackboxLogViewer() {
           "Gyros",
         ]);
       }
+
+      trackEvent("log_loaded", { file_type: file.name.split(".").pop()?.toLowerCase() });
 
       renderLogFileInfo(file);
       graphStore.seekBarMode = "avgThrottle";

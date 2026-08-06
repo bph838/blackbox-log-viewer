@@ -143,6 +143,7 @@ import { useSettingsStore } from "./stores/settings.js";
 import { useWorkspaceStore } from "./stores/workspace.js";
 import { useCraftConfigStore } from "./stores/craftConfig.js";
 import { recheckCraftConfigMatch } from "./log_lifecycle.js";
+import { trackEvent } from "./analytics.js";
 import AppToolbar from "./components/AppToolbar.vue";
 import WelcomePage from "./components/WelcomePage.vue";
 import ViewControls from "./components/ViewControls.vue";
@@ -229,40 +230,49 @@ function onFilesSelected(files) {
 }
 
 function onOpenSettings() {
+  trackEvent("open_settings");
   appStore.settingsDialogOpen = true;
 }
 
 function onOpenKeys() {
+  trackEvent("open_keys");
   appStore.keysDialogOpen = true;
 }
 
 function onOpenCraftConfig() {
+  trackEvent("open_craft_config");
   appStore.craftConfigDialogOpen = true;
 }
 
 function onOpenTuningLog() {
+  trackEvent("open_tuning_log");
   appStore.tuningLogDialogOpen = true;
 }
 
 function onExportCsv() {
+  trackEvent("export_csv");
   appStore.exportCsv?.();
 }
 
 function onExportGpx() {
+  trackEvent("export_gpx");
   appStore.exportGpx?.();
 }
 
 function onExportVideo() {
+  trackEvent("export_video");
   appStore.pauseForExport?.();
   videoExportParams.value = appStore.getVideoExportParams?.() ?? null;
   appStore.videoExportDialogOpen = true;
 }
 
 function onExportWorkspaces() {
+  trackEvent("export_workspaces");
   appStore.exportWorkspaces?.();
 }
 
 function onNewWindow() {
+  trackEvent("new_window");
   appStore.openNewWindow?.();
 }
 
@@ -273,6 +283,7 @@ function onViewConfig() {
 }
 
 function onToggleHeader() {
+  trackEvent("toggle_header");
   if (!appStore.headerDialogOpen) {
     graphStore.hasTableOverlay = false;
     graphStore.hasConfigOverlay = false;
@@ -281,6 +292,7 @@ function onToggleHeader() {
 }
 
 function onToggleTable() {
+  trackEvent("toggle_table");
   appStore.headerDialogOpen = false;
   graphStore.hasTableOverlay = !graphStore.hasTableOverlay;
   graphStore.hasConfigOverlay = false;
@@ -288,26 +300,32 @@ function onToggleTable() {
 }
 
 function onToggleVideo() {
+  trackEvent("toggle_video");
   appStore.viewVideo = !appStore.viewVideo;
 }
 
 function onToggleCraft() {
+  trackEvent("toggle_craft");
   settingsStore.saveSetting("drawCraft", !settingsStore.userSettings.drawCraft);
 }
 
 function onToggleSticks() {
+  trackEvent("toggle_sticks");
   settingsStore.saveSetting("drawSticks", !settingsStore.userSettings.drawSticks);
 }
 
 function onToggleAnalyser() {
+  trackEvent("toggle_analyser");
   graphStore.toggleAnalyser();
 }
 
 function onToggleStepResponse() {
+  trackEvent("toggle_step_response");
   graphStore.toggleStepResponse();
 }
 
 function onToggleMap() {
+  trackEvent("toggle_map");
   graphStore.toggleMap();
 }
 
@@ -388,6 +406,7 @@ function onSaveVideoConfig(cfg) {
 }
 
 function onSwitchWorkspace(id) {
+  trackEvent("switch_workspace", { workspace_id: id });
   workspaceStore.switchWorkspace?.(id);
 }
 

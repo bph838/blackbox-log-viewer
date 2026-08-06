@@ -9,6 +9,7 @@ import { useSettingsStore } from "./stores/settings.js";
 import { FlightLogParser } from "./flightlog_parser.js";
 import { blackboxTimeFromVideoTime, syncLogToVideo, setVideoTime, setVideoOffset } from "./video_handler.js";
 import { updateValuesChart } from "./values_display.js";
+import { trackEvent } from "./analytics.js";
 
 const SMALL_JUMP_TIME = 100 * 1000;
 
@@ -337,6 +338,7 @@ export function logSmartSync() {
 }
 
 export function videoLoaded() {
+  trackEvent("video_loaded");
   const logStore = useLogStore(pinia);
   logStore.hasVideo = true;
   setGraphState(GRAPH_STATE_PAUSED);
