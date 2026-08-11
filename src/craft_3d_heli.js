@@ -19,6 +19,21 @@ const CRAFT_FACING_OFFSETS = {
   backward: Math.PI,
 };
 
+// Collective color: blue for negative (descending) pitch, green for positive (climb) pitch.
+// Opacity carries the magnitude, so the disc is fully transparent at zero collective and
+// becomes more visible the further the stick is pushed away from center in either direction.
+// Colors are pulled from GraphConfig.PALETTE (graph_config.js) rather than pure RGB primaries,
+// since that palette is already tuned for legibility against the app's black graph background.
+const COLLECTIVE_COLOR_NEGATIVE = new THREE.Color(0x80b1d3); // palette "Blue"
+const COLLECTIVE_COLOR_POSITIVE = new THREE.Color(0xb3de69); // palette "Green"
+const COLLECTIVE_DISC_MAX_OPACITY = 0.75;
+
+// The model already includes a "Cone"-named mesh at the rotor head: a wide, nearly-flat disc
+// (rendered near-black at 10% opacity in the source asset) meant to represent the spinning
+// main rotor's blur. Rather than place a new mesh and guess at the rotor head's position, we
+// recolor that existing disc directly to indicate collective pitch.
+const COLLECTIVE_DISC_NODE_NAME = "Cone";
+
 /**
  * Whether the given flight log has the attitude fields this model needs to be driven by.
  */
@@ -37,8 +52,11 @@ export function Craft3DHeli(flightLog, canvas, facing) {
     y: flightLog.getMainFieldIndexByName("attitude[2]"),
     z: flightLog.getMainFieldIndexByName("attitude[0]"),
   };
+  const collectiveFieldIndex = flightLog.getMainFieldIndexByName("rcCommand[3]");
+  const [collectiveMin, collectiveMax] = flightLog.getSysConfig().collectiveRange ?? [-500, 500];
 
   let model = null;
+  let collectiveDisc = null;
 
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   renderer.setSize(canvas.clientWidth, canvas.clientHeight);
@@ -75,16 +93,35 @@ export function Craft3DHeli(flightLog, canvas, facing) {
   loader.load(MODEL_URL, (gltf) => {
     model = gltf.scene;
     modelWrapper.add(model);
+
+    if (typeof collectiveFieldIndex === "number") {
+      collectiveDisc = model.getObjectByName(COLLECTIVE_DISC_NODE_NAME) || null;
+    }
+
     modelWrapper.rotation.y = facingOffset;
     render();
   });
 
-  const rotateTo = (x, y, z) => {
+  const rotateTo = (x, y, z, collectiveRaw) => {
     if (!model) return;
 
     model.rotation.x = x;
     modelWrapper.rotation.y = y + facingOffset;
     model.rotation.z = z;
+
+    if (collectiveDisc && typeof collectiveRaw === "number") {
+      const isNegative = collectiveRaw < 0;
+      const magnitude = Math.min(
+        Math.abs(collectiveRaw) / (Math.abs(isNegative ? collectiveMin : collectiveMax) || 1),
+        1,
+      );
+
+      collectiveDisc.material.color.copy(
+        isNegative ? COLLECTIVE_COLOR_NEGATIVE : COLLECTIVE_COLOR_POSITIVE,
+      );
+      collectiveDisc.material.opacity = magnitude * COLLECTIVE_DISC_MAX_OPACITY;
+    }
+
     render();
   };
 
@@ -95,6 +132,7 @@ export function Craft3DHeli(flightLog, canvas, facing) {
       (-frame[attitudeFrameIndex.x] / 1800) * Math.PI,
       (-frame[attitudeFrameIndex.y] / 1800) * Math.PI,
       (-frame[attitudeFrameIndex.z] / 1800) * Math.PI,
+      typeof collectiveFieldIndex === "number" ? frame[collectiveFieldIndex] : undefined,
     );
   };
 
