@@ -3,7 +3,7 @@
   "productName": "Blackbox Explorer",
   "displayName": "Rotorflight - Blackbox Explorer",
   "description": "Crossplatform blackbox analitics tool for Rotorflight flight control system.",
-  "version": "0.0.27",
+  "version": "0.0.29",
   "type": "module",
   "main": "index.html",
   "default_locale": "en",
@@ -16,7 +16,8 @@
     "format": "prettier --write src",
     "test": "vitest run",
     "clean": "node -e \"require('fs').rmSync('node_modules/.vite', { recursive: true, force: true })\"",
-    "start:clean": "npm run clean && npm run start"
+    "start:clean": "npm run clean && npm run start",
+    "node":"nvm use 22.22.0"
   },
   "repository": {
     "type": "git",
