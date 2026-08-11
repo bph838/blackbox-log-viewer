@@ -539,7 +539,7 @@ export function FlightLogParser(logData) {
       // Rotorflight logs the unfiltered gyro as gyroRAW; the rest of the app (graph groups,
       // friendly labels, default workspaces) knows this field as gyroUnfilt.
       if ((matches = names[i].match(/^gyroRAW(.+)$/))) {
-        names[i] = `gyroUnfilt${matches[1]}`
+        names[i] = `gyroRAW${matches[1]}`
       }
     }
 

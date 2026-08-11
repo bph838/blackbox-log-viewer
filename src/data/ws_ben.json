@@ -360,214 +360,290 @@
         "title": "PRY Gyro"
     },
     {
+        "title": "RC Commands",
         "graphConfig": [
             {
+                "label": "RC Command",
+                "height": 1,
                 "fields": [
                     {
-                        "color": "#fb8072",
-                        "curve": {
-                            "outputRange": 1,
-                            "power": 1
-                        },
-                        "default": {
-                            "outputRange": 1,
-                            "power": 1,
-                            "smoothing": 0
-                        },
-                        "grid": false,
-                        "lineWidth": 1,
                         "name": "rcCommand[0]",
-                        "smoothing": 0
-                    },
-                    {
-                        "color": "#8dd3c7",
+                        "smoothing": 0,
                         "curve": {
-                            "outputRange": 1,
-                            "power": 1
+                            "power": 1,
+                            "MinMax": {
+                                "min": 1000,
+                                "max": 2000
+                            }
                         },
                         "default": {
-                            "outputRange": 1,
+                            "smoothing": 0,
                             "power": 1,
-                            "smoothing": 0
+                            "MinMax": {
+                                "min": 1000,
+                                "max": 2000
+                            }
                         },
-                        "grid": false,
-                        "lineWidth": 1,
+                        "color": "#fb8072",
+                        "lineWidth": 1
+                    },
+                    {
                         "name": "rcCommand[1]",
-                        "smoothing": 0
-                    },
-                    {
-                        "color": "#ffffb3",
+                        "smoothing": 0,
                         "curve": {
-                            "outputRange": 1,
-                            "power": 1
+                            "power": 1,
+                            "MinMax": {
+                                "min": 1000,
+                                "max": 2000
+                            }
                         },
                         "default": {
-                            "outputRange": 1,
+                            "smoothing": 0,
                             "power": 1,
-                            "smoothing": 0
+                            "MinMax": {
+                                "min": 1000,
+                                "max": 2000
+                            }
                         },
-                        "grid": false,
-                        "lineWidth": 1,
+                        "color": "#8dd3c7",
+                        "lineWidth": 1
+                    },
+                    {
                         "name": "rcCommand[2]",
-                        "smoothing": 0
-                    },
-                    {
-                        "color": "#bebada",
+                        "smoothing": 0,
                         "curve": {
-                            "outputRange": 1,
-                            "power": 1
+                            "power": 1,
+                            "MinMax": {
+                                "min": 1000,
+                                "max": 2000
+                            }
                         },
                         "default": {
-                            "outputRange": 1,
+                            "smoothing": 0,
                             "power": 1,
-                            "smoothing": 0
+                            "MinMax": {
+                                "min": 1000,
+                                "max": 2000
+                            }
                         },
-                        "grid": false,
-                        "lineWidth": 1,
+                        "color": "#ffffb3",
+                        "lineWidth": 1
+                    },
+                    {
                         "name": "rcCommand[3]",
-                        "smoothing": 0
+                        "smoothing": 0,
+                        "curve": {
+                            "power": 1,
+                            "MinMax": {
+                                "min": 1000,
+                                "max": 2000
+                            }
+                        },
+                        "default": {
+                            "smoothing": 0,
+                            "power": 1,
+                            "MinMax": {
+                                "min": 1000,
+                                "max": 2000
+                            }
+                        },
+                        "color": "#bebada",
+                        "lineWidth": 1
                     },
                     {
-                        "color": "#80b1d3",
-                        "curve": {
-                            "outputRange": 1,
-                            "power": 1
-                        },
-                        "default": {
-                            "outputRange": 1,
-                            "power": 1,
-                            "smoothing": 0
-                        },
-                        "grid": false,
-                        "lineWidth": 1,
                         "name": "rcCommand[4]",
-                        "smoothing": 0
-                    }
-                ],
-                "height": 1,
-                "label": "RC Command"
-            },
-            {
-                "fields": [
-                    {
-                        "color": "#fb8072",
+                        "smoothing": 0,
                         "curve": {
-                            "outputRange": 1,
-                            "power": 1
-                        },
-                        "default": {
-                            "outputRange": 1,
                             "power": 1,
-                            "smoothing": 0
-                        },
-                        "grid": false,
-                        "lineWidth": 1,
-                        "name": "headspeed",
-                        "smoothing": 0
-                    }
-                ],
-                "height": 1,
-                "label": "Rotor Speeds"
-            },
-            {
-                "fields": [
-                    {
-                        "color": "#fb8072",
-                        "curve": {
-                            "outputRange": 1,
-                            "power": 0.25
+                            "MinMax": {
+                                "min": 1000,
+                                "max": 2000
+                            }
                         },
                         "default": {
-                            "outputRange": 1,
-                            "power": 0.25,
-                            "smoothing": 0
+                            "smoothing": 0,
+                            "power": 1,
+                            "MinMax": {
+                                "min": 1000,
+                                "max": 2000
+                            }
                         },
-                        "grid": false,
-                        "lineWidth": 1,
-                        "name": "setpoint[all]",
-                        "smoothing": 0
+                        "color": "#80b1d3",
+                        "lineWidth": 1
                     }
-                ],
+                ]
+            },
+            {
+                "label": "Rotor Speeds",
                 "height": 1,
-                "label": "Setpoints"
+                "fields": [
+                    {
+                        "name": "headspeed",
+                        "smoothing": 0,
+                        "curve": {
+                            "power": 1,
+                            "MinMax": {
+                                "min": 0,
+                                "max": 2049
+                            }
+                        },
+                        "default": {
+                            "smoothing": 0,
+                            "power": 1,
+                            "MinMax": {
+                                "min": 0,
+                                "max": 2049
+                            }
+                        },
+                        "color": "#fb8072",
+                        "lineWidth": 1
+                    }
+                ]
+            },
+            {
+                "label": "Setpoints",
+                "height": 1,
+                "fields": [
+                    {
+                        "name": "setpoint[0]",
+                        "smoothing": 0,
+                        "curve": {
+                            "power": 1,
+                            "MinMax": {
+                                "min": -108,
+                                "max": 192
+                            }
+                        },
+                        "default": {
+                            "smoothing": 0,
+                            "power": 1,
+                            "MinMax": {
+                                "min": -108,
+                                "max": 192
+                            }
+                        },
+                        "color": "#fb8072",
+                        "lineWidth": 1
+                    },
+                    {
+                        "name": "setpoint[1]",
+                        "smoothing": 0,
+                        "curve": {
+                            "power": 1,
+                            "MinMax": {
+                                "min": -200,
+                                "max": 244
+                            }
+                        },
+                        "default": {
+                            "smoothing": 0,
+                            "power": 1,
+                            "MinMax": {
+                                "min": -200,
+                                "max": 244
+                            }
+                        },
+                        "color": "#8dd3c7",
+                        "lineWidth": 1
+                    },
+                    {
+                        "name": "setpoint[2]",
+                        "smoothing": 0,
+                        "curve": {
+                            "power": 1,
+                            "MinMax": {
+                                "min": -264,
+                                "max": 294
+                            }
+                        },
+                        "default": {
+                            "smoothing": 0,
+                            "power": 1,
+                            "MinMax": {
+                                "min": -264,
+                                "max": 294
+                            }
+                        },
+                        "color": "#ffffb3",
+                        "lineWidth": 1
+                    },
+                    {
+                        "name": "setpoint[3]",
+                        "smoothing": 0,
+                        "curve": {
+                            "power": 1,
+                            "MinMax": {
+                                "min": -958,
+                                "max": 877
+                            }
+                        },
+                        "default": {
+                            "smoothing": 0,
+                            "power": 1,
+                            "MinMax": {
+                                "min": -958,
+                                "max": 877
+                            }
+                        },
+                        "color": "#bebada",
+                        "lineWidth": 1
+                    }
+                ]
             }
-        ],
-        "title": "RC Commands"
+        ]
     },
     {
+        "title": "Gov Check",
         "graphConfig": [
             {
+                "label": "Custom graph",
+                "height": 1,
                 "fields": [
                     {
-                        "color": "#fb8072",
-                        "curve": {
-                            "outputRange": 1,
-                            "power": 1
-                        },
-                        "default": {
-                            "outputRange": 1,
-                            "power": 1,
-                            "smoothing": 0
-                        },
-                        "grid": false,
-                        "lineWidth": 1,
                         "name": "rcCommand[4]",
-                        "smoothing": 0
-                    },
-                    {
-                        "color": "#ffffb3",
+                        "smoothing": 0,
                         "curve": {
-                            "outputRange": 1,
-                            "power": 1
+                            "power": 1,
+                            "MinMax": {
+                                "min": 1000,
+                                "max": 2000
+                            }
                         },
                         "default": {
-                            "outputRange": 1,
+                            "smoothing": 0,
                             "power": 1,
-                            "smoothing": 0
+                            "MinMax": {
+                                "min": 1000,
+                                "max": 2000
+                            }
                         },
-                        "grid": false,
-                        "lineWidth": 1,
+                        "color": "#fb8072",
+                        "lineWidth": 1
+                    },
+                    {
                         "name": "headspeed",
-                        "smoothing": 0
-                    },
-                    {
-                        "color": "#bebada",
+                        "smoothing": 0,
                         "curve": {
-                            "outputRange": 1,
-                            "power": 1
+                            "power": 1,
+                            "MinMax": {
+                                "min": 0,
+                                "max": 2049
+                            }
                         },
                         "default": {
-                            "outputRange": 1,
+                            "smoothing": 0,
                             "power": 1,
-                            "smoothing": 5000
+                            "MinMax": {
+                                "min": 0,
+                                "max": 2049
+                            }
                         },
-                        "grid": false,
-                        "lineWidth": 1,
-                        "name": "motor[0]",
-                        "smoothing": 5000
-                    },
-                    {
-                        "color": "#80b1d3",
-                        "curve": {
-                            "outputRange": 1,
-                            "power": 1
-                        },
-                        "default": {
-                            "outputRange": 1,
-                            "power": 1,
-                            "smoothing": 5000
-                        },
-                        "grid": false,
-                        "lineWidth": 1,
-                        "name": "motor[0]",
-                        "smoothing": 5000
+                        "color": "#ffffb3",
+                        "lineWidth": 1
                     }
-                ],
-                "height": 1,
-                "label": "Custom graph"
+                ]
             }
-        ],
-        "title": "Gov Check"
+        ]
     },
     {
         "title": "Gyro Tune",
@@ -646,63 +722,63 @@
                 "height": 1,
                 "fields": [
                     {
-                        "name": "gyroUnfilt[0]",
-                        "smoothing": 3000,
+                        "name": "gyroRAW[0]",
+                        "smoothing": 0,
                         "curve": {
                             "power": 1,
                             "MinMax": {
-                                "min": -534,
-                                "max": 534
+                                "min": -266,
+                                "max": 261
                             }
                         },
                         "default": {
-                            "smoothing": 3000,
+                            "smoothing": 0,
                             "power": 1,
                             "MinMax": {
-                                "min": -534,
-                                "max": 534
+                                "min": -266,
+                                "max": 261
                             }
                         },
                         "color": "#fb8072",
                         "lineWidth": 1
                     },
                     {
-                        "name": "gyroUnfilt[1]",
-                        "smoothing": 3000,
+                        "name": "gyroRAW[1]",
+                        "smoothing": 0,
                         "curve": {
                             "power": 1,
                             "MinMax": {
-                                "min": -534,
-                                "max": 534
+                                "min": -203,
+                                "max": 274
                             }
                         },
                         "default": {
-                            "smoothing": 3000,
+                            "smoothing": 0,
                             "power": 1,
                             "MinMax": {
-                                "min": -534,
-                                "max": 534
+                                "min": -203,
+                                "max": 274
                             }
                         },
                         "color": "#8dd3c7",
                         "lineWidth": 1
                     },
                     {
-                        "name": "gyroUnfilt[2]",
-                        "smoothing": 3000,
+                        "name": "gyroRAW[2]",
+                        "smoothing": 0,
                         "curve": {
                             "power": 1,
                             "MinMax": {
-                                "min": -534,
-                                "max": 534
+                                "min": -301,
+                                "max": 337
                             }
                         },
                         "default": {
-                            "smoothing": 3000,
+                            "smoothing": 0,
                             "power": 1,
                             "MinMax": {
-                                "min": -534,
-                                "max": 534
+                                "min": -301,
+                                "max": 337
                             }
                         },
                         "color": "#ffffb3",
@@ -718,40 +794,21 @@
                         "name": "headspeed",
                         "smoothing": 0,
                         "curve": {
-                            "power": 1                            
+                            "power": 1,
+                            "MinMax": {
+                                "min": 0,
+                                "max": 2049
+                            }
                         },
                         "default": {
                             "smoothing": 0,
-                            "power": 1                            
+                            "power": 1,
+                            "MinMax": {
+                                "min": 0,
+                                "max": 2049
+                            }
                         },
                         "color": "#fb8072",
-                        "lineWidth": 1
-                    },
-                    {
-                        "name": "motorSpeed",
-                        "smoothing": 0,
-                        "curve": {
-                            "power": 1                           
-                        },
-                        "default": {
-                            "smoothing": 0,
-                            "power": 1                            
-                        },
-                        "color": "#8dd3c7",
-                        "lineWidth": 1
-                    },
-                    {
-                        "name": "tailSpeed",
-                        "smoothing": 0,
-                        "curve": {
-                            "power": 1                           
-                        },
-                        "default": {
-                            "smoothing": 0,
-                            "power": 1
-                            
-                        },
-                        "color": "#ffffb3",
                         "lineWidth": 1
                     }
                 ]

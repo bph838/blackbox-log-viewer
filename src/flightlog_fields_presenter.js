@@ -17,7 +17,7 @@ export function FlightLogFieldPresenter() {
   // this is intentional
 }
 
-const FRIENDLY_FIELD_NAMES = {
+/*const FRIENDLY_FIELD_NAMES = {
   'axisP[all]': 'PID P',
   'axisP[0]': 'PID P [roll]',
   'axisP[1]': 'PID P [pitch]',
@@ -203,7 +203,165 @@ const FRIENDLY_FIELD_NAMES = {
   gpsDistance: 'GPS Home distance',
   gpsHomeAzimuth: 'GPS Home azimuth',
   gpsTrajectoryTiltAngle: 'GPS Traject. tilt angle',
-}
+}*/
+
+  const FRIENDLY_FIELD_NAMES = {
+
+        'axisP[all]': 'PID P',
+        'axisP[0]': 'PID P [roll]',
+        'axisP[1]': 'PID P [pitch]',
+        'axisP[2]': 'PID P [yaw]',
+
+        'axisI[all]': 'PID I',
+        'axisI[0]': 'PID I [roll]',
+        'axisI[1]': 'PID I [pitch]',
+        'axisI[2]': 'PID I [yaw]',
+
+        'axisD[all]': 'PID D',
+        'axisD[0]': 'PID D [roll]',
+        'axisD[1]': 'PID D [pitch]',
+        'axisD[2]': 'PID D [yaw]',
+
+        'axisF[all]': 'PID Feedforward',
+        'axisF[0]': 'PID Feedforward [roll]',
+        'axisF[1]': 'PID Feedforward [pitch]',
+        'axisF[2]': 'PID Feedforward [yaw]',
+
+        'axisB[all]': 'PID Boost',
+        'axisB[0]': 'PID Boost [roll]',
+        'axisB[1]': 'PID Boost [pitch]',
+        'axisB[2]': 'PID Boost [yaw]',
+
+        'axisO[all]': 'PID Offset',
+        'axisO[0]': 'PID Offset [roll]',
+        'axisO[1]': 'PID Offset [pitch]',
+        'axisO[2]': 'PID Offset [yaw]',
+
+        //Virtual field
+        'axisSum[all]': 'PID Sum',
+        'axisSum[0]' : 'PID Sum [roll]',
+        'axisSum[1]' : 'PID Sum [pitch]',
+        'axisSum[2]' : 'PID Sum [yaw]',
+
+        'axisPD[all]': 'PID PD Sum',
+        'axisPD[0]' : 'PID PD Sum [roll]',
+        'axisPD[1]' : 'PID PD Sum [pitch]',
+        'axisPD[2]' : 'PID PD Sum [yaw]',
+
+        //Virtual field
+        'axisError[all]': 'PID Error',
+        'axisError[0]' : 'PID Error [roll]',
+        'axisError[1]' : 'PID Error [pitch]',
+        'axisError[2]' : 'PID Error [yaw]',
+
+        'rcCommand[all]': 'RC Commands',
+        'rcCommand[0]': 'RC Command [roll]',
+        'rcCommand[1]': 'RC Command [pitch]',
+        'rcCommand[2]': 'RC Command [yaw]',
+        'rcCommand[3]': 'RC Command [collective]',
+        'rcCommand[4]': 'RC Command [throttle]',
+
+        'setpoint[all]': 'Setpoints',
+        'setpoint[0]': 'Setpoint [roll]',
+        'setpoint[1]': 'Setpoint [pitch]',
+        'setpoint[2]': 'Setpoint [yaw]',
+        'setpoint[3]': 'Setpoint [collective]',
+
+        'gyroADC[all]': 'Gyros',
+        'gyroADC[0]': 'Gyro [roll]',
+        'gyroADC[1]': 'Gyro [pitch]',
+        'gyroADC[2]': 'Gyro [yaw]',
+
+        'gyroRAW[all]': 'Unfiltered Gyros',
+        'gyroRAW[0]': 'Unfiltered Gyro [roll]',
+        'gyroRAW[1]': 'Unfiltered Gyro [pitch]',
+        'gyroRAW[2]': 'Unfiltered Gyro [yaw]',
+
+        'accADC[all]': 'Accel',
+        'accADC[0]': 'Accel [X]',
+        'accADC[1]': 'Accel [Y]',
+        'accADC[2]': 'Accel [Z]',
+
+        'magADC[all]': 'Compass',
+        'magADC[0]': 'Compass [X]',
+        'magADC[1]': 'Compass [Y]',
+        'magADC[2]': 'Compass [Z]',
+
+        'mixer[all]': 'Mixer',
+        'mixer[0]': 'Mixer SR [roll]',
+        'mixer[1]': 'Mixer SP [pitch]',
+        'mixer[2]': 'Mixer SY [yaw]',
+        'mixer[3]': 'Mixer SC [collective]',
+
+        'headspeed': 'Headspeed',
+        'tailspeed': 'Tailspeed',
+
+        'altitude': 'Altitude',
+        'vario': 'Variometer',
+
+        'rssi': 'RSSI',
+
+        'Vbat': 'Battery Voltage',
+        'Ibat': 'Battery Current',
+
+        'Vbec': 'BEC Voltage',
+        'Vbus': '5V Voltage',
+
+        'Tmcu': 'MCU Temperature',
+        'Tesc': 'ESC Temperature',
+        'Tesc2': 'ESC2 Temperature',
+        'Tbec': 'BEC Temperature',
+
+        'EscV': 'ESC Voltage',
+        'EscI': 'ESC Current',
+        'EscCap': 'ESC Consumption',
+        'EscRPM': 'ESC eRPM',
+        'EscThr': 'ESC Throttle',
+        'EscPwm': 'ESC PWM',
+
+        'Esc2V': 'ESC2 Voltage',
+        'Esc2I': 'ESC2 Current',
+        'Esc2Cap': 'ESC2 Consumption',
+        'Esc2RPM': 'ESC2 eRPM',
+
+        'BecV': 'BEC Voltage',
+        'BecI': 'BEC Current',
+
+        'motor[all]': 'Motors',
+        'motor[0]': 'Motor [1]',
+        'motor[1]': 'Motor [2]',
+        'motor[2]': 'Motor [3]',
+        'motor[3]': 'Motor [4]',
+
+        'servo[all]': 'Servos',
+        'servo[0]': 'Servo [1]',
+        'servo[1]': 'Servo [2]',
+        'servo[2]': 'Servo [3]',
+        'servo[3]': 'Servo [4]',
+        'servo[4]': 'Servo [5]',
+        'servo[5]': 'Servo [6]',
+        'servo[6]': 'Servo [7]',
+        'servo[7]': 'Servo [8]',
+
+        'attitude[all]': 'Attitude',
+        'attitude[0]': 'Attitude [roll]',
+        'attitude[1]': 'Attitude [pitch]',
+        'attitude[2]': 'Attitude [yaw]',
+
+        'flightModeFlags': 'Flight Mode Flags',
+        'stateFlags': 'State Flags',
+        'failsafePhase': 'Failsafe Phase',
+        'rxSignalReceived': 'RX Signal Received',
+        'rxFlightChannelsValid': 'RX Flight Ch. Valid',
+
+        'govP': 'Gov P',
+        'govI': 'Gov I',
+        'govD': 'Gov D',
+        'govF': 'Gov F',
+        'govSum': 'Gov PID sum',
+        'govRequest':'HS Requested',
+        'govTarget':'HS Target',
+    };
 
 const DEBUG_FRIENDLY_FIELD_NAMES_INITIAL = {
   NONE: {

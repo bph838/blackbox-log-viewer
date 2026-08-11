@@ -1591,7 +1591,7 @@ GraphConfig.getExampleGraphConfigs = function (flightLog, graphNames) {
   if (!flightLog.isFieldDisabled().GYROUNFILT) {
     EXAMPLE_GRAPHS.push({
       label: "Unfiltered Gyros",
-      fields: ["gyroUnfilt[all]"],
+      fields: ["gyroRAW[0]","gyroRAW[1]","gyroRAW[2]"],
     });
   }
   if (!flightLog.isFieldDisabled().SETPOINT) {
