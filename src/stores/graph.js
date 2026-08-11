@@ -75,6 +75,7 @@ export const useGraphStore = defineStore("graph", () => {
   const spectrumClear = shallowRef(null);
   const applyGraphZoom = shallowRef(null);
   const selectLogIndex = shallowRef(null);
+  const switchingLog = ref(false);
   const setSeekBarMode = shallowRef(null);
 
   // --- Legend actions ---
@@ -256,6 +257,7 @@ export const useGraphStore = defineStore("graph", () => {
     spectrumClear,
     applyGraphZoom,
     selectLogIndex,
+    switchingLog,
     setSeekBarMode,
     buildLegendGraphs,
     highlightLegendField,

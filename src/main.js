@@ -650,10 +650,19 @@ function BlackboxLogViewer() {
     };
     graphStore.setSeekBarMode = setSeekBarMode;
     graphStore.selectLogIndex = (index) => {
-      selectLog(Number.parseInt(index, 10));
-      if (graph) {
-        graph.setAnalyser(graphStore.hasAnalyserFullscreen);
-      }
+      graphStore.switchingLog = true;
+      // selectLog() below re-parses the log and rebuilds the grapher synchronously, which blocks
+      // the main thread - wait two animation frames so the browser actually paints the busy
+      // cursor (driven by switchingLog, see App.vue) before that work starts.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          selectLog(Number.parseInt(index, 10));
+          if (graph) {
+            graph.setAnalyser(graphStore.hasAnalyserFullscreen);
+          }
+          graphStore.switchingLog = false;
+        });
+      });
     };
     workspaceStore.switchWorkspace = (id) => {
       if (workspaceStore.workspaceGraphConfigs[id] != null) {
