@@ -1170,7 +1170,7 @@ export function FlightLogGrapher(
           craft3D =
             flightLog.getSysConfig().firmwareType === FIRMWARE_TYPE_ROTORFLIGHT &&
             heliModelHasAttitude(flightLog)
-              ? new Craft3DHeli(flightLog, craftCanvas)
+              ? new Craft3DHeli(flightLog, craftCanvas, options.craft && options.craft.facing)
               : new Craft3D(flightLog, craftCanvas, idents.motorColors);
         } catch {
           //WebGL not supported, fall back to 2D rendering
