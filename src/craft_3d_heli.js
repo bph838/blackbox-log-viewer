@@ -10,6 +10,15 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 const MODEL_URL = "/resources/models/bell_cw.gltf";
 
+// Extra yaw (in radians) added on top of the log's real-time yaw so the model's on-screen
+// "zero yaw" pose matches the user's chosen initial facing direction.
+const CRAFT_FACING_OFFSETS = {
+  forward: 0,
+  left: Math.PI / 2,
+  right: -Math.PI / 2,
+  backward: Math.PI,
+};
+
 /**
  * Whether the given flight log has the attitude fields this model needs to be driven by.
  */
@@ -21,7 +30,8 @@ export function heliModelHasAttitude(flightLog) {
   );
 }
 
-export function Craft3DHeli(flightLog, canvas) {
+export function Craft3DHeli(flightLog, canvas, facing) {
+  const facingOffset = CRAFT_FACING_OFFSETS[facing] || 0;
   const attitudeFrameIndex = {
     x: flightLog.getMainFieldIndexByName("attitude[1]"),
     y: flightLog.getMainFieldIndexByName("attitude[2]"),
@@ -65,6 +75,7 @@ export function Craft3DHeli(flightLog, canvas) {
   loader.load(MODEL_URL, (gltf) => {
     model = gltf.scene;
     modelWrapper.add(model);
+    modelWrapper.rotation.y = facingOffset;
     render();
   });
 
@@ -72,7 +83,7 @@ export function Craft3DHeli(flightLog, canvas) {
     if (!model) return;
 
     model.rotation.x = x;
-    modelWrapper.rotation.y = y;
+    modelWrapper.rotation.y = y + facingOffset;
     model.rotation.z = z;
     render();
   };

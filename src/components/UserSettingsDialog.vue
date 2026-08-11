@@ -111,6 +111,19 @@
             </div>
           </UiBox>
 
+          <!-- Craft Settings -->
+          <UiBox title="Craft Settings">
+            <SettingRow label="Initial Attitude" help="Direction the 3D craft model faces at zero yaw">
+              <USelect
+                v-model="local.craft.facing"
+                :items="craftFacingOptions"
+                :ui="{ content: 'z-[300]' }"
+                size="sm"
+                class="min-w-36"
+              />
+            </SettingRow>
+          </UiBox>
+
              <!-- Overlay Positions (collapsible) -->
           <UiBox title="Overlay Positions">
             <details>
@@ -401,6 +414,13 @@ const darkModeOptions = [
   { label: "Auto (system)", value: 2 },
   { label: "Off (light)", value: 1 },
   { label: "On (dark)", value: 0 },
+];
+
+const craftFacingOptions = [
+  { label: "Facing Left", value: "left" },
+  { label: "Facing Forwards", value: "forward" },
+  { label: "Facing Right", value: "right" },
+  { label: "Facing Backwards", value: "backward" },
 ];
 
 // Overlay position rows — driven by local state so grid columns align
