@@ -53,7 +53,10 @@
           @click="onGraphClick($event, gi)"
           @mousedown.middle.prevent="onResetPen(gi, null)"
         >
-          <UIcon name="i-lucide-trash-2" class="size-3.5 mr-1 inline-block align-middle" />
+          <UIcon
+            :name="graphStore.legendGraphs.length === 1 ? 'i-lucide-chevrons-left-right' : 'i-lucide-chevrons-right-left'"
+            class="size-3.5 mr-1 inline-block align-middle"
+          />
           {{ graph.label }}
         </h3>
 
