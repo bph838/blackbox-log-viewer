@@ -1577,14 +1577,15 @@ GraphConfig.getExampleGraphConfigs = function (flightLog, graphNames) {
       label: "Motors",
       fields: ["motor[all]", "servo[5]"],
     });
+    /*
     EXAMPLE_GRAPHS.push({
       label: "Motors (Legacy)",
       fields: ["motorLegacy[all]", "servo[5]"],
-    });
+    });*/
   }
-  if (!flightLog.isFieldDisabled().RPM) {
-    EXAMPLE_GRAPHS.push({ label: "RPM", fields: ["eRPM[all]"] });
-  }
+  //if (!flightLog.isFieldDisabled().RPM) {
+//    EXAMPLE_GRAPHS.push({ label: "RPM", fields: ["eRPM[all]"] });
+//  }
   if (!flightLog.isFieldDisabled().GYRO) {
     EXAMPLE_GRAPHS.push({ label: "Gyros", fields: ["gyroADC[all]"] });
   }
