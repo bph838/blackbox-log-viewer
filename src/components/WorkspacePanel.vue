@@ -102,14 +102,14 @@ const workspaceItems = computed(() => {
         emit("apply-default", 1);
       },
     }
-    /*,
+    ,
     {
-      label: "Preset: SupaflyFPV",
+      label: "Preset: UAVTech",
       icon: "i-lucide-layout-template",
       onSelect() {
         emit("apply-default", 2);
       },
-    },*/
+    },
   ];
 
   return [wsItems, presetItems];

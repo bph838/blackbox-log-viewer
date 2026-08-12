@@ -73,6 +73,12 @@ const FRIENDLY_FIELD_NAMES = {
         'rcCommand[3]': 'RC Command [collective]',
         'rcCommand[4]': 'RC Command [throttle]',
 
+        'rcCommands[all]': 'RC Rates',
+        'rcCommands[0]': 'RC Rate [roll]',
+        'rcCommands[1]': 'RC Rate [pitch]',
+        'rcCommands[2]': 'RC Rate [yaw]',
+        'rcCommands[3]': 'RC Rate [throttle]',
+
         'setpoint[all]': 'Setpoints',
         'setpoint[0]': 'Setpoint [roll]',
         'setpoint[1]': 'Setpoint [pitch]',
@@ -94,6 +100,11 @@ const FRIENDLY_FIELD_NAMES = {
         'accADC[1]': 'Accel [Y]',
         'accADC[2]': 'Accel [Z]',
 
+        'accSmooth[all]': 'Accel',
+        'accSmooth[0]': 'Accel [X]',
+        'accSmooth[1]': 'Accel [Y]',
+        'accSmooth[2]': 'Accel [Z]',
+
         'magADC[all]': 'Compass',
         'magADC[0]': 'Compass [X]',
         'magADC[1]': 'Compass [Y]',
@@ -107,14 +118,19 @@ const FRIENDLY_FIELD_NAMES = {
 
         'headspeed': 'Headspeed',
         'tailspeed': 'Tailspeed',
+        'motorSpeed': 'Motor Speed',
+        'tailSpeed': 'Tail Speed',
 
         'altitude': 'Altitude',
         'vario': 'Variometer',
+        'baroAlt': 'Barometer Altitude',
 
         'rssi': 'RSSI',
 
         'Vbat': 'Battery Voltage',
         'Ibat': 'Battery Current',
+        'vbatLatest': 'Battery Voltage',
+        'amperageLatest': 'Battery Current',
 
         'Vbec': 'BEC Voltage',
         'Vbus': '5V Voltage',
@@ -145,6 +161,16 @@ const FRIENDLY_FIELD_NAMES = {
         'motor[2]': 'Motor [3]',
         'motor[3]': 'Motor [4]',
 
+        'eRPM[all]': 'eRPM',
+        'eRPM[0]': 'eRPM [1]',
+        'eRPM[1]': 'eRPM [2]',
+        'eRPM[2]': 'eRPM [3]',
+        'eRPM[3]': 'eRPM [4]',
+        'eRPM[4]': 'eRPM [5]',
+        'eRPM[5]': 'eRPM [6]',
+        'eRPM[6]': 'eRPM [7]',
+        'eRPM[7]': 'eRPM [8]',
+
         'servo[all]': 'Servos',
         'servo[0]': 'Servo [1]',
         'servo[1]': 'Servo [2]',
@@ -160,11 +186,35 @@ const FRIENDLY_FIELD_NAMES = {
         'attitude[1]': 'Attitude [pitch]',
         'attitude[2]': 'Attitude [yaw]',
 
+        'heading[all]': 'Heading',
+        'heading[0]': 'Heading [roll]',
+        'heading[1]': 'Heading [pitch]',
+        'heading[2]': 'Heading [yaw]',
+
         'flightModeFlags': 'Flight Mode Flags',
         'stateFlags': 'State Flags',
         'failsafePhase': 'Failsafe Phase',
+        'features': 'Features',
         'rxSignalReceived': 'RX Signal Received',
         'rxFlightChannelsValid': 'RX Flight Ch. Valid',
+
+        'GPS_numSat': 'GPS Satellites',
+        'GPS_coord[0]': 'GPS Latitude',
+        'GPS_coord[1]': 'GPS Longitude',
+        'GPS_altitude': 'GPS Altitude',
+        'GPS_speed': 'GPS Speed',
+        'GPS_ground_course': 'GPS Ground Course',
+        'GPS_velned[0]': 'GPS Velocity [N]',
+        'GPS_velned[1]': 'GPS Velocity [E]',
+        'GPS_velned[2]': 'GPS Velocity [D]',
+
+        'gpsCartesianCoords[all]': 'GPS Position',
+        'gpsCartesianCoords[0]': 'GPS Position [X]',
+        'gpsCartesianCoords[1]': 'GPS Position [Y]',
+        'gpsCartesianCoords[2]': 'GPS Position [Z]',
+        'gpsDistance': 'GPS Distance from Home',
+        'gpsHomeAzimuth': 'GPS Home Azimuth',
+        'gpsTrajectoryTiltAngle': 'GPS Trajectory Tilt Angle',
 
         'govP': 'Gov P',
         'govI': 'Gov I',

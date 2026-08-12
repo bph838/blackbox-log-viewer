@@ -8,6 +8,7 @@ import { SeekBar } from "./seekbar.js";
 //import workspace_ctzsnooze from "./data/ws_ctzsnooze.json";
 //import workspace_supafly from "./data/ws_supafly.json";
 import workspace_Ben from "./data/ws_ben.json";
+import workspace_UAVTech from "./data/ws_uavtech.json";
 import { FlightLog } from "./flightlog.js";
 import {
   stringTimetoMsec,
@@ -671,7 +672,7 @@ function BlackboxLogViewer() {
     };
     workspaceStore.saveWorkspace = (id, title) => onSaveWorkspace(id, title);
     workspaceStore.applyDefaultWorkspace = (index) => {
-      const presets = [null, structuredClone(workspace_Ben)/*,structuredClone(workspace_ctzsnooze), structuredClone(workspace_supafly)*/];
+      const presets = [null, structuredClone(workspace_Ben), structuredClone(workspace_UAVTech)/*,structuredClone(workspace_ctzsnooze), structuredClone(workspace_supafly)*/];
       if (presets[index]) {
         onSwitchWorkspace(presets[index], 1);
       }
