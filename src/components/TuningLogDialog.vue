@@ -265,7 +265,17 @@
                       : 'bg-primary/10 prose prose-sm dark:prose-invert max-w-none tuning-log-ai-turn'
                   "
                 >
-                  <template v-if="turn.role === 'user'">{{ turn.content }}</template>
+                  <template v-if="turn.role === 'user'">
+                    <div v-if="turnImages(turn).length" class="flex flex-wrap gap-1 mb-1">
+                      <img
+                        v-for="(src, j) in turnImages(turn)"
+                        :key="j"
+                        :src="src"
+                        class="h-16 rounded border border-default"
+                      />
+                    </div>
+                    {{ turnText(turn) }}
+                  </template>
                   <div v-else v-html="renderMarkdown(turn.content)" />
                 </div>
                 <div
@@ -299,11 +309,30 @@
                     text="Load your custom Agent Skills (configured under Settings → AI Analysis Settings) into this request via a code-execution container. Adds a small amount of extra cost/latency. Applies to follow-up questions too."
                   />
                 </label>
+                <div v-if="pendingImages.length" class="flex flex-wrap gap-2">
+                  <div v-for="img in pendingImages" :key="img.id" class="relative group/thumb">
+                    <img :src="img.dataUrl" class="h-14 w-14 object-cover rounded border border-default" />
+                    <UButton
+                      variant="solid"
+                      color="neutral"
+                      size="2xs"
+                      icon="i-lucide-x"
+                      title="Remove image"
+                      class="absolute -top-1.5 -right-1.5 rounded-full opacity-0 group-hover/thumb:opacity-100"
+                      @click="removePendingImage(img.id)"
+                    />
+                  </div>
+                </div>
                 <UTextarea
                   v-model="aiPromptText"
                   :rows="2"
-                  :placeholder="hasConversation ? 'Ask a follow-up question…' : 'Anything specific you want help with? (optional)'"
+                  :placeholder="
+                    hasConversation
+                      ? 'Ask a follow-up question… (paste an image to attach it)'
+                      : 'Anything specific you want help with? (optional - paste an image to attach it)'
+                  "
                   class="w-full"
+                  @paste="onPromptPaste"
                 />
                 <div class="flex items-center gap-2 flex-wrap">
                   <UButton
@@ -688,6 +717,9 @@ async function onCopyPrompt() {
 // ---- Ask AI ----
 
 const aiPromptText = ref("");
+// Images pasted into the prompt box to send alongside the question (e.g. a screenshot of a
+// Configurator page) - like aiPromptText, this is a single shared list rather than per-entry.
+const pendingImages = ref([]); // [{ id, dataUrl }]
 const aiError = ref("");
 const pendingEntryIds = ref(new Set());
 const streamingTextByEntryId = ref({});
@@ -730,9 +762,11 @@ const showAiPanel = computed(
 
 const conversationTurns = computed(() => {
   const conversation = currentEntry.value?.ai?.conversation || [];
-  // Only string-content turns are shown - a 'user' turn with array content is the initial
-  // image+prompt message, already shown above via the image/config panels.
-  return conversation.filter((turn) => typeof turn.content === "string");
+  // The first turn is always the initial analyze() request (step response image + config text),
+  // already shown above via the image/config panels, so it's skipped here. Every later turn is
+  // shown as-is, whether it's a follow-up's plain string or an array of text/image blocks (a
+  // follow-up with pasted images attached).
+  return conversation.slice(1);
 });
 
 const streamingText = computed(() => {
@@ -778,6 +812,53 @@ watch(selectedEntryId, () => {
   });
 });
 
+// Lets the user paste an image (e.g. copied from a screenshot tool, or another window) straight
+// into the prompt box to send it along with the question. Handled on the native paste event
+// rather than via navigator.clipboard.read() so it needs no extra permission prompt and fires
+// naturally on Ctrl+V.
+function onPromptPaste(e) {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+
+  const imageItems = Array.from(items).filter((item) => item.type.startsWith("image/"));
+  if (!imageItems.length) return;
+
+  // Stop the browser from also inserting a text/plain sibling (e.g. a file path) some clipboard
+  // sources attach alongside the image bitmap.
+  e.preventDefault();
+
+  for (const item of imageItems) {
+    const file = item.getAsFile();
+    if (!file) continue;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      pendingImages.value = [...pendingImages.value, { id: `${Date.now()}-${Math.random()}`, dataUrl: reader.result }];
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function removePendingImage(id) {
+  pendingImages.value = pendingImages.value.filter((img) => img.id !== id);
+}
+
+function turnText(turn) {
+  if (typeof turn.content === "string") return turn.content;
+  if (!Array.isArray(turn.content)) return "";
+  return turn.content
+    .filter((block) => block.type === "text")
+    .map((block) => block.text)
+    .join("\n");
+}
+
+function turnImages(turn) {
+  if (!Array.isArray(turn.content)) return [];
+  return turn.content
+    .filter((block) => block.type === "image")
+    .map((block) => `data:${block.source.media_type};base64,${block.source.data}`);
+}
+
 function onAskAi() {
   const entry = currentEntry.value;
   if (!entry || !entry.image) return;
@@ -788,6 +869,7 @@ function onAskAi() {
 
   const settings = settingsStore.userSettings;
   const promptText = aiPromptText.value;
+  const images = pendingImages.value.map((img) => img.dataUrl);
   const hadConversation = hasConversation.value;
   const historyMessages = TuningAI.buildHistoryMessages(tuningLogStore.currentLog, entry.id);
 
@@ -815,6 +897,7 @@ function onAskAi() {
     skillIds: useSkillsModel.value ? settings.aiSkillIds : [],
     historyMessages,
     expertMode: expertModeModel.value,
+    images,
     onChunk: (textSnapshot) => setStreamingText(entry.id, textSnapshot),
   };
 
@@ -822,10 +905,11 @@ function onAskAi() {
     clearPending(entry.id);
     tuningLogStore.setEntryAiResult(entry.id, { model: settings.aiModel, conversation: entryMessages, costUsd });
 
-    // aiPromptText is a single shared textarea, not per-entry - only worth clearing it if we're
-    // still looking at the entry this response belongs to.
+    // aiPromptText/pendingImages are a single shared textarea+attachments, not per-entry - only
+    // worth clearing them if we're still looking at the entry this response belongs to.
     if (currentEntry.value?.id === entry.id) {
       aiPromptText.value = "";
+      pendingImages.value = [];
     }
   }
 
