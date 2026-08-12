@@ -26,6 +26,18 @@ function imageBase64FromDataUrl(dataUrl) {
   return (dataUrl || "").replace(/^data:image\/\w+;base64,/, "");
 }
 
+function mediaTypeFromDataUrl(dataUrl) {
+  const match = /^data:(image\/\w+);base64,/.exec(dataUrl || "");
+  return match ? match[1] : "image/png";
+}
+
+function imageBlocksFromDataUrls(dataUrls) {
+  return (dataUrls || []).map((dataUrl) => ({
+    type: "image",
+    source: { type: "base64", media_type: mediaTypeFromDataUrl(dataUrl), data: imageBase64FromDataUrl(dataUrl) },
+  }));
+}
+
 /**
  * Estimated cost in USD for one API response, from its `usage` object. Cache writes are priced at
  * the 5-minute-TTL premium (1.25x input) since that's what this app requests.
@@ -245,7 +257,9 @@ function sendMessages(options, messages, onResult, onError) {
  * the rest of the tuning log's history prepended as context.
  *
  * options: { apiKey, model, effort, skillIds, historyMessages, entry: {image,
- * config}, instructions, expertMode, onChunk }
+ * config}, instructions, expertMode, images, onChunk }
+ * images, if given, is an array of extra data-URL images (e.g. pasted screenshots) to attach
+ * alongside the entry's own step response image.
  * effort, if given, is passed through as output_config.effort ('low'/'medium'/'high'/'xhigh'/
  * 'max') on models that support it - ignored otherwise.
  * skillIds, if given, are the IDs of custom Agent Skills previously uploaded to this Anthropic
@@ -275,6 +289,8 @@ export function analyze(options, onResult, onError) {
     });
   }
 
+  content.push(...imageBlocksFromDataUrls(options.images));
+
   content.push({
     type: "text",
     text: buildPromptText({ configSummary: options.entry.config, instructions: options.instructions, expertMode: options.expertMode }),
@@ -296,10 +312,12 @@ export function analyze(options, onResult, onError) {
  * Continues an existing entry's conversation with a follow-up question.
  *
  * options: { apiKey, model, effort, skillIds, historyMessages, messages, question,
- * onChunk }
+ * images, onChunk }
  * `messages` is this entry's own conversation so far (as returned by a previous analyze()/ask() call).
  * effort, if given, is passed through as output_config.effort on models that support it.
  * skillIds behaves as documented on analyze().
+ * images, if given, is an array of extra data-URL images (e.g. pasted screenshots) to attach
+ * alongside the question.
  * onChunk(textSnapshot), if given, is called repeatedly as the response streams in, with the full
  * response text accumulated so far.
  * onResult(resultText, entryMessages, costUsd) - pass the updated entryMessages back in for the
@@ -312,13 +330,20 @@ export function ask(options, onResult, onError) {
   }
 
   const question = (options.question || "").trim();
-  if (!question) {
+  const imageBlocks = imageBlocksFromDataUrls(options.images);
+  if (!question && !imageBlocks.length) {
     onError("Please enter a question.");
     return;
   }
 
+  // Plain text when there are no attached images, keeping the stored conversation shape
+  // unchanged for the common case - an array of blocks only when there's something to attach.
+  const content = imageBlocks.length
+    ? [...imageBlocks, { type: "text", text: question || "(No question given - see attached image(s).)" }]
+    : question;
+
   const historyMessages = options.historyMessages || [];
-  const messages = (options.messages || []).concat([{ role: "user", content: question }]);
+  const messages = (options.messages || []).concat([{ role: "user", content }]);
 
   sendMessages(
     options,
