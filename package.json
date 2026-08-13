@@ -3,7 +3,7 @@
   "productName": "Blackbox Explorer",
   "displayName": "Rotorflight - Blackbox Explorer",
   "description": "Crossplatform blackbox analitics tool for Rotorflight flight control system.",
-  "version": "0.0.33",
+  "version": "0.0.34",
   "type": "module",
   "main": "index.html",
   "default_locale": "en",
