@@ -436,6 +436,7 @@ function onImportFileChange(e) {
   tuningLogStore
     .importFromFile(file)
     .then(() => {
+      creatingNew.value = false;
       selectedEntryId.value = null;
       syncSelectionToCurrentFlightLog();
     })
@@ -469,7 +470,12 @@ const currentFlightLogEntry = computed(() => {
 // once captured, the matching entry itself is shown instead of a duplicate placeholder row.
 const pinnedSlotVisible = computed(() => !currentFlightLogEntry.value);
 
-const sidebarEntries = computed(() => [...tuningLogStore.entries].reverse());
+// Entries in the underlying log are stored in capture order, which isn't necessarily chronological
+// (e.g. importing a log built from out-of-order captures, or a flight log opened later that's
+// actually older) - sort by timestamp so the sidebar always reads newest-first.
+const sidebarEntries = computed(() =>
+  [...tuningLogStore.entries].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)),
+);
 
 const currentEntry = computed(() => {
   if (selectedEntryId.value === null) return null;
@@ -538,8 +544,8 @@ function deleteEntry(id) {
 
 const displayOrder = computed(() => {
   const order = pinnedSlotVisible.value ? [null] : [];
-  for (let i = tuningLogStore.entries.length - 1; i >= 0; i--) {
-    order.push(tuningLogStore.entries[i].id);
+  for (const entry of sidebarEntries.value) {
+    order.push(entry.id);
   }
   return order;
 });
@@ -606,12 +612,11 @@ function entryHasAnalysis(entry) {
   return !!(entry.ai && entry.ai.conversation && entry.ai.conversation.length);
 }
 
-// The current entry isn't necessarily the newest one in the log - entries are ordered by when
-// they were captured, not by flight log timestamp, so an older flight log opened later ends up
-// above it in the list.
+// The current entry isn't necessarily the newest one in the log - flight logs can be opened out of
+// chronological order, so an older flight log opened later ends up below newer entries in the
+// (timestamp-sorted) list.
 function isBehindLatest(entry) {
-  const entries = tuningLogStore.entries;
-  const latestId = entries.length ? entries[entries.length - 1].id : null;
+  const latestId = sidebarEntries.value.length ? sidebarEntries.value[0].id : null;
   return entry.id === currentFlightLogEntryId.value && entry.id !== latestId;
 }
 
