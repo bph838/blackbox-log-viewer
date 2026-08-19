@@ -2,7 +2,11 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import HeaderDialog from "./HeaderDialog.vue";
 import ParamTable from "./ParamTable.vue";
-import { FIRMWARE_TYPE_ROTORFLIGHT } from "../flightlog_fielddefs.js";
+import FeatureTable from "./FeatureTable.vue";
+import {
+  FIRMWARE_TYPE_ROTORFLIGHT,
+  FIRMWARE_TYPE_BETAFLIGHT,
+} from "../flightlog_fielddefs.js";
 
 function mountWithSysConfig(sysConfig) {
   return mount(HeaderDialog, {
@@ -20,6 +24,14 @@ function yawPrecompPaneParams(wrapper) {
     return null;
   }
   return pane.findComponent(ParamTable).props("params");
+}
+
+function featuresPaneData(wrapper) {
+  const pane = wrapper.find('[data-group="Features"]');
+  if (!pane.exists()) {
+    return null;
+  }
+  return pane.findComponent(FeatureTable).props("data");
 }
 
 describe("HeaderDialog Yaw Precompensation pane", () => {
@@ -53,5 +65,38 @@ describe("HeaderDialog Yaw Precompensation pane", () => {
     });
 
     expect(wrapper.find('[data-group="Yaw Precompensation"]').exists()).toBe(false);
+  });
+});
+
+describe("HeaderDialog Features pane", () => {
+  it("decodes Rotorflight feature bits using Rotorflight's own bit assignments", () => {
+    // bit 3 RX_SERIAL, bit 10 TELEMETRY, bit 27 ESC_SENSOR, bit 28 FREQ_SENSOR
+    const features = (1 << 3) | (1 << 10) | (1 << 27) | (1 << 28);
+    const wrapper = mountWithSysConfig({
+      firmwareType: FIRMWARE_TYPE_ROTORFLIGHT,
+      firmwareVersion: "4.6.0",
+      features,
+    });
+
+    const names = featuresPaneData(wrapper).map((f) => f.name);
+    expect(names).toEqual(
+      expect.arrayContaining(["RX_SERIAL", "TELEMETRY", "ESC_SENSOR", "FREQ_SENSOR"]),
+    );
+    // Rotorflight bit 28 is FREQ_SENSOR, not Betaflight's ANTI_GRAVITY.
+    expect(names).not.toContain("ANTI_GRAVITY");
+  });
+
+  it("still decodes Betaflight feature bits using Betaflight's bit assignments", () => {
+    // bit 27 ESC_SENSOR, bit 28 ANTI_GRAVITY (Betaflight numbering)
+    const features = (1 << 27) | (1 << 28);
+    const wrapper = mountWithSysConfig({
+      firmwareType: FIRMWARE_TYPE_BETAFLIGHT,
+      firmwareVersion: "4.3.0",
+      features,
+    });
+
+    const names = featuresPaneData(wrapper).map((f) => f.name);
+    expect(names).toEqual(expect.arrayContaining(["ESC_SENSOR", "ANTI_GRAVITY"]));
+    expect(names).not.toContain("FREQ_SENSOR");
   });
 });

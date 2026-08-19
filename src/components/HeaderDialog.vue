@@ -217,6 +217,7 @@ import {
   DEBUG_MODE,
   FIRMWARE_TYPE_BETAFLIGHT,
   FIRMWARE_TYPE_INAV,
+  FIRMWARE_TYPE_ROTORFLIGHT,
 } from "../flightlog_fielddefs";
 
 const open = defineModel("open", { type: Boolean, default: false });
@@ -243,6 +244,7 @@ const fwType = computed(() => sc.value.firmwareType);
 const fwVer = computed(() => sc.value.firmwareVersion || "0.0.0");
 const isBF = computed(() => fwType.value === FIRMWARE_TYPE_BETAFLIGHT);
 const isINAV = computed(() => fwType.value === FIRMWARE_TYPE_INAV);
+const isRotorflight = computed(() => fwType.value === FIRMWARE_TYPE_ROTORFLIGHT);
 
 function gte(ver) {
   return semver.gte(fwVer.value, ver);
@@ -849,6 +851,42 @@ const featuresList = computed(() => {
     return [];
   }
   const value = s.features;
+
+  if (isRotorflight.value) {
+    // Rotorflight's feature bits diverge from Betaflight's from bit 9 up
+    // (see rotorflight-firmware src/main/config/feature.h) — most notably
+    // bit 28 is FREQ_SENSOR, not ANTI_GRAVITY. This list is fixed (not
+    // version-gated) to match the official rotorflight-blackbox viewer.
+    const rfFeatures = [
+      { bit: 0, name: "RX_PPM", description: "PPM receiver" },
+      { bit: 3, name: "RX_SERIAL", description: "Serial receiver" },
+      { bit: 6, name: "SOFTSERIAL", description: "CPU serial port" },
+      { bit: 7, name: "GPS", description: "GPS connected" },
+      { bit: 10, name: "TELEMETRY", description: "Telemetry output" },
+      { bit: 13, name: "RX_PARALLEL_PWM", description: "PWM receiver" },
+      { bit: 14, name: "RX_MSP", description: "Controller over MSP" },
+      { bit: 16, name: "LED_STRIP", description: "LED strip" },
+      { bit: 18, name: "OSD", description: "On-screen display" },
+      { bit: 19, name: "CMS", description: "Configuration menu system" },
+      { bit: 27, name: "ESC_SENSOR", description: "ESC telemetry sensor" },
+      { bit: 28, name: "FREQ_SENSOR", description: "Frequency sensor" },
+      {
+        bit: 29,
+        name: "DYN_NOTCH",
+        description: "Dynamic gyro notch filtering",
+      },
+      { bit: 30, name: "RPM_FILTER", description: "RPM filtering" },
+    ];
+
+    return rfFeatures
+      .sort((a, b) => a.bit - b.bit)
+      .map((f) => ({
+        name: f.name,
+        description: f.description,
+        enabled: !!(value & (1 << f.bit)),
+      }))
+      .filter((f) => f.enabled);
+  }
 
   const features = [
     { bit: 0, name: "RX_PPM", description: "PPM Receiver" },
