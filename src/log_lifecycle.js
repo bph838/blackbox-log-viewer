@@ -105,19 +105,13 @@ export function renderLogFileInfo(file) {
         // Leave dateTime blank; the elapsed-time range below is still shown.
       }
 
-      const rangeLabel = `${formatTime(
-        logStore.flightLog.getMinTime(index) / 1000,
-        false,
-      )} - ${formatTime(
-        logStore.flightLog.getMaxTime(index) / 1000,
-        false,
-      )} [${formatTime(
+      const durationLabel = `[${formatTime(
         Math.ceil(
           (logStore.flightLog.getMaxTime(index) - logStore.flightLog.getMinTime(index)) / 1000,
         ),
         false,
       )}]`;
-      logLabel = dateTime ? `${dateTime}  ${rangeLabel}` : rangeLabel;
+      logLabel = dateTime ? `${dateTime}  ${durationLabel}` : durationLabel;
     }
     const label = logCount > 1
       ? `${index + 1}/${logCount}: ${logLabel}`
