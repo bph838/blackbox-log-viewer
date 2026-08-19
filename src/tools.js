@@ -207,6 +207,29 @@ export function formatTime(msec, displayMsec) {
   }:${leftPad(secs, "0", 2)}${displayMsec ? `.${leftPad(ms, "0", 3)}` : ""}`;
 }
 
+/**
+ * Format an ISO timestamp (see tuning_log.js:logTimestamp) as a compact "24 Jan 2026, 00:40"
+ * string for display next to a flight log entry. Reads UTC components rather than the viewer's
+ * local timezone - see TuningLogDialog.vue's formatTimestamp for why: the digits should match the
+ * "Log start datetime" header verbatim rather than shifting with the viewer's timezone.
+ */
+export function formatLogDateTime(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "UTC",
+  }).format(date);
+}
+
 export function stringLoopTime(
   loopTime,
   pid_process_denom,

@@ -3,9 +3,10 @@ import { useLogStore } from "./stores/log.js";
 import { useGraphStore } from "./stores/graph.js";
 import { useAppStore } from "./stores/app.js";
 import { useCraftConfigStore } from "./stores/craftConfig.js";
-import { formatTime, stringLoopTime } from "./tools.js";
+import { formatTime, formatLogDateTime, stringLoopTime } from "./tools.js";
 import { FIRMWARE_TYPE_ROTORFLIGHT } from "./flightlog_fielddefs.js";
 import { resolveGearRatios } from "./craft_config.js";
+import { logTimestamp } from "./tuning_log.js";
 
 /**
  * Compare the flight log's craft name against the loaded craft config (if any), and set the
@@ -90,7 +91,21 @@ export function renderLogFileInfo(file) {
     if (error) {
       logLabel = error;
     } else {
-      logLabel = `${formatTime(
+      // Parse this sub-log's own header so its "Log start datetime" (which can differ per
+      // arm/disarm session within a multi-log file) is available for the dropdown entry below.
+      // getLogError() above only reflects the lightweight index-scan pass, so a full header parse
+      // can still fail here - fall back to no date/time rather than aborting the whole file load.
+      let dateTime = "";
+      try {
+        logStore.flightLog.openLog(index);
+        dateTime = formatLogDateTime(
+          logTimestamp(logStore.flightLog.getSysConfig(), appStore.logFileLastModified),
+        );
+      } catch {
+        // Leave dateTime blank; the elapsed-time range below is still shown.
+      }
+
+      const rangeLabel = `${formatTime(
         logStore.flightLog.getMinTime(index) / 1000,
         false,
       )} - ${formatTime(
@@ -102,6 +117,7 @@ export function renderLogFileInfo(file) {
         ),
         false,
       )}]`;
+      logLabel = dateTime ? `${dateTime}  ${rangeLabel}` : rangeLabel;
     }
     const label = logCount > 1
       ? `${index + 1}/${logCount}: ${logLabel}`
