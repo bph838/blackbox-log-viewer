@@ -6,7 +6,7 @@ import { useCraftConfigStore } from "./stores/craftConfig.js";
 import { formatTime, formatLogDateTime, stringLoopTime } from "./tools.js";
 import { FIRMWARE_TYPE_ROTORFLIGHT } from "./flightlog_fielddefs.js";
 import { resolveGearRatios } from "./craft_config.js";
-import { logTimestamp } from "./tuning_log.js";
+import { parseLogStartDateTime } from "./tuning_log.js";
 
 /**
  * Compare the flight log's craft name against the loaded craft config (if any), and set the
@@ -95,14 +95,17 @@ export function renderLogFileInfo(file) {
       // arm/disarm session within a multi-log file) is available for the dropdown entry below.
       // getLogError() above only reflects the lightweight index-scan pass, so a full header parse
       // can still fail here - fall back to no date/time rather than aborting the whole file load.
+      // Deliberately skip logTimestamp()'s file-lastModified fallback: that value is identical
+      // for every sub-log in the file, so showing it next to several entries would look like they
+      // were all recorded at the same instant. Leave the date blank instead when this particular
+      // sub-log has no valid RTC timestamp of its own.
       let dateTime = "";
       try {
         logStore.flightLog.openLog(index);
-        dateTime = formatLogDateTime(
-          logTimestamp(logStore.flightLog.getSysConfig(), appStore.logFileLastModified),
-        );
+        const startDateTime = parseLogStartDateTime(logStore.flightLog.getSysConfig());
+        dateTime = startDateTime ? formatLogDateTime(startDateTime) : "";
       } catch {
-        // Leave dateTime blank; the elapsed-time range below is still shown.
+        // Leave dateTime blank; the duration below is still shown.
       }
 
       const durationLabel = `[${formatTime(
@@ -111,7 +114,19 @@ export function renderLogFileInfo(file) {
         ),
         false,
       )}]`;
-      logLabel = dateTime ? `${dateTime}  ${durationLabel}` : durationLabel;
+
+      if (dateTime) {
+        logLabel = `${dateTime}  ${durationLabel}`;
+      } else {
+        // No known date for this sub-log - fall back to the original elapsed-time-range label.
+        logLabel = `${formatTime(
+          logStore.flightLog.getMinTime(index) / 1000,
+          false,
+        )} - ${formatTime(
+          logStore.flightLog.getMaxTime(index) / 1000,
+          false,
+        )} ${durationLabel}`;
+      }
     }
     const label = logCount > 1
       ? `${index + 1}/${logCount}: ${logLabel}`

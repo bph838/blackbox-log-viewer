@@ -78,19 +78,14 @@ export function buildConfigSummary(sysConfig) {
 }
 
 /**
- * The flight log's own recorded start time (rather than whenever the user happened to click
- * "Capture") so the same flight log always produces the same timestamp/id, wherever it's captured
- * from - that keeps ids checkable/deduplicable against a given log.
+ * Read and validate a flight log's own "Log start datetime" header in isolation, with no
+ * fallback - use this when a made-up substitute (see logTimestamp() below) would be misleading,
+ * e.g. showing several distinct recordings as if they happened at the same instant.
  *
  * Flight controllers without an RTC report the header as "0000-01-01T00:00:00.000+00:00" instead
- * of omitting it, which parses as a valid (but useless) Date - that would otherwise make every
- * such log collide on the same id. When the header is missing or is that sentinel, fall back to
- * the originally-opened log file's `lastModified` timestamp (epoch ms, from the browser `File`
- * object - see appStore.logFileLastModified) - not a "created" time, since that would reset to
- * "now" when a log file is copied off an SD card, while last-modified survives the copy - and
- * finally to the current time if that isn't available either.
+ * of omitting it, which parses as a valid (but useless) Date - treated as absent here too.
  */
-export function logTimestamp(sysConfig, fileLastModified) {
+export function parseLogStartDateTime(sysConfig) {
   const raw = sysConfig && sysConfig["Log start datetime"];
 
   if (raw) {
@@ -98,6 +93,29 @@ export function logTimestamp(sysConfig, fileLastModified) {
     if (!Number.isNaN(parsed.getTime()) && parsed.getUTCFullYear() >= 2000) {
       return parsed.toISOString();
     }
+  }
+
+  return null;
+}
+
+/**
+ * The flight log's own recorded start time (rather than whenever the user happened to click
+ * "Capture") so the same flight log always produces the same timestamp/id, wherever it's captured
+ * from - that keeps ids checkable/deduplicable against a given log.
+ *
+ * When the log has no valid "Log start datetime" (see parseLogStartDateTime), fall back to the
+ * originally-opened log file's `lastModified` timestamp (epoch ms, from the browser `File` object
+ * - see appStore.logFileLastModified) - not a "created" time, since that would reset to "now" when
+ * a log file is copied off an SD card, while last-modified survives the copy - and finally to the
+ * current time if that isn't available either. This fallback is only appropriate for a single log
+ * considered on its own (e.g. an id for one captured tuning entry) - it's the same value for every
+ * sub-log in a multi-log file, so it would be misleading to show it next to several of them at
+ * once as if each were independently timestamped.
+ */
+export function logTimestamp(sysConfig, fileLastModified) {
+  const parsed = parseLogStartDateTime(sysConfig);
+  if (parsed) {
+    return parsed;
   }
 
   if (fileLastModified) {
