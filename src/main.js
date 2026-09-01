@@ -677,6 +677,19 @@ function BlackboxLogViewer() {
         onSwitchWorkspace(presets[index], 1);
       }
     };
+    workspaceStore.syncRotationToWorkspace = () => {
+      if (!logStore.flightLog || !graphStore.graphConfig) {
+        return;
+      }
+      const updatedConfig = GraphConfig.syncRotationFields(
+        logStore.flightLog,
+        graphStore.graphConfig,
+      );
+      const activeId = workspaceStore.activeWorkspace;
+      const title = workspaceStore.workspaceGraphConfigs[activeId]?.title || "Unnamed";
+      newGraphConfig(updatedConfig);
+      onSaveWorkspace(activeId, title);
+    };
   }
 
   appStore.loadFiles = loadFiles;

@@ -1,5 +1,5 @@
 import { FlightLogFieldPresenter } from "./flightlog_fields_presenter";
-import { RATES_TYPE, DEBUG_MODE } from "./flightlog_fielddefs";
+import { RATES_TYPE, DEBUG_MODE, AXIS } from "./flightlog_fielddefs";
 import { escapeRegExp } from "./tools";
 
 export function GraphConfig(graphConfig) {
@@ -216,25 +216,29 @@ GraphConfig.getDefaultSmoothingForField = function (flightLog, fieldName) {
   }
 };
 
+// The maximum achievable rotation rate (deg/s) for a single axis at full stick deflection.
+GraphConfig.getMaxRotationRateForAxis = function (flightLog, axis) {
+  const sysConfig = flightLog.getSysConfig();
+  switch (sysConfig["rates_type"]) {
+    case RATES_TYPE.indexOf("ACTUAL"):
+    case RATES_TYPE.indexOf("QUICK"):
+      return sysConfig["rates"][axis] * 10.0;
+    default:
+      return flightLog.rcCommandRawToDegreesPerSecond(500, axis);
+  }
+};
+
 GraphConfig.getDefaultCurveForField = function (flightLog, fieldName) {
   const sysConfig = flightLog.getSysConfig();
 
   const maxDegreesSecond = function (scale) {
-    switch (sysConfig["rates_type"]) {
-      case RATES_TYPE.indexOf("ACTUAL"):
-      case RATES_TYPE.indexOf("QUICK"):
-        return Math.max(
-          sysConfig["rates"][0] * 10.0 * scale,
-          sysConfig["rates"][1] * 10.0 * scale,
-          sysConfig["rates"][2] * 10.0 * scale,
-        );
-      default:
-        return Math.max(
-          flightLog.rcCommandRawToDegreesPerSecond(500, 0) * scale,
-          flightLog.rcCommandRawToDegreesPerSecond(500, 1) * scale,
-          flightLog.rcCommandRawToDegreesPerSecond(500, 2) * scale,
-        );
-    }
+    return (
+      Math.max(
+        GraphConfig.getMaxRotationRateForAxis(flightLog, AXIS.ROLL),
+        GraphConfig.getMaxRotationRateForAxis(flightLog, AXIS.PITCH),
+        GraphConfig.getMaxRotationRateForAxis(flightLog, AXIS.YAW),
+      ) * scale
+    );
   };
 
   const getMinMaxForFields = function (...fieldNames) {
@@ -1561,6 +1565,43 @@ GraphConfig.getMinMaxForFieldDuringAllTime = function (flightLog, fieldName) {
     mm.max,
   );
   return mm;
+};
+
+// Roll/pitch/yaw setpoint & gyro field pairs, keyed by the axis they belong to.
+const ROTATION_SYNC_FIELDS = {
+  "setpoint[0]": AXIS.ROLL,
+  "gyroADC[0]": AXIS.ROLL,
+  "setpoint[1]": AXIS.PITCH,
+  "gyroADC[1]": AXIS.PITCH,
+  "setpoint[2]": AXIS.YAW,
+  "gyroADC[2]": AXIS.YAW,
+};
+
+/**
+ * Return a deep copy of `graphs` with the min/max of any roll/pitch/yaw setpoint or gyro field
+ * rescaled to +/-(margin) of the flight log's configured maximum rotation rate for that axis, so
+ * the curve always shows the full range the heli's rates allow.
+ */
+GraphConfig.syncRotationFields = function (flightLog, graphs, margin = 0.05) {
+  // graphs may be a Vue-reactive proxy (e.g. straight from the graph store), which
+  // structuredClone() cannot clone directly, so round-trip through JSON instead.
+  const updatedGraphs = JSON.parse(JSON.stringify(graphs));
+  for (const graph of updatedGraphs) {
+    for (const field of graph.fields) {
+      const axis = ROTATION_SYNC_FIELDS[field.name];
+      if (axis === undefined) {
+        continue;
+      }
+      const max = Math.round(
+        GraphConfig.getMaxRotationRateForAxis(flightLog, axis) * (1 + margin),
+      );
+      if (!field.curve) {
+        field.curve = {};
+      }
+      field.curve.MinMax = { min: -max, max };
+    }
+  }
+  return updatedGraphs;
 };
 
 /**
