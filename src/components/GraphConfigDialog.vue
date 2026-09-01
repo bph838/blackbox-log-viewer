@@ -300,9 +300,6 @@ const addGraphItems = computed(() => [
 const BLACKLISTED_FIELDS = {
   time: true,
   loopIteration: true,
-  "setpoint[0]": true,
-  "setpoint[1]": true,
-  "setpoint[2]": true,
   "setpoint[3]": true,
 };
 const ARRAY_FIELD_PATTERN = /^(.+)\[\d+\]$/;

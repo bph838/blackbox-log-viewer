@@ -1251,6 +1251,11 @@ FlightLogFieldPresenter.decodeFieldToFriendly = function (
     case 'axisError[2]':
       return `${(value / highResolutionScale).toFixed(highResolutionAddPrecision)} °/s`
 
+    case 'setpoint[0]':
+    case 'setpoint[1]':
+    case 'setpoint[2]':
+      return `${(value / highResolutionScale).toFixed(highResolutionAddPrecision)} °/s`
+
     case 'rcCommand[0]':
     case 'rcCommand[1]':
     case 'rcCommand[2]':
