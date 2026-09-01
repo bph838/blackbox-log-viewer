@@ -217,12 +217,17 @@ GraphConfig.getDefaultSmoothingForField = function (flightLog, fieldName) {
 };
 
 // The maximum achievable rotation rate (deg/s) for a single axis at full stick deflection.
+// Formulas mirror rotorflight-firmware's src/main/fc/rc_rates.c applyXRates() functions
+// evaluated at rcCommandAbs = 1, where each curve's expo term cancels out to 1.
 GraphConfig.getMaxRotationRateForAxis = function (flightLog, axis) {
   const sysConfig = flightLog.getSysConfig();
   switch (sysConfig["rates_type"]) {
+    case RATES_TYPE.indexOf("ROTORFLIGHT"):
+      return sysConfig["rc_rates"][axis] * 5.0;
     case RATES_TYPE.indexOf("ACTUAL"):
+      return Math.max(sysConfig["rc_rates"][axis] * 10.0, sysConfig["rates"][axis] * 10.0);
     case RATES_TYPE.indexOf("QUICK"):
-      return sysConfig["rates"][axis] * 10.0;
+      return Math.max(sysConfig["rc_rates"][axis] * 2.0, sysConfig["rates"][axis] * 10.0);
     default:
       return flightLog.rcCommandRawToDegreesPerSecond(500, axis);
   }
