@@ -156,6 +156,7 @@ function BlackboxLogViewer() {
     const autoTrimmed = applyAutoTrim(logStore.flightLog, userSettings);
 
     graphStore.activeGraphConfig.adaptGraphs(logStore.flightLog, graphStore.graphConfig);
+    applyRotationSync();
 
     graph.onSeek = function (offset) {
       //Seek faster
@@ -326,6 +327,21 @@ function BlackboxLogViewer() {
     prefs.set("graphConfig", graphStore.graphConfig);
   }
 
+  // Rescale every roll/pitch/yaw deg/s field (setpoint, gyro, etc.) in the currently displayed
+  // graphs to the current flight log's configured max rotation rate. Applied to the live graphs
+  // only (not persisted back into the saved workspace slot) so it stays correct whenever a
+  // workspace or log with different rates gets loaded, without baking one log's numbers into a
+  // reusable workspace preset.
+  function applyRotationSync() {
+    if (!logStore.flightLog || !graphStore.graphConfig) {
+      return;
+    }
+    graphStore.graphConfig = GraphConfig.syncRotationFields(logStore.flightLog, graphStore.graphConfig);
+    graphStore.activeGraphConfig.setRedrawChart(true);
+    graphStore.activeGraphConfig.adaptGraphs(logStore.flightLog, graphStore.graphConfig);
+    prefs.set("graphConfig", graphStore.graphConfig);
+  }
+
   // Store to local cache and update Workspace Selector control
   function onSwitchWorkspace(newWorkspaces, newActiveId) {
     prefs.set("activeWorkspace", newActiveId);
@@ -339,6 +355,7 @@ function BlackboxLogViewer() {
     ) {
       newGraphConfig(newWorkspaces[newActiveId].graphConfig);
       graphStore.legendTitle = newWorkspaces[newActiveId].title;
+      applyRotationSync();
     }
   }
 
@@ -676,19 +693,6 @@ function BlackboxLogViewer() {
       if (presets[index]) {
         onSwitchWorkspace(presets[index], 1);
       }
-    };
-    workspaceStore.syncRotationToWorkspace = () => {
-      if (!logStore.flightLog || !graphStore.graphConfig) {
-        return;
-      }
-      const updatedConfig = GraphConfig.syncRotationFields(
-        logStore.flightLog,
-        graphStore.graphConfig,
-      );
-      const activeId = workspaceStore.activeWorkspace;
-      const title = workspaceStore.workspaceGraphConfigs[activeId]?.title || "Unnamed";
-      newGraphConfig(updatedConfig);
-      onSaveWorkspace(activeId, title);
     };
   }
 

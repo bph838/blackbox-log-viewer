@@ -79,7 +79,6 @@
           @switch-workspace="onSwitchWorkspace"
           @save-workspace="onSaveWorkspace"
           @apply-default="onApplyDefaultWorkspace"
-          @sync-rotation="onSyncRotationToWorkspace"
         />
       </Teleport>
 
@@ -417,10 +416,6 @@ function onSaveWorkspace(id, title) {
 
 function onApplyDefaultWorkspace(index) {
   workspaceStore.applyDefaultWorkspace?.(index);
-}
-
-function onSyncRotationToWorkspace() {
-  workspaceStore.syncRotationToWorkspace?.();
 }
 
 function onGotoBookmark(index) {

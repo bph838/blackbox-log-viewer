@@ -40,7 +40,6 @@ const emit = defineEmits([
   "switch-workspace",
   "save-workspace",
   "apply-default",
-  "sync-rotation",
 ]);
 
 const workspaceStore = useWorkspaceStore();
@@ -113,22 +112,6 @@ const workspaceItems = computed(() => {
     },
   ];
 
-  const syncItems = [
-    {
-      label: "Sync Rotation to Workspace",
-      icon: "i-lucide-refresh-cw",
-      onSelect() {
-        emit("sync-rotation");
-        toast.add({
-          title: "Rotation rates synced",
-          icon: "i-lucide-check",
-          color: "primary",
-          duration: 1000,
-        });
-      },
-    },
-  ];
-
-  return [wsItems, presetItems, syncItems];
+  return [wsItems, presetItems];
 });
 </script>
