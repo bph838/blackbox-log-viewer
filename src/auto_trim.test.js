@@ -162,6 +162,27 @@ describe("applyAutoTrim", () => {
     expect(playbackStore.videoExportOutTime).toBe(8e6);
   });
 
+  it("uses the last matching stop event after the start event, not the first", () => {
+    const events = [
+      { event: FlightLogEvent.GOVERNOR_STATE, time: 2e6, data: { govState: 0 } }, // THROTTLE_OFF @ 2s
+      { event: FlightLogEvent.AIRBORNE_STATE, time: 4e6, data: { airborneState: 0 } }, // LANDING @ 4s
+      { event: FlightLogEvent.AIRBORNE_STATE, time: 6e6, data: { airborneState: 0 } }, // LANDING @ 6s
+      { event: FlightLogEvent.AIRBORNE_STATE, time: 9e6, data: { airborneState: 0 } }, // LANDING @ 9s
+    ];
+    const flightLog = makeFlightLog({ minTime: 0, maxTime: 10e6, events });
+
+    applyAutoTrim(flightLog, {
+      autoTrim: true,
+      autoTrimStartEvent: "govState:THROTTLE_OFF",
+      autoTrimStopEvent: "airborne:LANDING",
+      autoTrimOffset: 0,
+    });
+
+    const playbackStore = usePlaybackStore(pinia);
+    expect(playbackStore.videoExportInTime).toBe(2e6);
+    expect(playbackStore.videoExportOutTime).toBe(9e6);
+  });
+
   it("does not trim when the start event never occurs", () => {
     const events = [
       { event: FlightLogEvent.AIRBORNE_STATE, time: 8e6, data: { airborneState: 0 } },
