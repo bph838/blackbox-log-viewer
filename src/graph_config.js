@@ -1572,20 +1572,35 @@ GraphConfig.getMinMaxForFieldDuringAllTime = function (flightLog, fieldName) {
   return mm;
 };
 
-// Roll/pitch/yaw setpoint & gyro field pairs, keyed by the axis they belong to.
+// Every roll/pitch/yaw field whose friendly value is displayed in deg/s, keyed by axis. Debug
+// slot fields (debug[0..7]) are deliberately excluded: which axis (if any) a debug slot
+// represents depends on the FC's debug_mode, so there's no fixed field-name-to-axis mapping.
 const ROTATION_SYNC_FIELDS = {
   "setpoint[0]": AXIS.ROLL,
-  "gyroADC[0]": AXIS.ROLL,
   "setpoint[1]": AXIS.PITCH,
-  "gyroADC[1]": AXIS.PITCH,
   "setpoint[2]": AXIS.YAW,
+  "gyroADC[0]": AXIS.ROLL,
+  "gyroADC[1]": AXIS.PITCH,
   "gyroADC[2]": AXIS.YAW,
+  "gyroRAW[0]": AXIS.ROLL,
+  "gyroRAW[1]": AXIS.PITCH,
+  "gyroRAW[2]": AXIS.YAW,
+  "gyroUnfilt[0]": AXIS.ROLL,
+  "gyroUnfilt[1]": AXIS.PITCH,
+  "gyroUnfilt[2]": AXIS.YAW,
+  "axisError[0]": AXIS.ROLL,
+  "axisError[1]": AXIS.PITCH,
+  "axisError[2]": AXIS.YAW,
+  "rcCommands[0]": AXIS.ROLL,
+  "rcCommands[1]": AXIS.PITCH,
+  "rcCommands[2]": AXIS.YAW,
 };
 
 /**
- * Return a deep copy of `graphs` with the min/max of any roll/pitch/yaw setpoint or gyro field
- * rescaled to +/-(margin) of the flight log's configured maximum rotation rate for that axis, so
- * the curve always shows the full range the heli's rates allow.
+ * Return a deep copy of `graphs` with the min/max of any roll/pitch/yaw field that's displayed
+ * in deg/s (setpoint, gyro, unfiltered gyro, PID error, RC rate) rescaled to +/-(margin) of the
+ * flight log's configured maximum rotation rate for that axis, so the curve always shows the
+ * full range the heli's rates allow.
  */
 GraphConfig.syncRotationFields = function (flightLog, graphs, margin = 0.05) {
   // graphs may be a Vue-reactive proxy (e.g. straight from the graph store), which
