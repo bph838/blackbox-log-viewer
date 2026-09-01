@@ -6,7 +6,7 @@ import { PrefStorage } from "../pref_storage.js";
 
 export const GRAPH_MIN_ZOOM = 1;
 export const GRAPH_MAX_ZOOM = 1000;
-export const GRAPH_DEFAULT_ZOOM = 100;
+export const GRAPH_DEFAULT_ZOOM = 25;
 
 export const useGraphStore = defineStore("graph", () => {
   const prefs = new PrefStorage();
