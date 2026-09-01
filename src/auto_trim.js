@@ -108,8 +108,9 @@ export function applyAutoTrim(flightLog, userSettings) {
         startEvent = event;
       }
     } else if (eventMatchesAutoTrimSelector(event, stopSelector)) {
+      // Keep matching past the first hit so we end up with the *last* stop event
+      // after the start event, rather than the first one.
       stopEvent = event;
-      break;
     }
   }
 
