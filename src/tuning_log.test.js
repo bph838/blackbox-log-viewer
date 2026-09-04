@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { makeId, create, buildConfigSummary, logTimestamp, addEntry, buildFilename, validationError } from "./tuning_log.js";
+import {
+  makeId,
+  create,
+  buildConfigSummary,
+  resolveLogDateTimes,
+  addEntry,
+  buildFilename,
+  validationError,
+} from "./tuning_log.js";
 
 describe("makeId", () => {
   it("is stable for the same input", () => {
@@ -51,21 +59,62 @@ describe("buildConfigSummary", () => {
   });
 });
 
-describe("logTimestamp", () => {
-  it("uses the log's own recorded start time when present and valid", () => {
-    const iso = logTimestamp({ "Log start datetime": "2026-03-04T05:06:07.000+00:00" });
-    expect(iso).toBe("2026-03-04T05:06:07.000Z");
+describe("resolveLogDateTimes", () => {
+  it("uses each log's own known start time and marks it as not calculated", () => {
+    const results = resolveLogDateTimes(
+      [
+        { startDateTime: "2026-03-04T05:00:00.000Z", durationMs: 60000 },
+        { startDateTime: "2026-03-04T06:00:00.000Z", durationMs: 60000 },
+      ],
+      null,
+    );
+
+    expect(results).toEqual([
+      { dateTime: "2026-03-04T05:00:00.000Z", isCalculated: false },
+      { dateTime: "2026-03-04T06:00:00.000Z", isCalculated: false },
+    ]);
   });
 
-  it("falls back to fileLastModified when the header is missing", () => {
-    const epochMs = Date.UTC(2026, 0, 15, 12, 0, 0);
-    expect(logTimestamp({}, epochMs)).toBe(new Date(epochMs).toISOString());
+  it("falls back to fallbackIso for a leading unknown log", () => {
+    const results = resolveLogDateTimes([{ startDateTime: null, durationMs: 60000 }], "2026-01-15T12:00:00.000Z");
+
+    expect(results).toEqual([{ dateTime: "2026-01-15T12:00:00.000Z", isCalculated: true }]);
   });
 
-  it("falls back to fileLastModified for the no-RTC sentinel date", () => {
-    const epochMs = Date.UTC(2026, 0, 15, 12, 0, 0);
-    const iso = logTimestamp({ "Log start datetime": "0000-01-01T00:00:00.000+00:00" }, epochMs);
-    expect(iso).toBe(new Date(epochMs).toISOString());
+  it("estimates an unknown log from the previous known log's end time (start + duration)", () => {
+    const results = resolveLogDateTimes(
+      [
+        { startDateTime: "2026-03-04T05:00:00.000Z", durationMs: 60000 },
+        { startDateTime: null, durationMs: 30000 },
+        { startDateTime: "2026-03-05T00:00:00.000Z", durationMs: 60000 },
+      ],
+      null,
+    );
+
+    expect(results[1]).toEqual({ dateTime: "2026-03-04T05:01:00.000Z", isCalculated: true });
+    // A later known log is trusted outright, even though it doesn't follow on from the estimate.
+    expect(results[2]).toEqual({ dateTime: "2026-03-05T00:00:00.000Z", isCalculated: false });
+  });
+
+  it("keeps a run of consecutive unknown logs incrementing forward instead of colliding", () => {
+    const results = resolveLogDateTimes(
+      [
+        { startDateTime: "2026-03-04T05:00:00.000Z", durationMs: 60000 },
+        { startDateTime: null, durationMs: 30000 },
+        { startDateTime: null, durationMs: 45000 },
+      ],
+      null,
+    );
+
+    expect(results[1].dateTime).toBe("2026-03-04T05:01:00.000Z");
+    expect(results[2].dateTime).toBe("2026-03-04T05:01:30.000Z");
+    expect(results[1].isCalculated).toBe(true);
+    expect(results[2].isCalculated).toBe(true);
+  });
+
+  it("returns a null dateTime when there's no known log and no fallback", () => {
+    const results = resolveLogDateTimes([{ startDateTime: null, durationMs: 60000 }], null);
+    expect(results).toEqual([{ dateTime: null, isCalculated: true }]);
   });
 });
 

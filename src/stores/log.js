@@ -36,6 +36,10 @@ export const useLogStore = defineStore("log", () => {
   const logIndexEntries = shallowRef([]);
   // Each: { label, value, disabled }
   const activeLogIndex = ref(0);
+  // Per sub-log { dateTime, isCalculated } (see tuning_log.js:resolveLogDateTimes), index-aligned
+  // with logIndexEntries - lets the Tuning Log show/estimate a date/time for the active sub-log
+  // without re-walking every sub-log in the file itself.
+  const logDateTimes = shallowRef([]);
 
   const minTime = computed(() => flightLog.value?.getMinTime() ?? 0);
   const maxTime = computed(() => flightLog.value?.getMaxTime() ?? 0);
@@ -75,6 +79,7 @@ export const useLogStore = defineStore("log", () => {
     fieldStats,
     logIndexEntries,
     activeLogIndex,
+    logDateTimes,
     minTime,
     maxTime,
     firmwareClass,

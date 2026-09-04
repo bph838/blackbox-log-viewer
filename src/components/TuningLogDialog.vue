@@ -97,8 +97,16 @@
                 :class="selectedEntryId === entry.id ? 'bg-primary/15' : 'hover:bg-elevated'"
                 @click="selectEntry(entry.id)"
               >
-                <div class="font-medium flex items-center gap-1 pr-5">
+                <div class="font-medium flex items-center gap-1 pr-5 flex-wrap">
                   {{ entry.id === currentFlightLogEntryId ? "Current" : formatTimestamp(entry.timestamp) }}
+                  <UBadge
+                    v-if="entry.id !== currentFlightLogEntryId && entry.calculatedDateTime"
+                    color="warning"
+                    variant="subtle"
+                    size="xs"
+                  >
+                    Approximated Datetime
+                  </UBadge>
                   <UTooltip
                     v-if="isBehindLatest(entry)"
                     text="The current log is not the latest entry in this tuning log"
@@ -126,8 +134,16 @@
                 >
                   {{ entry.craftName }}
                 </div>
-                <div class="text-dimmed">
+                <div class="text-dimmed flex items-center gap-1 flex-wrap">
                   {{ entry.id === currentFlightLogEntryId ? formatTimestamp(entry.timestamp) : "Read-only" }}
+                  <UBadge
+                    v-if="entry.id === currentFlightLogEntryId && entry.calculatedDateTime"
+                    color="warning"
+                    variant="subtle"
+                    size="xs"
+                  >
+                    Approximated Datetime
+                  </UBadge>
                   <template v-if="entryCost(entry)"> · {{ formatCost(entryCost(entry)) }}</template>
                 </div>
                 <UPopover
@@ -167,7 +183,12 @@
 
           <div ref="scrollContainerEl" class="flex-1 min-w-0 flex flex-col gap-2 overflow-y-auto pr-1" @scroll="onScrollContainerScroll">
             <div class="flex items-center justify-between gap-2 flex-wrap">
-              <h4 class="font-medium text-sm">{{ mainTitle }}</h4>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h4 class="font-medium text-sm">{{ mainTitle }}</h4>
+                <UBadge v-if="mainTitleIsCalculated" color="warning" variant="subtle" size="xs">
+                  Approximated Datetime
+                </UBadge>
+              </div>
               <div class="flex items-center gap-1 flex-wrap">
                 <UButton
                   v-if="hasImage"
@@ -377,7 +398,6 @@ import HelpIcon from "./HelpIcon.vue";
 import { useTuningLogStore } from "../stores/tuningLog.js";
 import { useLogStore } from "../stores/log.js";
 import { useGraphStore } from "../stores/graph.js";
-import { useAppStore } from "../stores/app.js";
 import { useSettingsStore } from "../stores/settings.js";
 import * as TuningLog from "../tuning_log.js";
 import * as TuningAI from "../tuning_ai.js";
@@ -388,7 +408,6 @@ const open = defineModel("open", { type: Boolean, default: false });
 const tuningLogStore = useTuningLogStore();
 const logStore = useLogStore();
 const graphStore = useGraphStore();
-const appStore = useAppStore();
 const settingsStore = useSettingsStore();
 
 const modelOptions = AI_MODELS.models.map((m) => ({
@@ -462,15 +481,23 @@ const sysConfig = computed(() => {
   return logStore.flightLog?.getSysConfig?.() ?? null;
 });
 
+// { dateTime, isCalculated } for the currently-open sub-log, from logStore.logDateTimes (built once
+// per file load - see log_lifecycle.js/tuning_log.js:resolveLogDateTimes) rather than re-derived
+// here, so a sub-log with no known "Log start datetime" gets the same file-wide estimate that
+// every other sub-log's estimate was built from, instead of this dialog inventing its own guess.
+const currentFlightLogDateTime = computed(() => {
+  logStore.activeLogIndex; // dependency - see sysConfig above for why this is needed
+  const flightLog = logStore.flightLog;
+  if (!flightLog) return null;
+  return logStore.logDateTimes[flightLog.getLogIndex()] ?? null;
+});
+
 // The id the currently-open flight log's entry would have (whether or not it's been captured yet).
 const currentFlightLogEntryId = computed(() => {
-  if (!sysConfig.value) return null;
+  const resolved = currentFlightLogDateTime.value;
+  if (!resolved?.dateTime) return null;
   const flightLog = logStore.flightLog;
-  return TuningLog.makeId(
-    TuningLog.logTimestamp(sysConfig.value, appStore.logFileLastModified),
-    flightLog?.getLogIndex?.(),
-    flightLog?.getLogCount?.(),
-  );
+  return TuningLog.makeId(resolved.dateTime, flightLog?.getLogIndex?.(), flightLog?.getLogCount?.());
 });
 
 const currentFlightLogEntry = computed(() => {
@@ -508,13 +535,15 @@ function captureFromContext() {
   if (!stepResponse) return null;
 
   const sc = flightLog.getSysConfig();
+  const resolved = currentFlightLogDateTime.value;
 
   return {
     image: stepResponse.captureImage(),
     config: TuningLog.buildConfigSummary(sc),
     notes: "",
     craftName: sc["Craft name"] || "",
-    timestamp: TuningLog.logTimestamp(sc, appStore.logFileLastModified),
+    timestamp: resolved?.dateTime || new Date().toISOString(),
+    calculatedDateTime: !!resolved?.isCalculated,
     logIndex: flightLog.getLogIndex(),
     logCount: flightLog.getLogCount(),
   };
@@ -655,6 +684,10 @@ const mainTitle = computed(() => {
   if (isCurrentFlightLog.value) return `Current flight log — ${formatTimestamp(currentEntry.value.timestamp)}`;
   return formatTimestamp(currentEntry.value.timestamp);
 });
+
+// currentEntry is null in the selectedEntryId === null branch above (nothing captured yet, so no
+// timestamp is shown there to badge) - this only needs to check the entry's own persisted flag.
+const mainTitleIsCalculated = computed(() => !!currentEntry.value?.calculatedDateTime);
 
 const noImageMessage = computed(() =>
   logStore.flightLog ? "The step response panel is not available for this flight log." : "No flight log is currently open.",
@@ -981,10 +1014,11 @@ function isSameDay(a, b) {
 }
 
 /**
- * Entry timestamps are the flight log's own recorded start time (see tuning_log.js:logTimestamp),
- * always stamped in UTC. We want the digits shown here to match the "Log start datetime" the user
- * sees elsewhere (e.g. the header dialog) verbatim, rather than shifting them to the viewer's
- * local timezone - so this reads UTC components throughout instead of local ones.
+ * Entry timestamps are the flight log's own recorded start time, or an estimate when it doesn't
+ * have one (see tuning_log.js:resolveLogDateTimes) - either way, always stamped in UTC. We want
+ * the digits shown here to match the "Log start datetime" the user sees elsewhere (e.g. the header
+ * dialog) verbatim, rather than shifting them to the viewer's local timezone - so this reads UTC
+ * components throughout instead of local ones.
  */
 function formatTimestamp(iso) {
   try {

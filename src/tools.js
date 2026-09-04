@@ -208,7 +208,7 @@ export function formatTime(msec, displayMsec) {
 }
 
 /**
- * Format an ISO timestamp (see tuning_log.js:logTimestamp) as a compact "24 Jan 2026, 00:40"
+ * Format an ISO timestamp (see tuning_log.js:resolveLogDateTimes) as a compact "24 Jan 2026, 00:40"
  * string for display next to a flight log entry. Reads UTC components rather than the viewer's
  * local timezone - see TuningLogDialog.vue's formatTimestamp for why: the digits should match the
  * "Log start datetime" header verbatim rather than shifting with the viewer's timezone.

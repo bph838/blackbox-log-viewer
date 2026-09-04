@@ -6,7 +6,7 @@ import { useCraftConfigStore } from "./stores/craftConfig.js";
 import { formatTime, formatLogDateTime, stringLoopTime } from "./tools.js";
 import { FIRMWARE_TYPE_ROTORFLIGHT } from "./flightlog_fielddefs.js";
 import { resolveGearRatios } from "./craft_config.js";
-import { parseLogStartDateTime } from "./tuning_log.js";
+import { parseLogStartDateTime, resolveLogDateTimes } from "./tuning_log.js";
 
 /**
  * Compare the flight log's craft name against the loaded craft config (if any), and set the
@@ -85,9 +85,15 @@ export function renderLogFileInfo(file) {
 
   const logCount = logStore.flightLog.getLogCount();
   const entries = [];
+  // One { startDateTime, durationMs } per sub-log, in file order - fed to resolveLogDateTimes()
+  // below so the Tuning Log can estimate a date/time for sub-logs that don't have their own (see
+  // that function for why the dropdown label below doesn't use the estimate itself).
+  const rawLogs = [];
   for (let index = 0; index < logCount; index++) {
     const error = logStore.flightLog.getLogError(index);
     let logLabel;
+    let startDateTime = null;
+    let durationMs = 0;
     if (error) {
       logLabel = error;
     } else {
@@ -95,30 +101,27 @@ export function renderLogFileInfo(file) {
       // arm/disarm session within a multi-log file) is available for the dropdown entry below.
       // getLogError() above only reflects the lightweight index-scan pass, so a full header parse
       // can still fail here - fall back to no date/time rather than aborting the whole file load.
-      // Deliberately skip logTimestamp()'s file-lastModified fallback: that value is identical
-      // for every sub-log in the file, so showing it next to several entries would look like they
-      // were all recorded at the same instant. Leave the date blank instead when this particular
-      // sub-log has no valid RTC timestamp of its own.
       let dateTime = "";
       try {
         logStore.flightLog.openLog(index);
-        const startDateTime = parseLogStartDateTime(logStore.flightLog.getSysConfig());
+        startDateTime = parseLogStartDateTime(logStore.flightLog.getSysConfig());
         dateTime = startDateTime ? formatLogDateTime(startDateTime) : "";
       } catch {
         // Leave dateTime blank; the duration below is still shown.
       }
 
-      const durationLabel = `[${formatTime(
-        Math.ceil(
-          (logStore.flightLog.getMaxTime(index) - logStore.flightLog.getMinTime(index)) / 1000,
-        ),
-        false,
-      )}]`;
+      durationMs = Math.ceil(
+        (logStore.flightLog.getMaxTime(index) - logStore.flightLog.getMinTime(index)) / 1000,
+      );
+      const durationLabel = `[${formatTime(durationMs, false)}]`;
 
       if (dateTime) {
         logLabel = `${dateTime}  ${durationLabel}`;
       } else {
         // No known date for this sub-log - fall back to the original elapsed-time-range label.
+        // Deliberately not resolveLogDateTimes()'s estimate: that value is a best guess built by
+        // walking outward from neighboring sub-logs, and showing it here with no indication that
+        // it's a guess would misrepresent it as an actual recorded time.
         logLabel = `${formatTime(
           logStore.flightLog.getMinTime(index) / 1000,
           false,
@@ -132,9 +135,14 @@ export function renderLogFileInfo(file) {
       ? `${index + 1}/${logCount}: ${logLabel}`
       : logLabel;
     entries.push({ label, value: index, disabled: !!error });
+    rawLogs.push({ startDateTime, durationMs });
   }
   logStore.logIndexEntries = entries;
   logStore.activeLogIndex = 0;
+
+  const fallbackIso =
+    appStore.logFileLastModified != null ? new Date(appStore.logFileLastModified).toISOString() : null;
+  logStore.logDateTimes = resolveLogDateTimes(rawLogs, fallbackIso);
 }
 
 export function renderSelectedLogInfo() {

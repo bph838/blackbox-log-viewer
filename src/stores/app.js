@@ -12,7 +12,7 @@ export const useAppStore = defineStore("app", () => {
   // file is being loaded, so the UI can show a busy cursor and "<file> is being loaded..." message.
   const loadingFileNames = ref([]);
   // File.lastModified (epoch ms) of the loaded log file - used as a fallback timestamp source by
-  // the Tuning Log feature when a flight controller has no RTC (see tuning_log.js:logTimestamp).
+  // the Tuning Log feature when a flight controller has no RTC (see tuning_log.js:resolveLogDateTimes).
   const logFileLastModified = ref(null);
 
   // Status bar display strings (pushed from legacy code)
