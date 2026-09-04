@@ -99,14 +99,13 @@
               >
                 <div class="font-medium flex items-center gap-1 pr-5 flex-wrap">
                   {{ entry.id === currentFlightLogEntryId ? "Current" : formatTimestamp(entry.timestamp) }}
-                  <UBadge
+                  <UTooltip
                     v-if="entry.id !== currentFlightLogEntryId && entry.calculatedDateTime"
-                    color="warning"
-                    variant="subtle"
-                    size="xs"
+                    :text="APPROXIMATED_DATETIME_TOOLTIP"
+                    :delay-duration="0"
                   >
-                    Approximated Datetime
-                  </UBadge>
+                    <UBadge color="warning" variant="subtle" size="xs">Approximated Datetime</UBadge>
+                  </UTooltip>
                   <UTooltip
                     v-if="isBehindLatest(entry)"
                     text="The current log is not the latest entry in this tuning log"
@@ -136,14 +135,13 @@
                 </div>
                 <div class="text-dimmed flex items-center gap-1 flex-wrap">
                   {{ entry.id === currentFlightLogEntryId ? formatTimestamp(entry.timestamp) : "Read-only" }}
-                  <UBadge
+                  <UTooltip
                     v-if="entry.id === currentFlightLogEntryId && entry.calculatedDateTime"
-                    color="warning"
-                    variant="subtle"
-                    size="xs"
+                    :text="APPROXIMATED_DATETIME_TOOLTIP"
+                    :delay-duration="0"
                   >
-                    Approximated Datetime
-                  </UBadge>
+                    <UBadge color="warning" variant="subtle" size="xs">Approximated Datetime</UBadge>
+                  </UTooltip>
                   <template v-if="entryCost(entry)"> · {{ formatCost(entryCost(entry)) }}</template>
                 </div>
                 <UPopover
@@ -185,9 +183,9 @@
             <div class="flex items-center justify-between gap-2 flex-wrap">
               <div class="flex items-center gap-2 flex-wrap">
                 <h4 class="font-medium text-sm">{{ mainTitle }}</h4>
-                <UBadge v-if="mainTitleIsCalculated" color="warning" variant="subtle" size="xs">
-                  Approximated Datetime
-                </UBadge>
+                <UTooltip v-if="mainTitleIsCalculated" :text="APPROXIMATED_DATETIME_TOOLTIP" :delay-duration="0">
+                  <UBadge color="warning" variant="subtle" size="xs">Approximated Datetime</UBadge>
+                </UTooltip>
               </div>
               <div class="flex items-center gap-1 flex-wrap">
                 <UButton
@@ -414,6 +412,9 @@ const modelOptions = AI_MODELS.models.map((m) => ({
   label: m.displayName + (m.description ? ` (${m.description})` : ""),
   value: m.id,
 }));
+
+const APPROXIMATED_DATETIME_TOOLTIP =
+  "This datetime is not the actual datetime of the log, it was approximated to keep the logs in order";
 
 // ---- Create / Import ----
 
