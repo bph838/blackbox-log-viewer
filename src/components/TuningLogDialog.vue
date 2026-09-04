@@ -452,12 +452,25 @@ const configVisible = ref(false);
 const imageExpanded = ref(false);
 const confirmDeleteId = ref(null);
 
-const sysConfig = computed(() => logStore.flightLog?.getSysConfig?.() ?? null);
+// logStore.flightLog is the same object reference for every sub-log of a multi-log file - only
+// its internal state changes (see log_lifecycle.js/main.js selectLog(), which calls
+// flightLog.openLog(index) in place rather than replacing the ref) - so this must also depend on
+// activeLogIndex, or switching sub-logs wouldn't re-evaluate it (same pattern as
+// stores/log.js:hasGps).
+const sysConfig = computed(() => {
+  logStore.activeLogIndex;
+  return logStore.flightLog?.getSysConfig?.() ?? null;
+});
 
 // The id the currently-open flight log's entry would have (whether or not it's been captured yet).
 const currentFlightLogEntryId = computed(() => {
   if (!sysConfig.value) return null;
-  return TuningLog.makeId(TuningLog.logTimestamp(sysConfig.value, appStore.logFileLastModified));
+  const flightLog = logStore.flightLog;
+  return TuningLog.makeId(
+    TuningLog.logTimestamp(sysConfig.value, appStore.logFileLastModified),
+    flightLog?.getLogIndex?.(),
+    flightLog?.getLogCount?.(),
+  );
 });
 
 const currentFlightLogEntry = computed(() => {
@@ -502,6 +515,8 @@ function captureFromContext() {
     notes: "",
     craftName: sc["Craft name"] || "",
     timestamp: TuningLog.logTimestamp(sc, appStore.logFileLastModified),
+    logIndex: flightLog.getLogIndex(),
+    logCount: flightLog.getLogCount(),
   };
 }
 

@@ -35,8 +35,18 @@ function hashHex(text) {
   return hi + lo;
 }
 
-export function makeId(timestampIso) {
-  return hashHex(String(timestampIso));
+/**
+ * `logIndex`/`logCount` identify which sub-log within a multi-log BBL file this id is for. A
+ * timestamp alone isn't always unique across sub-logs of the same file - e.g. a flight controller
+ * without an RTC reports the same placeholder "Log start datetime" for every sub-log, so
+ * logTimestamp() falls back to the file's lastModified time for all of them alike. When there's
+ * more than one log in the file, fold the log's index into the id so each sub-log still gets a
+ * distinct, stable id even when their timestamps collide; a single-log file keeps the plain
+ * timestamp-only id (unaffected by whatever index that one log happens to have).
+ */
+export function makeId(timestampIso, logIndex, logCount) {
+  const key = logCount > 1 ? `${timestampIso}|${logIndex}` : String(timestampIso);
+  return hashHex(key);
 }
 
 export function create(name, craftName) {
@@ -129,13 +139,13 @@ export function logTimestamp(sysConfig, fileLastModified) {
 }
 
 /**
- * options: { image, config, notes, craftName, timestamp }
+ * options: { image, config, notes, craftName, timestamp, logIndex, logCount }
  */
 export function addEntry(log, options) {
   const timestamp = options.timestamp || new Date().toISOString();
 
   const entry = {
-    id: makeId(timestamp),
+    id: makeId(timestamp, options.logIndex, options.logCount),
     timestamp,
     craftName: options.craftName || "",
     image: options.image,

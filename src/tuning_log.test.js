@@ -9,6 +9,18 @@ describe("makeId", () => {
   it("differs for different input", () => {
     expect(makeId("2026-01-02T03:04:05.000Z")).not.toBe(makeId("2026-01-02T03:04:05.001Z"));
   });
+
+  it("ignores logIndex for a single-log file", () => {
+    const ts = "2026-01-02T03:04:05.000Z";
+    expect(makeId(ts, 0, 1)).toBe(makeId(ts));
+    expect(makeId(ts, 5, 1)).toBe(makeId(ts));
+  });
+
+  it("folds logIndex into the id for a multi-log file, so same-timestamp sub-logs stay distinct", () => {
+    const ts = "2026-01-02T03:04:05.000Z";
+    expect(makeId(ts, 0, 3)).not.toBe(makeId(ts, 1, 3));
+    expect(makeId(ts, 0, 3)).not.toBe(makeId(ts));
+  });
 });
 
 describe("create", () => {
@@ -67,6 +79,18 @@ describe("addEntry", () => {
     expect(entry.id).toBe(makeId("2026-01-02T03:04:05.000Z"));
     expect(entry.image).toBe("data:x");
     expect(entry.notes).toBe("");
+  });
+
+  it("folds logIndex/logCount into the id when given", () => {
+    const log = create("Log", "Heli");
+    const entry = addEntry(log, {
+      timestamp: "2026-01-02T03:04:05.000Z",
+      logIndex: 2,
+      logCount: 5,
+    });
+
+    expect(entry.id).toBe(makeId("2026-01-02T03:04:05.000Z", 2, 5));
+    expect(entry.id).not.toBe(makeId("2026-01-02T03:04:05.000Z"));
   });
 });
 
