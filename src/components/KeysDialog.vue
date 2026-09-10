@@ -76,6 +76,7 @@ const layout = [
       data: [
         { keys: ["A"], action: "Toggle analyser display" },
         { keys: ["Shift"], action: "Show frequency under mouse" },
+        { keys: ["Ctrl"], action: "Show the Main/Tail/Motor rpm if a craft config if loaded" },
       ],
     },
   ],
