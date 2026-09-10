@@ -49,7 +49,7 @@ const columns = [
 ];
 
 const tableUi = {
-  thead: "sr-only",
+  thead: "hidden",
   base: "w-full",
   td: "py-0.5 text-xs",
   tr: "",
