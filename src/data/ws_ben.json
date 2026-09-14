@@ -1,153 +1,4 @@
-[
-    {
-        "title": "Setpoint - Gyro",
-        "graphConfig": [
-            {
-                "label": "Roll",
-                "height": 1,
-                "fields": [
-                    {
-                        "name": "setpoint[0]",
-                        "smoothing": 0,
-                        "curve": {
-                            "power": 1,
-                            "MinMax": {
-                                "min": -180,
-                                "max": 180
-                            }
-                        },
-                        "default": {
-                            "smoothing": 0,
-                            "power": 1,
-                            "MinMax": {
-                                "min": -180,
-                                "max": 180
-                            }
-                        },
-                        "color": "#fb8072",
-                        "lineWidth": 1
-                    },
-                    {
-                        "name": "gyroADC[0]",
-                        "smoothing": 3000,
-                        "curve": {
-                            "power": 1,
-                            "MinMax": {
-                                "min": -180,
-                                "max": 180
-                            }
-                        },
-                        "default": {
-                            "smoothing": 3000,
-                            "power": 1,
-                            "MinMax": {
-                                "min": -180,
-                                "max": 180
-                            }
-                        },
-                        "color": "#ffffb3",
-                        "lineWidth": 1
-                    }
-                ]
-            },
-            {
-                "label": "Pitch",
-                "height": 1,
-                "fields": [
-                    {
-                        "name": "setpoint[1]",
-                        "smoothing": 0,
-                        "curve": {
-                            "power": 1,
-                            "MinMax": {
-                                "min": -180,
-                                "max": 180
-                            }
-                        },
-                        "default": {
-                            "smoothing": 0,
-                            "power": 1,
-                            "MinMax": {
-                                "min": -180,
-                                "max": 180
-                            }
-                        },
-                        "color": "#fb8072",
-                        "lineWidth": 1
-                    },
-                    {
-                        "name": "gyroADC[1]",
-                        "smoothing": 3000,
-                        "curve": {
-                            "power": 1,
-                            "MinMax": {
-                                "min": -180,
-                                "max": 180
-                            }
-                        },
-                        "default": {
-                            "smoothing": 3000,
-                            "power": 1,
-                            "MinMax": {
-                                "min": -180,
-                                "max": 180
-                            }
-                        },
-                        "color": "#8dd3c7",
-                        "lineWidth": 1
-                    }
-                ]
-            },
-            {
-                "label": "Yaw",
-                "height": 1,
-                "fields": [
-                    {
-                        "name": "setpoint[2]",
-                        "smoothing": 0,
-                        "curve": {
-                            "power": 1,
-                            "MinMax": {
-                                "min": -450,
-                                "max": 450
-                            }
-                        },
-                        "default": {
-                            "smoothing": 0,
-                            "power": 1,
-                            "MinMax": {
-                                "min": -450,
-                                "max": 450
-                            }
-                        },
-                        "color": "#fb8072",
-                        "lineWidth": 1
-                    },
-                    {
-                        "name": "gyroADC[2]",
-                        "smoothing": 3000,
-                        "curve": {
-                            "power": 1,
-                            "MinMax": {
-                                "min": -450,
-                                "max": 450
-                            }
-                        },
-                        "default": {
-                            "smoothing": 3000,
-                            "power": 1,
-                            "MinMax": {
-                                "min": -450,
-                                "max": 450
-                            }
-                        },
-                        "color": "#8dd3c7",
-                        "lineWidth": 1
-                    }
-                ]
-            }
-        ]
-    },
+[    {},
     {
         "graphConfig": [
             {
@@ -1785,226 +1636,238 @@
         "title": "Tracking",
         "graphConfig": [
             {
+                "label": "Roll",
+                "height": 1,
                 "fields": [
                     {
                         "name": "setpoint[0]",
                         "smoothing": 0,
                         "curve": {
                             "power": 0.25,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -399,
+                                "max": 399
+                            }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 0.25,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -399,
+                                "max": 399
+                            }
                         },
                         "color": "#fb8072",
-                        "lineWidth": 1,
-                        "grid": false
+                        "lineWidth": 1
                     },
                     {
                         "name": "gyroADC[0]",
                         "smoothing": 3000,
                         "curve": {
                             "power": 0.25,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -399,
+                                "max": 399
+                            }
                         },
                         "default": {
                             "smoothing": 3000,
                             "power": 0.25,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -399,
+                                "max": 399
+                            }
                         },
-                        "color": "#ffffb3",
-                        "lineWidth": 1,
-                        "grid": false
+                        "color": "#b3de69",
+                        "lineWidth": 1
                     },
                     {
                         "name": "mixer[0]",
                         "smoothing": 0,
                         "curve": {
                             "power": 1,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -3.2880000000000003,
+                                "max": 7.944
+                            }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 1,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -3.2880000000000003,
+                                "max": 7.944
+                            }
                         },
-                        "color": "#ffffb3",
-                        "lineWidth": 1,
-                        "grid": false
+                        "color": "#bebada",
+                        "lineWidth": 1
                     }
-                ],
-                "height": 1,
-                "label": "Roll"
+                ]
             },
             {
+                "label": "Pitch",
+                "height": 1,
                 "fields": [
                     {
                         "name": "setpoint[1]",
                         "smoothing": 0,
                         "curve": {
                             "power": 0.25,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -378,
+                                "max": 378
+                            }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 0.25,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -378,
+                                "max": 378
+                            }
                         },
                         "color": "#fb8072",
-                        "lineWidth": 1,
-                        "grid": false
+                        "lineWidth": 1
                     },
                     {
                         "name": "gyroADC[1]",
                         "smoothing": 3000,
                         "curve": {
                             "power": 0.25,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -378,
+                                "max": 378
+                            }
                         },
                         "default": {
                             "smoothing": 3000,
                             "power": 0.25,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -378,
+                                "max": 378
+                            }
                         },
-                        "color": "#ffffb3",
-                        "lineWidth": 1,
-                        "grid": false
+                        "color": "#b3de69",
+                        "lineWidth": 1
                     },
                     {
                         "name": "mixer[1]",
                         "smoothing": 0,
                         "curve": {
                             "power": 1,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -12.972,
+                                "max": 12.984
+                            }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 1,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -12.972,
+                                "max": 12.984
+                            }
                         },
-                        "color": "#ffffb3",
-                        "lineWidth": 1,
-                        "grid": false
+                        "color": "#bebada",
+                        "lineWidth": 1
                     }
-                ],
-                "height": 1,
-                "label": "Pitch"
+                ]
             },
             {
+                "label": "Yaw",
+                "height": 1,
                 "fields": [
                     {
                         "name": "setpoint[2]",
                         "smoothing": 0,
                         "curve": {
                             "power": 0.25,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -546,
+                                "max": 546
+                            }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 0.25,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -546,
+                                "max": 546
+                            }
                         },
                         "color": "#fb8072",
-                        "lineWidth": 1,
-                        "grid": false
+                        "lineWidth": 1
                     },
                     {
                         "name": "gyroADC[2]",
                         "smoothing": 3000,
                         "curve": {
                             "power": 0.25,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -546,
+                                "max": 546
+                            }
                         },
                         "default": {
                             "smoothing": 3000,
                             "power": 0.25,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": -546,
+                                "max": 546
+                            }
                         },
-                        "color": "#ffffb3",
-                        "lineWidth": 1,
-                        "grid": false
+                        "color": "#b3de69",
+                        "lineWidth": 1
                     },
                     {
                         "name": "mixer[2]",
                         "smoothing": 0,
                         "curve": {
                             "power": 1,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": 0,
+                                "max": 17.856
+                            }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 1,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": 0,
+                                "max": 17.856
+                            }
                         },
-                        "color": "#ffffb3",
-                        "lineWidth": 1,
-                        "grid": false
+                        "color": "#bebada",
+                        "lineWidth": 1
                     }
-                ],
-                "height": 1,
-                "label": "Yaw"
+                ]
             },
             {
+                "label": "RPM",
+                "height": 1,
                 "fields": [
                     {
                         "name": "headspeed",
                         "smoothing": 0,
                         "curve": {
                             "power": 1,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": 0,
+                                "max": 3716
+                            }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 1,
-                            "outputRange": 1
+                            "MinMax": {
+                                "min": 0,
+                                "max": 3716
+                            }
                         },
                         "color": "#fb8072",
-                        "lineWidth": 1,
-                        "grid": false
-                    },
-                    {
-                        "name": "motor[0]",
-                        "smoothing": 5000,
-                        "curve": {
-                            "power": 1,
-                            "outputRange": 1
-                        },
-                        "default": {
-                            "smoothing": 5000,
-                            "power": 1,
-                            "outputRange": 1
-                        },
-                        "color": "#8dd3c7",
-                        "lineWidth": 1,
-                        "grid": false
+                        "lineWidth": 1
                     }
-                ],
-                "height": 1,
-                "label": "RPM"
-            },
-            {
-                "fields": [
-                    {
-                        "name": "servo[all]",
-                        "smoothing": 5000,
-                        "curve": {
-                            "power": 1,
-                            "outputRange": 1
-                        },
-                        "default": {
-                            "smoothing": 5000,
-                            "power": 1,
-                            "outputRange": 1
-                        },
-                        "color": "#fb8072",
-                        "lineWidth": 1,
-                        "grid": false
-                    }
-                ],
-                "height": 1,
-                "label": "Servos"
+                ]
             }
         ]
     }
