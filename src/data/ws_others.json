@@ -1,0 +1,158 @@
+[
+  null,   
+  {
+    "title": "Tail Trouble (Motorised)",
+    "graphConfig": [
+      {
+        "fields": [
+          {
+            "name": "rcCommand[2]",
+            "smoothing": 0,
+            "curve": {
+              "power": 1,
+              "outputRange": 1
+            },
+            "default": {
+              "smoothing": 0,
+              "power": 1,
+              "outputRange": 1
+            },
+            "color": "#fb8072",
+            "lineWidth": 1,
+            "grid": false
+          },
+          {
+            "name": "motor[1]",
+            "smoothing": 5000,
+            "curve": {
+              "power": 1,
+              "outputRange": 1
+            },
+            "default": {
+              "smoothing": 5000,
+              "power": 1,
+              "outputRange": 1
+            },
+            "color": "#ccebc5",
+            "lineWidth": 1,
+            "grid": false
+          },
+          {
+            "name": "tailspeed",
+            "smoothing": 0,
+            "curve": {
+              "power": 1,
+              "outputRange": 1
+            },
+            "default": {
+              "smoothing": 0,
+              "power": 1,
+              "outputRange": 1
+            },
+            "color": "#fdb462",
+            "lineWidth": 1,
+            "grid": false
+          },
+          {
+            "name": "headspeed",
+            "smoothing": 0,
+            "curve": {
+              "power": 1,
+              "outputRange": 1
+            },
+            "default": {
+              "smoothing": 0,
+              "power": 1,
+              "outputRange": 1
+            },
+            "color": "#b3de69",
+            "lineWidth": 1,
+            "grid": false
+          },
+          {
+            "name": "gyroADC[2]",
+            "smoothing": 3000,
+            "curve": {
+              "power": 0.25,
+              "outputRange": 1
+            },
+            "default": {
+              "smoothing": 3000,
+              "power": 0.25,
+              "outputRange": 1
+            },
+            "color": "#fccde5",
+            "lineWidth": 2,
+            "grid": false
+          },
+          {
+            "name": "axisI[2]",
+            "smoothing": 3000,
+            "curve": {
+              "power": 0.25,
+              "outputRange": 1
+            },
+            "default": {
+              "smoothing": 3000,
+              "power": 0.25,
+              "outputRange": 1
+            },
+            "color": "#fdb462",
+            "lineWidth": 1,
+            "grid": false
+          },
+          {
+            "name": "axisD[2]",
+            "smoothing": 3000,
+            "curve": {
+              "power": 0.25,
+              "outputRange": 1
+            },
+            "default": {
+              "smoothing": 3000,
+              "power": 0.25,
+              "outputRange": 1
+            },
+            "color": "#b3de69",
+            "lineWidth": 1,
+            "grid": false
+          },
+          {
+            "name": "axisP[2]",
+            "smoothing": 3000,
+            "curve": {
+              "power": 0.25,
+              "outputRange": 1
+            },
+            "default": {
+              "smoothing": 3000,
+              "power": 0.25,
+              "outputRange": 1
+            },
+            "color": "#d9d9d9",
+            "lineWidth": 1,
+            "grid": false
+          },
+          {
+            "name": "gyroRAW[2]",
+            "smoothing": 0,
+            "curve": {
+              "power": 0.25,
+              "outputRange": 1
+            },
+            "default": {
+              "smoothing": 0,
+              "power": 0.25,
+              "outputRange": 1
+            },
+            "color": "#bc80bd",
+            "lineWidth": 1,
+            "grid": false
+          }
+        ],
+        "height": 1,
+        "label": "Tail Trouble"
+      }
+    ]
+  }
+]

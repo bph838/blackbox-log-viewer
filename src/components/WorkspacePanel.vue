@@ -3,14 +3,8 @@
     <h4>Workspace</h4>
 
     <UDropdownMenu :items="workspaceItems" class="w-full">
-      <UButton
-        variant="outline"
-        color="neutral"
-        size="xs"
-        block
-        class="justify-between font-mono"
-        trailing-icon="i-lucide-chevron-down"
-      >
+      <UButton variant="outline" color="neutral" size="xs" block class="justify-between font-mono"
+        trailing-icon="i-lucide-chevron-down">
         <span v-if="activeEntry" class="flex items-center gap-1 truncate">
           <span class="opacity-50">{{ workspaceStore.activeWorkspace }}</span>
           <span class="truncate">{{ activeEntry.title }}</span>
@@ -20,12 +14,8 @@
 
       <template #ws-trailing="{ item }">
         <UIcon v-if="item.wsActive" name="i-lucide-check" class="size-4 text-green-500" />
-        <UIcon
-          name="i-lucide-save"
-          class="size-4 opacity-40 hover:opacity-100 cursor-pointer"
-          title="Save current graph setup to this workspace"
-          @click.stop.prevent="onSaveClick(item)"
-        />
+        <UIcon name="i-lucide-save" class="size-4 opacity-40 hover:opacity-100 cursor-pointer"
+          title="Save current graph setup to this workspace" @click.stop.prevent="onSaveClick(item)" />
       </template>
     </UDropdownMenu>
   </div>
@@ -108,6 +98,13 @@ const workspaceItems = computed(() => {
       icon: "i-lucide-layout-template",
       onSelect() {
         emit("apply-default", 2);
+      },
+    },
+    {
+      label: "Preset: Others",
+      icon: "i-lucide-layout-template",
+      onSelect() {
+        emit("apply-default", 3);
       },
     },
   ];
