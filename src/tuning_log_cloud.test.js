@@ -11,6 +11,7 @@ import {
   setIndexRow,
   emptyIndex,
   defaultLogDir,
+  deleteLog,
 } from "./tuning_log_cloud.js";
 
 const IMG_A = "data:image/png;base64,QUFBQQ==";
@@ -176,6 +177,31 @@ describe("tuning log cloud sync", () => {
 
     await sync(client, pc2);
     expect(pc2.log.entries).toEqual([]);
+  });
+
+  it("deletes a log, its images and its index row, and doesn't bring it back", async () => {
+    const pc1 = newLog();
+    const entry = add(pc1, "2026-09-01T00:00:00.000Z", IMG_A);
+    const other = newLog("Tail");
+    await sync(client, pc1);
+    await sync(client, other);
+    const dir = pc1.sync.cloudDir;
+
+    const row = indexRowsForCraft(await fetchIndex(client), "TRON 7.0").find((r) => r.logId === pc1.log.logId);
+    const pc2 = await downloadLog(client, row);
+
+    expect(await deleteLog(client, pc1.log.logId)).toBe(true);
+    expect(fake.files()[`${dir}/log.json`]).toBeUndefined();
+    expect(fake.fileBase64(`${dir}/images/${entry.id}.png`)).toBeUndefined();
+    expect(indexRowsForCraft(await fetchIndex(client), "TRON 7.0").map((r) => r.name)).toEqual(["Tail"]);
+
+    // A computer with a copy (even with changes of its own) is told, rather than re-uploading it.
+    recordChange(pc2.sync, { op: OPS.IMPORT_LOG });
+    const result = await syncLog(client, pc2.log, pc2.sync);
+    expect(result.deletedInCloud).toBe(true);
+    expect(fake.files()[`${dir}/log.json`]).toBeUndefined();
+
+    expect(await deleteLog(client, pc1.log.logId)).toBe(false);
   });
 
   it("keeps a log in its folder after its craft name changes, moving its index row", async () => {

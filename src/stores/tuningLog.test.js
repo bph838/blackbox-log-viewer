@@ -290,6 +290,35 @@ describe("useTuningLogStore cloud sync", () => {
     expect(cloudError).toContain("Can't reach GitHub");
   });
 
+  it("deletes a log from this computer and the cloud, and from other computers when they sync", async () => {
+    const pc1 = await configuredStore();
+    pc1.createLog("Cyclic", "TRON 7.0");
+    pc1.addEntry({ image: IMAGE, timestamp: "2026-09-01T00:00:00.000Z" });
+    await settle();
+    await pc1.syncNow();
+    const pc1Db = db;
+
+    // A second computer that downloads it.
+    setTuningLogDb(createTuningLogDb(createMemoryBackend()));
+    localStorage.clear();
+    const pc2 = await configuredStore();
+    const [row] = await pc2.listCloudLogs("TRON 7.0");
+    expect(await pc2.openCloudLog(row)).toBe(true);
+
+    setTuningLogDb(pc1Db);
+    const { logs } = await pc1.listLogsForCraft("TRON 7.0");
+    expect(logs[0]).toMatchObject({ isLocal: true, inCloud: true });
+    await pc1.deleteLog(logs[0]);
+
+    expect(pc1.hasLog).toBe(false);
+    expect(pc1.localLogs).toEqual([]);
+    expect((await pc1.listLogsForCraft("TRON 7.0")).logs).toEqual([]);
+
+    await pc2.syncNow();
+    expect(pc2.hasLog).toBe(false);
+    expect(pc2.localLogs).toEqual([]);
+  });
+
   it("opens a cloud log on another computer, with its images", async () => {
     const pc1 = await configuredStore();
     pc1.createLog("Cyclic", "TRON 7.0");

@@ -13,32 +13,69 @@
 
       <ul v-if="logs.length" class="flex flex-col divide-y divide-default border border-default rounded-md">
         <li v-for="log in logs" :key="log.logId" class="flex items-center gap-3 px-3 py-2">
-          <div class="flex-1 min-w-0">
-            <div class="font-medium truncate">{{ log.name }}</div>
-            <div class="text-xs text-dimmed flex items-center gap-1 flex-wrap">
-              <span>{{ log.entryCount }} {{ log.entryCount === 1 ? "entry" : "entries" }}</span>
-              <span v-if="log.updated">· {{ formatUpdated(log.updated) }}</span>
-              <span v-if="!log.inCloud && tuningLogStore.cloudEnabled">· This computer only</span>
-              <span v-else-if="!log.isLocal">· In the cloud</span>
-              <span v-if="log.pendingCount && tuningLogStore.cloudEnabled" class="text-warning">· {{ log.pendingCount }} unsynced</span>
+          <template v-if="confirmingId === log.logId">
+            <div class="flex-1 min-w-0 text-xs">
+              <div class="font-medium">Delete “{{ log.name }}”?</div>
+              <div class="text-dimmed">
+                {{ log.entryCount }} {{ log.entryCount === 1 ? "entry" : "entries" }} will be deleted
+                {{ deleteLocation(log) }}. This can't be undone.
+              </div>
             </div>
-          </div>
-          <UBadge v-if="log.logId === currentLogId" color="neutral" variant="subtle" size="sm">Open</UBadge>
-          <UButton
-            v-else
-            size="xs"
-            color="primary"
-            variant="soft"
-            :label="log.isLocal ? 'Open' : 'Download & open'"
-            :loading="openingId === log.logId"
-            :disabled="!!openingId"
-            @click="onOpen(log)"
-          />
+            <UButton
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              label="Cancel"
+              :disabled="!!deletingId"
+              @click="confirmingId = null"
+            />
+            <UButton
+              size="xs"
+              color="error"
+              label="Delete"
+              :loading="deletingId === log.logId"
+              :disabled="!!deletingId"
+              @click="onDelete(log)"
+            />
+          </template>
+          <template v-else>
+            <div class="flex-1 min-w-0">
+              <div class="font-medium truncate">{{ log.name }}</div>
+              <div class="text-xs text-dimmed flex items-center gap-1 flex-wrap">
+                <span>{{ log.entryCount }} {{ log.entryCount === 1 ? "entry" : "entries" }}</span>
+                <span v-if="log.updated">· {{ formatUpdated(log.updated) }}</span>
+                <span v-if="!log.inCloud && tuningLogStore.cloudEnabled">· This computer only</span>
+                <span v-else-if="!log.isLocal">· In the cloud</span>
+                <span v-if="log.pendingCount && tuningLogStore.cloudEnabled" class="text-warning">· {{ log.pendingCount }} unsynced</span>
+              </div>
+            </div>
+            <UBadge v-if="log.logId === currentLogId" color="neutral" variant="subtle" size="sm">Open</UBadge>
+            <UButton
+              v-else
+              size="xs"
+              color="primary"
+              variant="soft"
+              :label="log.isLocal ? 'Open' : 'Download & open'"
+              :loading="openingId === log.logId"
+              :disabled="!!openingId"
+              @click="onOpen(log)"
+            />
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-trash-2"
+              title="Delete this tuning log"
+              :disabled="!!openingId || !!deletingId"
+              @click="confirmDelete(log)"
+            />
+          </template>
         </li>
       </ul>
       <p v-else class="text-xs text-dimmed">No tuning logs for {{ craftLabel }} yet.</p>
 
       <p v-if="openError" class="text-xs text-error">{{ openError }}</p>
+      <p v-if="deleteError" class="text-xs text-error">{{ deleteError }}</p>
 
       <div class="flex items-center gap-2">
         <UButton
@@ -67,7 +104,7 @@ const props = defineProps({
   currentLogId: { type: String, default: null },
 });
 
-const emit = defineEmits(["opened", "new"]);
+const emit = defineEmits(["opened", "new", "deleted"]);
 
 const tuningLogStore = useTuningLogStore();
 
@@ -76,6 +113,9 @@ const logs = ref([]);
 const cloudError = ref(null);
 const openingId = ref(null);
 const openError = ref("");
+const confirmingId = ref(null);
+const deletingId = ref(null);
+const deleteError = ref("");
 
 const craftLabel = computed(() => props.craftName || "this heli");
 
@@ -112,6 +152,33 @@ async function onOpen(log) {
     openError.value = `Couldn't open “${log.name}”: ${error.message}`;
   } finally {
     openingId.value = null;
+  }
+}
+
+function deleteLocation(log) {
+  const fromCloud = log.inCloud && tuningLogStore.cloudEnabled;
+  if (fromCloud && log.isLocal) return "from this computer and from GitHub (and other computers when they next sync)";
+  if (fromCloud) return "from GitHub (and other computers when they next sync)";
+  return "from this computer";
+}
+
+function confirmDelete(log) {
+  confirmingId.value = log.logId;
+  deleteError.value = "";
+}
+
+async function onDelete(log) {
+  deletingId.value = log.logId;
+  deleteError.value = "";
+  try {
+    await tuningLogStore.deleteLog(log);
+    emit("deleted", log);
+  } catch (error) {
+    deleteError.value = `Couldn't delete “${log.name}” from GitHub: ${error.message}`;
+  } finally {
+    deletingId.value = null;
+    confirmingId.value = null;
+    load();
   }
 }
 

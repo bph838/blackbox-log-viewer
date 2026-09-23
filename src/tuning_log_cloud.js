@@ -95,6 +95,22 @@ export function setIndexRow(index, log, dir, updated) {
 }
 
 /**
+ * Takes a log out of the index. Modifies `index`; resolves the removed row, or null if it wasn't
+ * listed.
+ */
+export function removeIndexRow(index, logId) {
+  for (const [key, group] of Object.entries(index.crafts)) {
+    const row = group.logs && group.logs[logId];
+    if (!row) continue;
+
+    delete group.logs[logId];
+    if (!Object.keys(group.logs).length) delete index.crafts[key];
+    return row;
+  }
+  return null;
+}
+
+/**
  * Every log listed for a craft, most recently updated first:
  * [{ logId, name, craftName, path, updated, entryCount }]
  */
@@ -161,6 +177,11 @@ export async function syncLog(client, local, sync, { now = () => new Date().toIS
     const remoteFile = await client.getJsonFile(logPath(dir));
     const remote = remoteFile ? remoteFile.json : null;
 
+    // It was in the cloud before and isn't now: deleted (see deleteLog) - don't bring it back.
+    if (!remoteFile && sync.baseSha) {
+      return { log: local, sync, uploaded: false, downloaded: false, deletedInCloud: true };
+    }
+
     if (remoteFile && remoteFile.sha === sync.baseSha && !sync.pending.length) {
       return { log: local, sync, uploaded: false, downloaded: false };
     }
@@ -210,5 +231,40 @@ export async function syncLog(client, local, sync, { now = () => new Date().toIS
     const newSync = markSynced(clone(sync), merged, result.shas[logPath(dir)]);
     newSync.cloudDir = dir;
     return { log: merged, sync: newSync, uploaded: true, downloaded };
+  }
+}
+
+/**
+ * Deletes a log from the repo - its index row, log.json and images - in one commit. `fallbackDir`
+ * (this computer's sync.cloudDir) is used if the index doesn't list the log. Resolves whether
+ * there was anything to delete. Throws a GitHubError if GitHub can't be reached or refuses.
+ */
+export async function deleteLog(client, logId, fallbackDir = null) {
+  for (let attempt = 1; ; attempt++) {
+    const index = await fetchIndex(client);
+    const row = removeIndexRow(index, logId);
+    const dir = (row && row.path) || fallbackDir;
+
+    const deletes = [];
+    const logFile = dir ? await client.getJsonFile(logPath(dir)) : null;
+    if (logFile) {
+      for (const entry of (logFile.json && logFile.json.entries) || []) {
+        if (entry.hasImage) deletes.push(imagePath(dir, entry.id));
+      }
+      deletes.push(logPath(dir));
+    }
+
+    // Index first: with the one-file-at-a-time fallback, nothing is left pointing at deleted files.
+    const files = row ? [{ path: INDEX_PATH, text: JSON.stringify(index, null, 2) }] : [];
+    if (!files.length && !deletes.length) return false;
+
+    const name = (row && row.name) || (logFile && logFile.json && logFile.json.name) || logId;
+    try {
+      await client.commitFiles({ files, deletes, message: `Delete tuning log "${name}"` });
+      return true;
+    } catch (error) {
+      if (error.isConflict && attempt < MAX_ATTEMPTS) continue;
+      throw error;
+    }
   }
 }

@@ -188,6 +188,11 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     if (!start) return;
 
     const result = await Cloud.syncLog(activeClient, start.log, start.sync);
+    if (result.deletedInCloud) {
+      // Deleted on another computer - delete it here too.
+      await deleteLocalLog(logId);
+      return;
+    }
     if (result.uploaded || result.downloaded || result.sync !== start.sync) {
       await applySyncResult(start, result);
     }
@@ -447,6 +452,26 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     await refreshLocalLogs();
   }
 
+  /**
+   * Deletes a log from listLogsForCraft everywhere: from this computer and, if it's been synced,
+   * from the cloud (so other computers drop their copies on their next sync). Throws if the cloud
+   * copy couldn't be deleted - the local copy is gone by then, and the log is still listed as in
+   * the cloud, so deleting can be retried.
+   */
+  async function deleteLog(item) {
+    const stored = item.isLocal ? await db.getLog(item.logId) : null;
+    const cloudDir = (stored && stored.sync && stored.sync.cloudDir) || (item.row && item.row.path) || null;
+
+    if (item.isLocal) await deleteLocalLog(item.logId);
+
+    const activeClient = item.inCloud ? getClient() : null;
+    if (!activeClient) return;
+
+    // Let a sync that's already running finish first, so it can't re-upload the log afterwards.
+    if (syncPromise) await syncPromise;
+    await Cloud.deleteLog(activeClient, item.logId, cloudDir);
+  }
+
   function findEntry(entryId) {
     return entries.value.find((entry) => entry.id === entryId) || null;
   }
@@ -611,6 +636,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     switchLog,
     closeLog,
     deleteLocalLog,
+    deleteLog,
     addEntry,
     deleteEntry,
     updateEntryNotes,
