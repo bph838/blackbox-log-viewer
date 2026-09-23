@@ -196,6 +196,10 @@ export function addEntry(log, options) {
     image: options.image,
     config: options.config || "",
     notes: options.notes || "",
+    // When this entry was added to the log. Its id comes from the flight log, so deleting an entry
+    // and capturing the same flight again gives the same id - this is what lets the new entry win
+    // over the old one's deletion tombstone (see tuning_log_sync.js).
+    addedAt: new Date().toISOString(),
   };
 
   // Persisted on the entry itself (rather than re-derived from the timestamp later) so the

@@ -168,7 +168,7 @@ describe("tuning log cloud sync", () => {
     const pc2 = await downloadLog(client, indexRowsForCraft(await fetchIndex(client), "TRON 7.0")[0]);
 
     pc1.log.entries = [];
-    pc1.log.deletedEntries.push({ id: entry.id, deletedAt: "2026-09-05T00:00:00.000Z" });
+    pc1.log.deletedEntries.push({ id: entry.id, deletedAt: new Date().toISOString() });
     recordChange(pc1.sync, { op: OPS.DELETE_ENTRY, entryId: entry.id });
     await sync(client, pc1);
 

@@ -120,6 +120,48 @@ describe("mergeLogs", () => {
     expect(merged.deletedEntries.map((t) => t.id).sort()).toEqual(["e1", "e2"]);
   });
 
+  describe("re-adding a deleted entry (same flight captured again, so the same id)", () => {
+    const added = "2026-09-01T00:00:00.000Z";
+    const deleted = "2026-09-02T00:00:00.000Z";
+    const readded = "2026-09-03T00:00:00.000Z";
+
+    it("keeps an entry added after its tombstone", () => {
+      const base = log([], { deletedEntries: [{ id: "e1", deletedAt: deleted }] });
+      const local = log([entry("e1", { addedAt: readded })], { deletedEntries: [{ id: "e1", deletedAt: deleted }] });
+      const merged = mergeLogs(base, local, clone(base));
+      expect(merged.entries.map((e) => e.id)).toEqual(["e1"]);
+    });
+
+    it("replaces the old copy the other side still has with the re-added one", () => {
+      const old = entry("e1", { addedAt: added, notes: "old notes" });
+      const base = log([old]);
+      const local = log([entry("e1", { addedAt: readded, notes: "" })], {
+        deletedEntries: [{ id: "e1", deletedAt: deleted }],
+      });
+      const merged = mergeLogs(base, local, clone(base));
+      expect(merged.entries).toHaveLength(1);
+      expect(merged.entries[0].addedAt).toBe(readded);
+      expect(merged.entries[0].notes).toBe("");
+    });
+
+    it("still deletes an entry deleted again after being re-added", () => {
+      const tombstones = [
+        { id: "e1", deletedAt: deleted },
+        { id: "e1", deletedAt: "2026-09-04T00:00:00.000Z" },
+      ];
+      const base = log([entry("e1", { addedAt: readded })]);
+      const local = log([], { deletedEntries: [tombstones[1]] });
+      const remote = log([entry("e1", { addedAt: readded })], { deletedEntries: [tombstones[0]] });
+      expect(mergeLogs(base, local, remote).entries).toEqual([]);
+    });
+
+    it("still deletes entries from before addedAt existed", () => {
+      const base = log([entry("e1")]);
+      const local = log([], { deletedEntries: [{ id: "e1", deletedAt: deleted }] });
+      expect(mergeLogs(base, local, clone(base)).entries).toEqual([]);
+    });
+  });
+
   it("keeps a local image on a merged entry (remote copies carry none)", () => {
     const local = log([entry("e1", { image: "data:image/png;base64,AAAA" })]);
     const remote = log([entry("e1", { hasImage: true })]);

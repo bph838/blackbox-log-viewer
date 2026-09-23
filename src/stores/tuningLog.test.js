@@ -218,6 +218,37 @@ describe("useTuningLogStore cloud sync", () => {
     expect(JSON.parse(fake.files()[logFile]).entries[0].notes).toBe("typed during sync");
   });
 
+  it("keeps an entry that was deleted and then captured again, on every computer", async () => {
+    const pc1 = await configuredStore();
+    pc1.createLog("Cyclic", "TRON 7.0");
+    const capture = { image: IMAGE, config: "p: 1", timestamp: "2026-09-01T00:00:00.000Z" };
+    const entry = pc1.addEntry(capture);
+    await settle();
+    await pc1.syncNow();
+
+    pc1.deleteEntry(entry.id);
+    await settle();
+    await pc1.syncNow();
+    expect(pc1.entries).toEqual([]);
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const again = pc1.addEntry(capture);
+    expect(again.id).toBe(entry.id);
+    await settle();
+    await pc1.syncNow();
+    expect(pc1.entries.map((e) => e.id)).toEqual([entry.id]);
+    expect(pc1.entries[0].image).toBe(IMAGE);
+
+    // Another computer opening the log sees it too, image and all.
+    setTuningLogDb(createTuningLogDb(createMemoryBackend()));
+    localStorage.clear();
+    const pc2 = await configuredStore();
+    const [row] = await pc2.listCloudLogs("TRON 7.0");
+    await pc2.openCloudLog(row);
+    expect(pc2.entries.map((e) => e.id)).toEqual([entry.id]);
+    expect(pc2.entries[0].image).toBe(IMAGE);
+  });
+
   it("lists a heli's logs from this computer and the cloud together, and opens either kind", async () => {
     const pc1 = await configuredStore();
     pc1.createLog("Cyclic", "TRON 7.0");

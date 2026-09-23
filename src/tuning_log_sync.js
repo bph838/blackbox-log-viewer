@@ -3,9 +3,10 @@
 // the local and cloud copies have both changed since they were last in step, mergeLogs() combines
 // them with a three-way merge against the last-synced copy (sync.base), so nothing done offline -
 // or on another computer - is lost: entries are unioned by id, deletions are carried as
-// tombstones (log.deletedEntries) so they can't be resurrected by the other copy, and a note or AI
-// conversation edited on both sides keeps both versions rather than one silently overwriting the
-// other.
+// tombstones (log.deletedEntries) so the other copy can't bring a deleted entry back, and a note or
+// AI conversation edited on both sides keeps both versions rather than one silently overwriting
+// the other. A tombstone only applies to an entry added before it (entry.addedAt < deletedAt), so
+// deleting an entry and then capturing the same flight again (same id) keeps the new entry.
 //
 // Everything here is pure (no storage or network) - see stores/tuningLog.js for where it's used.
 
@@ -118,17 +119,30 @@ function byId(entries) {
   return map;
 }
 
+/**
+ * Unions tombstones by entry id, keeping the latest deletion of each - so an entry deleted, re-added
+ * and deleted again stays deleted.
+ */
 function mergeTombstones(...lists) {
   const map = new Map();
   for (const list of lists) {
     for (const tombstone of list || []) {
       const existing = map.get(tombstone.id);
-      if (!existing || tombstone.deletedAt < existing.deletedAt) {
+      if (!existing || String(tombstone.deletedAt) > String(existing.deletedAt)) {
         map.set(tombstone.id, tombstone);
       }
     }
   }
   return [...map.values()];
+}
+
+/**
+ * Whether a tombstone deletes this entry: only if the entry was added before the deletion. (Entries
+ * from before addedAt existed count as added at the beginning of time.)
+ */
+function isDeleted(entry, tombstones) {
+  const tombstone = tombstones.get(entry.id);
+  return !!tombstone && String(tombstone.deletedAt) > String(entry.addedAt || "");
 }
 
 /**
@@ -191,6 +205,14 @@ function mergeAi(base, local, remote) {
 }
 
 function mergeEntry(base, local, remote) {
+  // One side deleted this entry and captured the same flight again: that's a new entry, not an
+  // edit of the old one - the newer one replaces it outright.
+  if ((local.addedAt || "") !== (remote.addedAt || "")) {
+    const newer = clone(String(local.addedAt || "") > String(remote.addedAt || "") ? local : remote);
+    if (!newer.image && local.image) newer.image = local.image;
+    return newer;
+  }
+
   const merged = clone(remote);
 
   // Image data is never in a remote/base copy - keep whatever the local copy already has loaded.
@@ -224,7 +246,7 @@ export function mergeLogs(base, local, remote) {
   if (!local) return clone(remote);
 
   const deletedEntries = mergeTombstones(base && base.deletedEntries, local.deletedEntries, remote.deletedEntries);
-  const deletedIds = new Set(deletedEntries.map((t) => t.id));
+  const tombstones = new Map(deletedEntries.map((t) => [t.id, t]));
 
   const baseEntries = byId(base && base.entries);
   const localEntries = byId(local.entries);
@@ -234,16 +256,22 @@ export function mergeLogs(base, local, remote) {
 
   for (const remoteEntry of remote.entries || []) {
     seen.add(remoteEntry.id);
-    if (deletedIds.has(remoteEntry.id)) continue;
 
     const localEntry = localEntries.get(remoteEntry.id);
-    entries.push(
-      localEntry ? mergeEntry(baseEntries.get(remoteEntry.id), localEntry, remoteEntry) : clone(remoteEntry),
-    );
+    const remoteAlive = !isDeleted(remoteEntry, tombstones);
+    const localAlive = !!localEntry && !isDeleted(localEntry, tombstones);
+
+    if (remoteAlive && localAlive) {
+      entries.push(mergeEntry(baseEntries.get(remoteEntry.id), localEntry, remoteEntry));
+    } else if (remoteAlive) {
+      entries.push(clone(remoteEntry));
+    } else if (localAlive) {
+      entries.push(clone(localEntry));
+    }
   }
 
   for (const localEntry of local.entries || []) {
-    if (seen.has(localEntry.id) || deletedIds.has(localEntry.id)) continue;
+    if (seen.has(localEntry.id) || isDeleted(localEntry, tombstones)) continue;
 
     // Not in the cloud copy and not deleted there either: new here (or the cloud copy lost it) -
     // keep it either way.
