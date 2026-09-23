@@ -59,6 +59,8 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
   const currentSync = ref(null);
   // Summaries of every log stored on this computer - see tuning_log_db.js listLogs().
   const localLogs = ref([]);
+  // Goes up whenever a log is deleted, so every open list of logs (TuningLogPicker) reloads.
+  const deletedLogsVersion = ref(0);
   const aiExpertMode = ref(false);
   const aiUseSkills = ref(true);
   const apiKeyBannerDismissed = ref(false);
@@ -450,6 +452,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     }
     await db.deleteLog(logId);
     await refreshLocalLogs();
+    deletedLogsVersion.value++;
   }
 
   /**
@@ -467,9 +470,13 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     const activeClient = item.inCloud ? getClient() : null;
     if (!activeClient) return;
 
-    // Let a sync that's already running finish first, so it can't re-upload the log afterwards.
-    if (syncPromise) await syncPromise;
-    await Cloud.deleteLog(activeClient, item.logId, cloudDir);
+    try {
+      // Let a sync that's already running finish first, so it can't re-upload the log afterwards.
+      if (syncPromise) await syncPromise;
+      await Cloud.deleteLog(activeClient, item.logId, cloudDir);
+    } finally {
+      deletedLogsVersion.value++;
+    }
   }
 
   function findEntry(entryId) {
@@ -614,6 +621,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     currentLog,
     currentSync,
     localLogs,
+    deletedLogsVersion,
     aiExpertMode,
     aiUseSkills,
     apiKeyBannerDismissed,

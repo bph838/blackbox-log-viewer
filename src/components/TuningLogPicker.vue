@@ -136,6 +136,8 @@ async function load() {
 }
 
 watch(() => props.craftName, load, { immediate: true });
+// A log deleted here or in another list (e.g. the dialog's switcher) - show the list without it.
+watch(() => tuningLogStore.deletedLogsVersion, load);
 
 async function onOpen(log) {
   openingId.value = log.logId;
@@ -178,7 +180,6 @@ async function onDelete(log) {
   } finally {
     deletingId.value = null;
     confirmingId.value = null;
-    load();
   }
 }
 
