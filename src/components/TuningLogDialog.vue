@@ -255,7 +255,13 @@
             </ul>
           </div>
 
-          <div ref="scrollContainerEl" class="flex-1 min-w-0 flex flex-col gap-2 overflow-y-auto pr-1" @scroll="onScrollContainerScroll">
+          <!-- scrollbar-gutter: always reserve the scrollbar's width, so an entry long enough to scroll
+               doesn't get a narrower panel (and a smaller step response image) than one that isn't. -->
+          <div
+            ref="scrollContainerEl"
+            class="flex-1 min-w-0 flex flex-col gap-2 overflow-y-auto pr-1 [scrollbar-gutter:stable]"
+            @scroll="onScrollContainerScroll"
+          >
             <!-- With an image, the title + buttons overlay the top of it and only appear while the
                  mouse is over its top fifth (or they have keyboard focus) - so they never push the
                  image around, and it sits in the same place for every entry being compared. -->
