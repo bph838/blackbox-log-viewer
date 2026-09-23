@@ -256,58 +256,72 @@
           </div>
 
           <div ref="scrollContainerEl" class="flex-1 min-w-0 flex flex-col gap-2 overflow-y-auto pr-1" @scroll="onScrollContainerScroll">
-            <div class="flex items-center justify-between gap-2 flex-wrap">
-              <div class="flex items-center gap-2 flex-wrap">
-                <h4 class="font-medium text-sm">{{ mainTitle }}</h4>
-                <UTooltip v-if="mainTitleIsCalculated" :text="APPROXIMATED_DATETIME_TOOLTIP" :delay-duration="0">
-                  <UBadge color="warning" variant="subtle" size="xs">Approximated Datetime</UBadge>
-                </UTooltip>
+            <!-- With an image, the title + buttons overlay the top of it and only appear while the
+                 mouse is over its top fifth (or they have keyboard focus) - so they never push the
+                 image around, and it sits in the same place for every entry being compared. -->
+            <div class="relative" :class="hasImage ? (imageExpanded ? 'w-full' : 'w-fit max-w-full self-center') : 'flex flex-col gap-2'">
+              <div :class="hasImage ? 'absolute inset-x-0 top-0 h-1/5 min-h-8 z-10 group/imghdr' : ''">
+                <div
+                  class="flex items-center justify-between gap-2 flex-wrap"
+                  :class="
+                    hasImage
+                      ? 'p-2 rounded-t border-b border-default bg-default/90 shadow-sm opacity-0 pointer-events-none transition-opacity duration-150 group-hover/imghdr:opacity-100 group-hover/imghdr:pointer-events-auto group-focus-within/imghdr:opacity-100 group-focus-within/imghdr:pointer-events-auto'
+                      : ''
+                  "
+                >
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h4 class="font-medium text-sm">{{ mainTitle }}</h4>
+                    <UTooltip v-if="mainTitleIsCalculated" :text="APPROXIMATED_DATETIME_TOOLTIP" :delay-duration="0">
+                      <UBadge color="warning" variant="subtle" size="xs">Approximated Datetime</UBadge>
+                    </UTooltip>
+                  </div>
+                  <div class="flex items-center gap-1 flex-wrap">
+                    <UButton
+                      v-if="hasImage"
+                      variant="soft"
+                      color="neutral"
+                      size="xs"
+                      :label="imageExpanded ? 'Shrink image' : 'Expand image'"
+                      @click="imageExpanded = !imageExpanded"
+                    />
+                    <UButton
+                      v-if="hasConfig"
+                      variant="soft"
+                      color="neutral"
+                      size="xs"
+                      :label="configVisible ? 'Hide config' : 'Expand config'"
+                      @click="configVisible = !configVisible"
+                    />
+                    <UButton
+                      v-if="hasImage"
+                      variant="soft"
+                      color="neutral"
+                      size="xs"
+                      icon="i-lucide-copy"
+                      label="Copy Image"
+                      @click="onCopyImage"
+                    />
+                    <UButton
+                      v-if="hasImage && isCurrentFlightLog"
+                      variant="soft"
+                      color="neutral"
+                      size="xs"
+                      icon="i-lucide-copy"
+                      label="Copy Prompt"
+                      @click="onCopyPrompt"
+                    />
+                  </div>
+                </div>
               </div>
-              <div class="flex items-center gap-1 flex-wrap">
-                <UButton
-                  v-if="hasImage"
-                  variant="soft"
-                  color="neutral"
-                  size="xs"
-                  :label="imageExpanded ? 'Shrink image' : 'Expand image'"
-                  @click="imageExpanded = !imageExpanded"
-                />
-                <UButton
-                  v-if="hasConfig"
-                  variant="soft"
-                  color="neutral"
-                  size="xs"
-                  :label="configVisible ? 'Hide config' : 'Expand config'"
-                  @click="configVisible = !configVisible"
-                />
-                <UButton
-                  v-if="hasImage"
-                  variant="soft"
-                  color="neutral"
-                  size="xs"
-                  icon="i-lucide-copy"
-                  label="Copy Image"
-                  @click="onCopyImage"
-                />
-                <UButton
-                  v-if="hasImage && isCurrentFlightLog"
-                  variant="soft"
-                  color="neutral"
-                  size="xs"
-                  icon="i-lucide-copy"
-                  label="Copy Prompt"
-                  @click="onCopyPrompt"
-                />
-              </div>
-            </div>
 
-            <UAlert v-if="!hasImage" color="neutral" variant="soft" :description="noImageMessage" />
-            <img
-              v-if="hasImage"
-              :src="currentEntry.image"
-              class="rounded border border-default bg-black"
-              :class="imageExpanded ? 'w-full' : 'max-h-64 object-contain'"
-            />
+              <UAlert v-if="!hasImage" color="neutral" variant="soft" :description="noImageMessage" />
+              <img
+                v-if="hasImage"
+                :src="currentEntry.image"
+                class="block rounded border border-default bg-black"
+                :class="imageExpanded ? 'w-full' : 'max-h-64 object-contain'"
+              />
+            </div>
 
             <div v-if="hasConfig && configVisible">
               <UInput
