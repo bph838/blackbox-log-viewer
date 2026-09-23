@@ -114,21 +114,45 @@ export function parseLogStartDateTime(sysConfig) {
  * no RTC reports the same useless placeholder for every sub-log it writes, so on their own they
  * can't be told apart or placed in time at all.
  *
- * Walks the sub-logs in file order, tracking a running "cursor" time: a sub-log with a known start
- * time is trusted outright and resets the cursor to (its own start + its own duration) for the
- * next sub-log; one with no known start time instead takes the current cursor as its *estimated*
- * start (flagged `isCalculated: true`) and then advances the cursor by its own duration anyway -
- * so a run of several unknown sub-logs in a row still increments forward through each of their
- * durations rather than collapsing onto the same instant. Before the first known sub-log (or if
- * the file has none at all), the cursor starts from `fallbackIso` - typically the flight log
- * file's own `lastModified` time (epoch ms, from the browser `File` object - see
- * appStore.logFileLastModified), since that's stable across copying the file (unlike a "created"
- * time, which would reset to "now" when the file is copied off an SD card).
+ * When every sub-log carries its own `startUs` (the flight log's raw microsecond "time" field at
+ * that sub-log's start), all sub-logs in the file share one continuous elapsed-time clock - it
+ * only resets on an FC reboot, not per arm/disarm - so *any* single sub-log with a known date/time
+ * is enough to place every other sub-log in real time, exactly: subtract its `startUs` from its
+ * known date/time to get the estimated real-world moment the FC booted, then add each unknown
+ * sub-log's own `startUs` to that boot moment. This works equally well for unknown sub-logs that
+ * come *before* the known one (e.g. an RTC that only becomes valid partway through the file, once
+ * it's had time to sync) as for ones that come after, unlike walking forward through durations.
  *
- * `logs`: per sub-log `{ startDateTime: isoString|null, durationMs: number }`, in file order.
- * Returns a same-length/order array of `{ dateTime: isoString|null, isCalculated: boolean }`.
+ * Falls back to walking the sub-logs in file order with a running "cursor" time when no sub-log in
+ * the file has a known date/time at all (or callers don't supply `startUs`): a sub-log with a known
+ * start time resets the cursor to (its own start + its own duration) for the next sub-log; one
+ * with no known start time takes the current cursor as its *estimated* start and then advances the
+ * cursor by its own duration anyway - so a run of several unknown sub-logs in a row still
+ * increments forward through each of their durations rather than collapsing onto the same instant.
+ * The cursor starts from `fallbackIso` - typically the flight log file's own `lastModified` time
+ * (epoch ms, from the browser `File` object - see appStore.logFileLastModified), since that's
+ * stable across copying the file (unlike a "created" time, which would reset to "now" when the
+ * file is copied off an SD card).
+ *
+ * `logs`: per sub-log `{ startDateTime: isoString|null, startUs?: number, durationMs: number }`,
+ * in file order. Returns a same-length/order array of
+ * `{ dateTime: isoString|null, isCalculated: boolean }`.
  */
 export function resolveLogDateTimes(logs, fallbackIso) {
+  if (logs.length > 0 && logs.every((log) => typeof log.startUs === "number")) {
+    const anchor = logs.find((log) => log.startDateTime);
+
+    if (anchor) {
+      const bootMs = new Date(anchor.startDateTime).getTime() - anchor.startUs / 1000;
+
+      return logs.map((log) =>
+        log.startDateTime
+          ? { dateTime: log.startDateTime, isCalculated: false }
+          : { dateTime: new Date(bootMs + log.startUs / 1000).toISOString(), isCalculated: true },
+      );
+    }
+  }
+
   let cursor = fallbackIso || null;
   const results = [];
 

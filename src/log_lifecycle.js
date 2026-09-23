@@ -84,65 +84,75 @@ export function renderLogFileInfo(file) {
   appStore.logFileLastModified = file.lastModified ?? null;
 
   const logCount = logStore.flightLog.getLogCount();
-  const entries = [];
-  // One { startDateTime, durationMs } per sub-log, in file order - fed to resolveLogDateTimes()
-  // below so the Tuning Log can estimate a date/time for sub-logs that don't have their own (see
-  // that function for why the dropdown label below doesn't use the estimate itself).
+  const errors = [];
+  // One { startDateTime, startUs, durationMs } per sub-log, in file order - fed to
+  // resolveLogDateTimes() below, which estimates a date/time for any sub-log that doesn't have its
+  // own valid "Log start datetime" (e.g. one taken before the flight controller's RTC had synced),
+  // by borrowing another sub-log's known date/time and its own elapsed-time offset (`startUs`) -
+  // see that function for why this works even when the borrowed sub-log comes later in the file.
   const rawLogs = [];
   for (let index = 0; index < logCount; index++) {
     const error = logStore.flightLog.getLogError(index);
-    let logLabel;
+    errors.push(error);
+
+    if (error) {
+      rawLogs.push({ startDateTime: null, startUs: 0, durationMs: 0 });
+      continue;
+    }
+
+    // Parse this sub-log's own header so its "Log start datetime" (which can differ per
+    // arm/disarm session within a multi-log file) is available below. getLogError() above only
+    // reflects the lightweight index-scan pass, so a full header parse can still fail here - fall
+    // back to no date/time rather than aborting the whole file load.
     let startDateTime = null;
-    let durationMs = 0;
+    try {
+      logStore.flightLog.openLog(index);
+      startDateTime = parseLogStartDateTime(logStore.flightLog.getSysConfig());
+    } catch {
+      // Leave startDateTime null; the sub-log's elapsed time range is still known below.
+    }
+
+    const startUs = logStore.flightLog.getMinTime(index);
+    const durationMs = Math.ceil((logStore.flightLog.getMaxTime(index) - startUs) / 1000);
+    rawLogs.push({ startDateTime, startUs, durationMs });
+  }
+
+  const fallbackIso =
+    appStore.logFileLastModified != null ? new Date(appStore.logFileLastModified).toISOString() : null;
+  const dateTimes = resolveLogDateTimes(rawLogs, fallbackIso);
+  logStore.logDateTimes = dateTimes;
+
+  const entries = [];
+  for (let index = 0; index < logCount; index++) {
+    const error = errors[index];
+    let logLabel;
+
     if (error) {
       logLabel = error;
     } else {
-      // Parse this sub-log's own header so its "Log start datetime" (which can differ per
-      // arm/disarm session within a multi-log file) is available for the dropdown entry below.
-      // getLogError() above only reflects the lightweight index-scan pass, so a full header parse
-      // can still fail here - fall back to no date/time rather than aborting the whole file load.
-      let dateTime = "";
-      try {
-        logStore.flightLog.openLog(index);
-        startDateTime = parseLogStartDateTime(logStore.flightLog.getSysConfig());
-        dateTime = startDateTime ? formatLogDateTime(startDateTime) : "";
-      } catch {
-        // Leave dateTime blank; the duration below is still shown.
-      }
+      const { dateTime: resolvedIso, isCalculated } = dateTimes[index];
+      const durationLabel = `[${formatTime(rawLogs[index].durationMs, false)}]`;
 
-      durationMs = Math.ceil(
-        (logStore.flightLog.getMaxTime(index) - logStore.flightLog.getMinTime(index)) / 1000,
-      );
-      const durationLabel = `[${formatTime(durationMs, false)}]`;
-
-      if (dateTime) {
-        logLabel = `${dateTime}  ${durationLabel}`;
+      if (resolvedIso) {
+        // A calculated date/time is a best guess built by anchoring off another sub-log in the
+        // same file (see resolveLogDateTimes) - mark it with "~" so it isn't mistaken for an
+        // actual recorded time.
+        const formatted = formatLogDateTime(resolvedIso);
+        logLabel = `${isCalculated ? "~" : ""}${formatted}  ${durationLabel}`;
       } else {
-        // No known date for this sub-log - fall back to the original elapsed-time-range label.
-        // Deliberately not resolveLogDateTimes()'s estimate: that value is a best guess built by
-        // walking outward from neighboring sub-logs, and showing it here with no indication that
-        // it's a guess would misrepresent it as an actual recorded time.
-        logLabel = `${formatTime(
-          logStore.flightLog.getMinTime(index) / 1000,
-          false,
-        )} - ${formatTime(
+        // No known or calculable date for this sub-log - fall back to the elapsed-time-range label.
+        logLabel = `${formatTime(rawLogs[index].startUs / 1000, false)} - ${formatTime(
           logStore.flightLog.getMaxTime(index) / 1000,
           false,
         )} ${durationLabel}`;
       }
     }
-    const label = logCount > 1
-      ? `${index + 1}/${logCount}: ${logLabel}`
-      : logLabel;
+
+    const label = logCount > 1 ? `${index + 1}/${logCount}: ${logLabel}` : logLabel;
     entries.push({ label, value: index, disabled: !!error });
-    rawLogs.push({ startDateTime, durationMs });
   }
   logStore.logIndexEntries = entries;
   logStore.activeLogIndex = 0;
-
-  const fallbackIso =
-    appStore.logFileLastModified != null ? new Date(appStore.logFileLastModified).toISOString() : null;
-  logStore.logDateTimes = resolveLogDateTimes(rawLogs, fallbackIso);
 }
 
 export function renderSelectedLogInfo() {
