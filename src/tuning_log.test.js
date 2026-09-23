@@ -117,48 +117,48 @@ describe("resolveLogDateTimes", () => {
     expect(results).toEqual([{ dateTime: null, isCalculated: true }]);
   });
 
-  describe("with startUs (elapsed-time anchoring)", () => {
-    it("estimates leading unknown sub-logs backward from a later known sub-log", () => {
+  describe("leading unknown sub-logs before a later known one", () => {
+    it("walks backward from the known sub-log's start, subtracting durations", () => {
       // Mirrors an FC whose RTC only syncs partway through the file: the first two sub-logs have
-      // no "Log start datetime", but all three share one continuous elapsed-time clock.
+      // no "Log start datetime" of their own.
       const results = resolveLogDateTimes(
         [
-          { startDateTime: null, startUs: 35_000_000, durationMs: 11000 }, // 00:35 - 00:46
-          { startDateTime: null, startUs: 50_000_000, durationMs: 263000 }, // 00:50 - 05:13
-          { startDateTime: "2026-09-20T15:54:00.000Z", startUs: 954_000_000, durationMs: 250000 }, // 15:54, known
+          { startDateTime: null, durationMs: 11000 }, // 00:35 - 00:46
+          { startDateTime: null, durationMs: 263000 }, // 00:50 - 05:13
+          { startDateTime: "2026-09-20T15:54:00.000Z", durationMs: 250000 }, // known
         ],
         null,
       );
 
-      // Boot time = 2026-09-20T15:54:00.000Z - 954s = 2026-09-20T15:38:06.000Z
-      expect(results[0]).toEqual({ dateTime: "2026-09-20T15:38:41.000Z", isCalculated: true });
-      expect(results[1]).toEqual({ dateTime: "2026-09-20T15:38:56.000Z", isCalculated: true });
       expect(results[2]).toEqual({ dateTime: "2026-09-20T15:54:00.000Z", isCalculated: false });
+      // Zero-gap assumption: each preceding sub-log's estimated start is the next one's estimated
+      // start minus its own duration (263000ms, then 11000ms).
+      expect(results[1]).toEqual({ dateTime: "2026-09-20T15:49:37.000Z", isCalculated: true });
+      expect(results[0]).toEqual({ dateTime: "2026-09-20T15:49:26.000Z", isCalculated: true });
+    });
+
+    it("prefers a later known sub-log over fallbackIso for the leading run", () => {
+      const results = resolveLogDateTimes(
+        [
+          { startDateTime: null, durationMs: 60000 },
+          { startDateTime: "2026-03-04T05:00:00.000Z", durationMs: 60000 },
+        ],
+        "2020-01-01T00:00:00.000Z",
+      );
+
+      expect(results[0]).toEqual({ dateTime: "2026-03-04T04:59:00.000Z", isCalculated: true });
     });
 
     it("still estimates a trailing unknown sub-log forward from an earlier known one", () => {
       const results = resolveLogDateTimes(
         [
-          { startDateTime: "2026-03-04T05:00:00.000Z", startUs: 0, durationMs: 60000 },
-          { startDateTime: null, startUs: 120_000_000, durationMs: 30000 },
+          { startDateTime: "2026-03-04T05:00:00.000Z", durationMs: 60000 },
+          { startDateTime: null, durationMs: 30000 },
         ],
         null,
       );
 
-      expect(results[1]).toEqual({ dateTime: "2026-03-04T05:02:00.000Z", isCalculated: true });
-    });
-
-    it("falls back to duration-chaining when no sub-log has a known date, even with startUs", () => {
-      const results = resolveLogDateTimes(
-        [
-          { startDateTime: null, startUs: 0, durationMs: 60000 },
-          { startDateTime: null, startUs: 90_000_000, durationMs: 30000 },
-        ],
-        "2026-01-15T12:00:00.000Z",
-      );
-
-      expect(results[0]).toEqual({ dateTime: "2026-01-15T12:00:00.000Z", isCalculated: true });
-      expect(results[1]).toEqual({ dateTime: "2026-01-15T12:01:00.000Z", isCalculated: true });
+      expect(results[1]).toEqual({ dateTime: "2026-03-04T05:01:00.000Z", isCalculated: true });
     });
   });
 });

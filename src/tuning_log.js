@@ -112,57 +112,59 @@ export function parseLogStartDateTime(sysConfig) {
  * Estimates a start date/time for every sub-log in a BBL file, including ones whose own header
  * lacks a valid "Log start datetime" (see parseLogStartDateTime) - e.g. a flight controller with
  * no RTC reports the same useless placeholder for every sub-log it writes, so on their own they
- * can't be told apart or placed in time at all.
+ * can't be told apart or placed in time at all. Each sub-log's raw microsecond "time" field isn't
+ * usable for this - it's re-parsed fresh per sub-log (see flightlog_index.js) and isn't a
+ * continuous clock across them, so it can't tell us the real gap between one sub-log ending and
+ * the next starting.
  *
- * When every sub-log carries its own `startUs` (the flight log's raw microsecond "time" field at
- * that sub-log's start), all sub-logs in the file share one continuous elapsed-time clock - it
- * only resets on an FC reboot, not per arm/disarm - so *any* single sub-log with a known date/time
- * is enough to place every other sub-log in real time, exactly: subtract its `startUs` from its
- * known date/time to get the estimated real-world moment the FC booted, then add each unknown
- * sub-log's own `startUs` to that boot moment. This works equally well for unknown sub-logs that
- * come *before* the known one (e.g. an RTC that only becomes valid partway through the file, once
- * it's had time to sync) as for ones that come after, unlike walking forward through durations.
+ * Instead, chains by each sub-log's own duration, assuming zero gap between consecutive sub-logs
+ * (the best available guess with no other information) - trusting a known start time outright, and
+ * for a run of unknown ones between two known points (or at either end of the file), walking
+ * outward from the *nearest* known/anchored sub-log in file order: forward from an earlier one by
+ * adding durations, or backward from a later one by subtracting them. This is what lets a leading
+ * run of unknown sub-logs (e.g. an RTC that only syncs partway through the file) borrow a *later*
+ * sub-log's known date/time, not just an earlier one.
  *
- * Falls back to walking the sub-logs in file order with a running "cursor" time when no sub-log in
- * the file has a known date/time at all (or callers don't supply `startUs`): a sub-log with a known
- * start time resets the cursor to (its own start + its own duration) for the next sub-log; one
- * with no known start time takes the current cursor as its *estimated* start and then advances the
- * cursor by its own duration anyway - so a run of several unknown sub-logs in a row still
- * increments forward through each of their durations rather than collapsing onto the same instant.
- * The cursor starts from `fallbackIso` - typically the flight log file's own `lastModified` time
- * (epoch ms, from the browser `File` object - see appStore.logFileLastModified), since that's
- * stable across copying the file (unlike a "created" time, which would reset to "now" when the
- * file is copied off an SD card).
+ * When there's no known start time anywhere in the file, the whole file instead chains forward from
+ * `fallbackIso` - typically the flight log file's own `lastModified` time (epoch ms, from the
+ * browser `File` object - see appStore.logFileLastModified), since that's stable across copying the
+ * file (unlike a "created" time, which would reset to "now" when the file is copied off an SD
+ * card).
  *
- * `logs`: per sub-log `{ startDateTime: isoString|null, startUs?: number, durationMs: number }`,
- * in file order. Returns a same-length/order array of
- * `{ dateTime: isoString|null, isCalculated: boolean }`.
+ * `logs`: per sub-log `{ startDateTime: isoString|null, durationMs: number }`, in file order.
+ * Returns a same-length/order array of `{ dateTime: isoString|null, isCalculated: boolean }`.
  */
 export function resolveLogDateTimes(logs, fallbackIso) {
-  if (logs.length > 0 && logs.every((log) => typeof log.startUs === "number")) {
-    const anchor = logs.find((log) => log.startDateTime);
-
-    if (anchor) {
-      const bootMs = new Date(anchor.startDateTime).getTime() - anchor.startUs / 1000;
-
-      return logs.map((log) =>
-        log.startDateTime
-          ? { dateTime: log.startDateTime, isCalculated: false }
-          : { dateTime: new Date(bootMs + log.startUs / 1000).toISOString(), isCalculated: true },
-      );
-    }
-  }
-
-  let cursor = fallbackIso || null;
+  const firstKnownIndex = logs.findIndex((log) => log.startDateTime);
   const results = [];
 
-  for (const log of logs) {
+  // Forward pass: chain from each known start time (or, if the file has none at all, from
+  // fallbackIso) through the unknown sub-logs that follow it. Sub-logs before the first known one
+  // are left unresolved here (null) when the file does have a known start time somewhere - the
+  // backward pass below fills those in from that known point instead of from fallbackIso.
+  let cursor = firstKnownIndex === -1 ? fallbackIso || null : null;
+  for (let i = 0; i < logs.length; i++) {
+    const log = logs[i];
     if (log.startDateTime) {
       results.push({ dateTime: log.startDateTime, isCalculated: false });
       cursor = addMs(log.startDateTime, log.durationMs);
+    } else if (i < firstKnownIndex) {
+      // Placeholder - always overwritten by the backward pass below, since firstKnownIndex > i
+      // here means firstKnownIndex > 0, so that pass runs and covers every index below it.
+      results.push(null);
     } else {
       results.push({ dateTime: cursor, isCalculated: true });
       cursor = cursor ? addMs(cursor, log.durationMs) : null;
+    }
+  }
+
+  // Backward pass: fill in any leading run of unknown sub-logs by walking backward from the first
+  // known start time, subtracting each preceding sub-log's own duration in turn.
+  if (firstKnownIndex > 0) {
+    let cursorBack = logs[firstKnownIndex].startDateTime;
+    for (let i = firstKnownIndex - 1; i >= 0; i--) {
+      cursorBack = addMs(cursorBack, -logs[i].durationMs);
+      results[i] = { dateTime: cursorBack, isCalculated: true };
     }
   }
 

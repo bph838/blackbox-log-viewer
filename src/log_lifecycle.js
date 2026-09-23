@@ -85,11 +85,12 @@ export function renderLogFileInfo(file) {
 
   const logCount = logStore.flightLog.getLogCount();
   const errors = [];
-  // One { startDateTime, startUs, durationMs } per sub-log, in file order - fed to
-  // resolveLogDateTimes() below, which estimates a date/time for any sub-log that doesn't have its
-  // own valid "Log start datetime" (e.g. one taken before the flight controller's RTC had synced),
-  // by borrowing another sub-log's known date/time and its own elapsed-time offset (`startUs`) -
-  // see that function for why this works even when the borrowed sub-log comes later in the file.
+  // One { startDateTime, durationMs } per sub-log (plus startUs, only used for the elapsed-time
+  // fallback label below), in file order - fed to resolveLogDateTimes() below, which estimates a
+  // date/time for any sub-log that doesn't have its own valid "Log start datetime" (e.g. one taken
+  // before the flight controller's RTC had synced) by chaining durations out from the nearest
+  // known one - see that function for why this works even when the nearest known sub-log comes
+  // later in the file.
   const rawLogs = [];
   for (let index = 0; index < logCount; index++) {
     const error = logStore.flightLog.getLogError(index);
