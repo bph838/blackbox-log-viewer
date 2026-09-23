@@ -99,17 +99,21 @@ export function buildPromptText(options) {
   return text;
 }
 
-function entryToHistoryContent(entry) {
+function entryToHistoryContent(entry, includeImage) {
   const content = [];
 
-  if (entry.image) {
+  if (includeImage && entry.image) {
     content.push({
       type: "image",
       source: { type: "base64", media_type: "image/png", data: imageBase64FromDataUrl(entry.image) },
     });
   }
 
-  let text = `Step response captured ${entry.timestamp}\n\nConfiguration:\n${entry.config || "(none)"}`;
+  let text = `Step response captured ${entry.timestamp}`;
+  if (!includeImage && entry.image) {
+    text += " (graph omitted to save tokens - see the configuration and earlier analysis below)";
+  }
+  text += `\n\nConfiguration:\n${entry.config || "(none)"}`;
   if (entry.notes) {
     text += `\n\nUser notes: ${entry.notes}`;
   }
@@ -136,21 +140,28 @@ function lastAssistantText(entry) {
  * plus that entry's own final AI answer if it has one), so a new request has the whole tuning
  * log's history as context. Pass excludingEntryId to leave out the entry currently being asked
  * about (it's supplied separately as the new message, not as history).
+ *
+ * maxImages limits how many step response graphs the history carries, to save tokens: only the
+ * most recent maxImages history entries keep their image, older ones are sent as text only
+ * (config, notes, earlier analysis). null/undefined or a negative value sends every image.
  */
-export function buildHistoryMessages(log, excludingEntryId) {
+export function buildHistoryMessages(log, excludingEntryId, maxImages) {
   const messages = [];
-  const entries = (log && log.entries) || [];
+  const entries = ((log && log.entries) || []).filter(
+    (entry) => !(excludingEntryId && entry.id === excludingEntryId),
+  );
 
-  for (const entry of entries) {
-    if (excludingEntryId && entry.id === excludingEntryId) continue;
+  const sendAllImages = maxImages === null || maxImages === undefined || maxImages < 0;
+  const firstImageIndex = sendAllImages ? 0 : Math.max(0, entries.length - maxImages);
 
-    messages.push({ role: "user", content: entryToHistoryContent(entry) });
+  entries.forEach((entry, index) => {
+    messages.push({ role: "user", content: entryToHistoryContent(entry, index >= firstImageIndex) });
 
     const assistantText = lastAssistantText(entry);
     if (assistantText) {
       messages.push({ role: "assistant", content: assistantText });
     }
-  }
+  });
 
   return messages;
 }

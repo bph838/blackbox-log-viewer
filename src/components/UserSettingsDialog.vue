@@ -260,6 +260,22 @@
               </p>
             </div>
             <div class="flex flex-col gap-1">
+              <SettingRow label="History graphs">
+                <USelect
+                  v-model="local.aiHistoryImageLimit"
+                  :items="aiHistoryImageLimitOptions"
+                  :ui="{ content: 'z-[300]' }"
+                  size="sm"
+                  class="min-w-44"
+                />
+              </SettingRow>
+              <p class="text-xs text-dimmed">
+                How many earlier Tuning Log entries send their step response graph to the AI. Older
+                entries still send their configuration, notes and earlier analysis as text, so the
+                history isn't lost - fewer graphs means fewer tokens and a cheaper request.
+              </p>
+            </div>
+            <div class="flex flex-col gap-1">
               <label class="text-sm">Custom Skill IDs (optional)</label>
               <div v-for="(skillId, idx) in local.aiSkillIds" :key="idx" class="flex items-center gap-2">
                 <UInput
@@ -379,6 +395,15 @@ watch(open, (val) => {
 });
 
 // Option data
+const aiHistoryImageLimitOptions = [
+  { label: "None", value: 0 },
+  { label: "Last 3 entries", value: 3 },
+  { label: "Last 5 entries", value: 5 },
+  { label: "Last 10 entries", value: 10 },
+  { label: "Last 20 entries", value: 20 },
+  { label: "All entries", value: -1 },
+];
+
 const stickModeOptions = [
   { label: "Mode 1", value: 1 },
   { label: "Mode 2", value: 2 },

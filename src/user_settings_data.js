@@ -82,4 +82,7 @@ export const defaultUserSettings = {
   aiModel: AI_MODELS.defaultModel,
   aiEffort: "high",
   aiSkillIds: [],
+  // How many earlier entries' step response graphs go into the AI history (most recent first);
+  // older entries are sent as text only. -1 sends them all.
+  aiHistoryImageLimit: 10,
 };

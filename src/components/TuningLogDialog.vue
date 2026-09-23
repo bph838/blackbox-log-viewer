@@ -925,7 +925,11 @@ function onAskAi() {
   const promptText = aiPromptText.value;
   const images = pendingImages.value.map((img) => img.dataUrl);
   const hadConversation = hasConversation.value;
-  const historyMessages = TuningAI.buildHistoryMessages(tuningLogStore.currentLog, entry.id);
+  const historyMessages = TuningAI.buildHistoryMessages(
+    tuningLogStore.currentLog,
+    entry.id,
+    settings.aiHistoryImageLimit,
+  );
 
   pendingEntryIds.value = new Set(pendingEntryIds.value).add(entry.id);
   aiError.value = "";

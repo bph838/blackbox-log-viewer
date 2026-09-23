@@ -59,6 +59,9 @@ export function create(name, craftName) {
     craftName: craftName || "",
     createdDate,
     entries: [],
+    // Tombstones ({ id, deletedAt }) for deleted entries, so a sync can't bring them back from
+    // another copy of the log - see tuning_log_sync.js.
+    deletedEntries: [],
   };
 }
 
@@ -245,6 +248,10 @@ export function validationError(log) {
         return 'This file is not a tuning log (its "entries" field is malformed).';
       }
     }
+  }
+
+  if (log.deletedEntries !== undefined && !Array.isArray(log.deletedEntries)) {
+    return 'This file is not a tuning log (its "deletedEntries" field is malformed).';
   }
 
   return null;
