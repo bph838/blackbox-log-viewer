@@ -218,6 +218,47 @@ describe("useTuningLogStore cloud sync", () => {
     expect(JSON.parse(fake.files()[logFile]).entries[0].notes).toBe("typed during sync");
   });
 
+  it("lists a heli's logs from this computer and the cloud together, and opens either kind", async () => {
+    const pc1 = await configuredStore();
+    pc1.createLog("Cyclic", "TRON 7.0");
+    await settle();
+    pc1.createLog("Goblin log", "Goblin");
+    await settle();
+    await pc1.syncNow();
+
+    // A second computer with a log of its own for the same heli, never synced.
+    setTuningLogDb(createTuningLogDb(createMemoryBackend()));
+    localStorage.clear();
+    const pc2 = await configuredStore();
+    fake.setOnline(false);
+    pc2.createLog("Tail", "tron 7.0");
+    await settle();
+    fake.setOnline(true);
+
+    const { logs, cloudError } = await pc2.listLogsForCraft("TRON 7.0");
+    expect(cloudError).toBeNull();
+    expect(logs.map((l) => [l.name, l.isLocal, l.inCloud]).sort()).toEqual([
+      ["Cyclic", false, true],
+      ["Tail", true, false],
+    ]);
+
+    expect(await pc2.openLog(logs.find((l) => l.name === "Cyclic"))).toBe(true);
+    expect(pc2.currentLog.name).toBe("Cyclic");
+    expect(await pc2.openLog(logs.find((l) => l.name === "Tail"))).toBe(true);
+    expect(pc2.currentLog.name).toBe("Tail");
+  });
+
+  it("still lists this computer's logs when offline", async () => {
+    const store = await configuredStore();
+    store.createLog("Cyclic", "TRON 7.0");
+    await settle();
+    fake.setOnline(false);
+
+    const { logs, cloudError } = await store.listLogsForCraft("TRON 7.0");
+    expect(logs.map((l) => l.name)).toEqual(["Cyclic"]);
+    expect(cloudError).toContain("Can't reach GitHub");
+  });
+
   it("opens a cloud log on another computer, with its images", async () => {
     const pc1 = await configuredStore();
     pc1.createLog("Cyclic", "TRON 7.0");

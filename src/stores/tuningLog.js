@@ -4,7 +4,7 @@ import { PrefStorage } from "../pref_storage.js";
 import { triggerDownload } from "../tools.js";
 import * as TuningLog from "../tuning_log.js";
 import { createTuningLogDb } from "../tuning_log_db.js";
-import { OPS, emptySyncState, recordChange, pendingCount, mergeLogs } from "../tuning_log_sync.js";
+import { OPS, emptySyncState, recordChange, pendingCount, mergeLogs, craftKey } from "../tuning_log_sync.js";
 import * as Cloud from "../tuning_log_cloud.js";
 import { createGitHubClient } from "../github_client.js";
 import { useSettingsStore } from "./settings.js";
@@ -261,6 +261,70 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     const index = await Cloud.fetchIndex(activeClient);
     const localIds = new Set(localLogs.value.map((l) => l.logId));
     return Cloud.indexRowsForCraft(index, craftName).map((row) => ({ ...row, isLocal: localIds.has(row.logId) }));
+  }
+
+  /**
+   * Every log for a heli (by craft name) - on this computer and in the cloud - newest first:
+   * { logs: [{ logId, name, craftName, entryCount, updated, isLocal, inCloud, pendingCount, row }],
+   *   cloudError } where cloudError says why cloud logs couldn't be listed (e.g. offline), in which
+   * case only this computer's logs are included.
+   */
+  async function listLogsForCraft(craftName) {
+    await refreshLocalLogs();
+    const key = craftKey(craftName);
+    const byId = new Map();
+
+    for (const local of localLogs.value.filter((l) => l.craftKey === key)) {
+      byId.set(local.logId, {
+        logId: local.logId,
+        name: local.name,
+        craftName: local.craftName,
+        entryCount: local.entryCount,
+        updated: local.updatedAt,
+        isLocal: true,
+        inCloud: !!local.lastSyncedAt,
+        pendingCount: local.pendingCount,
+        row: null,
+      });
+    }
+
+    let cloudError = null;
+    if (cloudEnabled.value) {
+      try {
+        for (const row of await listCloudLogs(craftName)) {
+          const existing = byId.get(row.logId);
+          if (existing) {
+            existing.inCloud = true;
+            existing.row = row;
+            if (row.updated > (existing.updated || "")) existing.updated = row.updated;
+          } else {
+            byId.set(row.logId, {
+              logId: row.logId,
+              name: row.name,
+              craftName: row.craftName,
+              entryCount: row.entryCount,
+              updated: row.updated,
+              isLocal: false,
+              inCloud: true,
+              pendingCount: 0,
+              row,
+            });
+          }
+        }
+      } catch (error) {
+        cloudError = error.isNetwork ? "Can't reach GitHub - showing logs on this computer only." : error.message;
+      }
+    }
+
+    const logs = [...byId.values()].sort((a, b) => String(b.updated || "").localeCompare(String(a.updated || "")));
+    return { logs, cloudError };
+  }
+
+  /**
+   * Makes a log from listLogsForCraft the current log. Resolves false if it couldn't be opened.
+   */
+  function openLog(item) {
+    return item.isLocal ? switchLog(item.logId) : openCloudLog(item.row);
   }
 
   /**
@@ -541,6 +605,8 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     syncNow,
     listCloudLogs,
     openCloudLog,
+    listLogsForCraft,
+    openLog,
     createLog,
     switchLog,
     closeLog,

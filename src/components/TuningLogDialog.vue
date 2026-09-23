@@ -5,7 +5,29 @@
         <div class="flex items-center gap-2 flex-wrap">
           <UIcon name="i-lucide-message-square" class="size-5 text-primary" />
           <h4 class="font-semibold">Tuning Log</h4>
-          <span v-if="tuningLogStore.hasLog" class="text-xs text-dimmed">{{ tuningLogStore.currentLog.name }}</span>
+          <UPopover v-model:open="switcherOpen" :ui="{ content: 'z-[300]' }">
+            <UButton
+              variant="ghost"
+              color="neutral"
+              size="xs"
+              trailing-icon="i-lucide-chevron-down"
+              :label="tuningLogStore.hasLog ? tuningLogStore.currentLog.name : 'Open a log…'"
+              title="Switch tuning log"
+              class="text-dimmed"
+            />
+            <template #content>
+              <div class="p-3 w-[26rem] flex flex-col gap-2">
+                <p class="text-xs font-medium">Tuning logs for {{ switcherCraft || "this heli" }}</p>
+                <TuningLogPicker
+                  v-if="switcherOpen"
+                  :craft-name="switcherCraft"
+                  :current-log-id="currentLogId"
+                  @opened="onLogOpened"
+                  @new="onNewForCraft(switcherCraft)"
+                />
+              </div>
+            </template>
+          </UPopover>
           <span v-if="tuningLogStore.totalCostUsd" class="text-xs text-dimmed"
             >Total: {{ formatCost(tuningLogStore.totalCostUsd) }}</span
           >
@@ -47,12 +69,50 @@
       <div class="flex flex-col gap-3 text-sm">
         <p v-if="importError" class="text-xs text-error">{{ importError }}</p>
 
+        <!-- The loaded flight log is for a different heli than the open tuning log -->
+        <div v-if="showCraftMismatch" class="flex flex-col gap-2 rounded-md border border-default bg-elevated p-3">
+          <p class="flex items-start gap-2">
+            <UIcon name="i-lucide-triangle-alert" class="size-4 text-warning shrink-0 mt-0.5" />
+            <span>
+              This flight log is for <strong>{{ flightCraft }}</strong>, but the open tuning log “{{
+                tuningLogStore.currentLog.name
+              }}” is for <strong>{{ tuningLogStore.currentLog.craftName }}</strong>. Open a tuning log for
+              {{ flightCraft }}, or start a new one?
+            </span>
+          </p>
+          <TuningLogPicker
+            :craft-name="flightCraft"
+            :current-log-id="currentLogId"
+            @opened="onLogOpened"
+            @new="onNewForCraft(flightCraft)"
+          >
+            <template #actions>
+              <UButton
+                size="xs"
+                variant="ghost"
+                color="neutral"
+                :label="`Keep using “${tuningLogStore.currentLog.name}”`"
+                @click="dismissCraftMismatch"
+              />
+            </template>
+          </TuningLogPicker>
+        </div>
+
         <!-- Empty state -->
-        <div v-if="!tuningLogStore.hasLog && !creatingNew" class="p-4 text-sm text-dimmed">
-          <p>
+        <div v-if="!tuningLogStore.hasLog && !creatingNew" class="p-4 text-sm flex flex-col gap-3">
+          <p class="text-dimmed">
             No tuning log is open yet. Create a new one, or import an existing tuning log
             <code>.json</code> file, using the buttons above.
           </p>
+          <div v-if="flightCraft" class="flex flex-col gap-2 max-w-xl">
+            <p class="font-medium">Tuning logs for {{ flightCraft }}</p>
+            <TuningLogPicker
+              :craft-name="flightCraft"
+              :current-log-id="currentLogId"
+              @opened="onLogOpened"
+              @new="onNewForCraft(flightCraft)"
+            />
+          </div>
         </div>
 
         <!-- Create-new form -->
@@ -409,11 +469,13 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import HelpIcon from "./HelpIcon.vue";
+import TuningLogPicker from "./TuningLogPicker.vue";
 import { useTuningLogStore } from "../stores/tuningLog.js";
 import { useLogStore } from "../stores/log.js";
 import { useGraphStore } from "../stores/graph.js";
 import { useSettingsStore } from "../stores/settings.js";
 import * as TuningLog from "../tuning_log.js";
+import { craftKey } from "../tuning_log_sync.js";
 import * as TuningAI from "../tuning_ai.js";
 import AI_MODELS from "../data/ai_models.json";
 
@@ -436,12 +498,20 @@ const APPROXIMATED_DATETIME_TOOLTIP =
 
 const creatingNew = ref(false);
 const newLogName = ref("");
+// Craft name the new log is for - the flight log's, unless started from the log switcher.
+const newLogCraft = ref("");
 const createError = ref("");
 const importError = ref("");
 const importInput = ref(null);
 
 function onNewClick() {
-  newLogName.value = sysConfig.value?.["Craft name"] || "";
+  onNewForCraft(sysConfig.value?.["Craft name"] || "");
+}
+
+function onNewForCraft(craftName) {
+  switcherOpen.value = false;
+  newLogName.value = craftName || "";
+  newLogCraft.value = craftName || "";
   createError.value = "";
   creatingNew.value = true;
 }
@@ -453,7 +523,7 @@ function onCreateConfirm() {
     return;
   }
 
-  tuningLogStore.createLog(name, sysConfig.value?.["Craft name"] || "");
+  tuningLogStore.createLog(name, newLogCraft.value || sysConfig.value?.["Craft name"] || "");
   creatingNew.value = false;
   selectedEntryId.value = null;
   syncSelectionToCurrentFlightLog();
@@ -497,6 +567,39 @@ const sysConfig = computed(() => {
   logStore.activeLogIndex;
   return logStore.flightLog?.getSysConfig?.() ?? null;
 });
+
+// ---- Switching logs / craft mismatch ----
+
+const switcherOpen = ref(false);
+const currentLogId = computed(() => tuningLogStore.currentLog?.logId ?? null);
+const flightCraft = computed(() => (sysConfig.value?.["Craft name"] || "").trim());
+// The heli whose logs the switcher lists: the loaded flight log's, else the open tuning log's.
+const switcherCraft = computed(() => flightCraft.value || tuningLogStore.currentLog?.craftName || "");
+
+// "Keep using this log" for a given log + heli pair, so the banner doesn't keep coming back.
+const dismissedMismatch = ref(null);
+
+function mismatchKey() {
+  return `${currentLogId.value}|${craftKey(flightCraft.value)}`;
+}
+
+const showCraftMismatch = computed(() => {
+  const log = tuningLogStore.currentLog;
+  if (!log || !log.craftName || !flightCraft.value || creatingNew.value) return false;
+  if (craftKey(log.craftName) === craftKey(flightCraft.value)) return false;
+  return dismissedMismatch.value !== mismatchKey();
+});
+
+function dismissCraftMismatch() {
+  dismissedMismatch.value = mismatchKey();
+}
+
+function onLogOpened() {
+  switcherOpen.value = false;
+  creatingNew.value = false;
+  selectedEntryId.value = null;
+  syncSelectionToCurrentFlightLog();
+}
 
 // { dateTime, isCalculated } for the currently-open sub-log, from logStore.logDateTimes (built once
 // per file load - see log_lifecycle.js/tuning_log.js:resolveLogDateTimes) rather than re-derived
