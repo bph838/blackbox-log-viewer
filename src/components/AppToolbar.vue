@@ -84,6 +84,7 @@
           title="Tuning Log: capture step response history and get AI tuning advice"
           @click="$emit('open-tuning-log')"
         />
+        <TuningLogSyncStatus hide-when-synced />
       </div>
       <div class="flex items-center gap-1">
         <UButton
@@ -111,6 +112,7 @@
 import { useLogStore } from "../stores/log.js";
 import { useAppStore } from "../stores/app.js";
 import LogFileInput from "./LogFileInput.vue";
+import TuningLogSyncStatus from "./TuningLogSyncStatus.vue";
 
 defineEmits([
   "files-selected",
