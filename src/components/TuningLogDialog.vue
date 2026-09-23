@@ -9,6 +9,22 @@
           <span v-if="tuningLogStore.totalCostUsd" class="text-xs text-dimmed"
             >Total: {{ formatCost(tuningLogStore.totalCostUsd) }}</span
           >
+          <UTooltip v-if="syncIndicator" :text="syncIndicator.tooltip" :delay-duration="0">
+            <button
+              type="button"
+              class="flex items-center gap-1 text-xs rounded px-1.5 py-0.5 hover:bg-elevated"
+              :class="syncIndicator.class"
+              :disabled="tuningLogStore.syncStatus === 'syncing'"
+              @click="tuningLogStore.syncNow()"
+            >
+              <UIcon
+                :name="syncIndicator.icon"
+                class="size-3.5"
+                :class="{ 'animate-spin': tuningLogStore.syncStatus === 'syncing' }"
+              />
+              {{ syncIndicator.label }}
+            </button>
+          </UTooltip>
         </div>
         <div class="flex items-center gap-1">
           <UButton variant="soft" color="neutral" size="xs" label="New…" @click="onNewClick" />
@@ -640,10 +656,64 @@ watch(open, (isOpen) => {
 
   if (!isOpen) return;
 
+  // Pick up anything changed on another computer (and upload anything waiting).
+  tuningLogStore.syncNow();
+
   if (tuningLogStore.hasLog) {
     syncSelectionToCurrentFlightLog();
   } else {
     selectedEntryId.value = null;
+  }
+});
+
+// ---- Cloud sync indicator ----
+
+function plural(count, word) {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+const syncIndicator = computed(() => {
+  const pending = tuningLogStore.totalPendingCount;
+  const waiting = pending ? `${plural(pending, "change")} saved on this computer` : "";
+
+  switch (tuningLogStore.syncStatus) {
+    case "syncing":
+      return {
+        icon: "i-lucide-refresh-cw",
+        label: "Syncing…",
+        class: "text-dimmed",
+        tooltip: "Syncing tuning logs with GitHub",
+      };
+    case "synced":
+      return {
+        icon: "i-lucide-cloud-check",
+        label: "Synced",
+        class: "text-dimmed",
+        tooltip: "Everything is saved to GitHub. Click to check for changes made elsewhere.",
+      };
+    case "pending":
+      return {
+        icon: "i-lucide-cloud-upload",
+        label: `${plural(pending, "change")} to upload`,
+        class: "text-dimmed",
+        tooltip: "Changes are uploaded to GitHub a few seconds after you stop editing. Click to upload now.",
+      };
+    case "offline":
+      return {
+        icon: "i-lucide-cloud-off",
+        label: pending ? `Offline · ${plural(pending, "change")} waiting` : "Offline",
+        class: "text-warning",
+        tooltip: `Can't reach GitHub.${waiting ? ` ${waiting}, and will upload` : " Will sync"} automatically when back online. Click to retry now.`,
+      };
+    case "error":
+      return {
+        icon: "i-lucide-cloud-alert",
+        label: "Sync failed",
+        class: "text-error",
+        tooltip: `${(tuningLogStore.syncError?.message || "Sync failed").replace(/\.+$/, "")}.${waiting ? ` ${waiting} - nothing is lost.` : ""} Click to retry.`,
+      };
+    default:
+      return null;
   }
 });
 

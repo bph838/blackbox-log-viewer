@@ -55,12 +55,12 @@ describe("recordChange", () => {
     expect(pendingCount(sync)).toBe(2);
   });
 
-  it("drops an entry added and deleted again before it was ever synced", () => {
+  it("replaces an entry's other pending changes with its deletion", () => {
     const sync = emptySyncState();
     recordChange(sync, { op: OPS.ADD_ENTRY, entryId: "a" });
     recordChange(sync, { op: OPS.UPDATE_NOTES, entryId: "a" });
     recordChange(sync, { op: OPS.DELETE_ENTRY, entryId: "a" });
-    expect(pendingCount(sync)).toBe(0);
+    expect(sync.pending.map((c) => c.op)).toEqual([OPS.DELETE_ENTRY]);
   });
 
   it("keeps the deletion of an already-synced entry, replacing its other pending changes", () => {

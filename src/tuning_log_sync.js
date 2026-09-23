@@ -43,21 +43,17 @@ export function emptySyncState() {
 
 /**
  * Adds a change to the outbox, collapsing it with earlier unsynced changes where that loses
- * nothing: repeated edits to the same entry's notes/AI result count once, and an entry added and
- * deleted again before it was ever synced drops out entirely. Returns the same sync object.
+ * nothing: repeated edits to the same entry's notes/AI result count once, and deleting an entry
+ * replaces its other pending changes. (A deletion is always kept, even for an entry that looks
+ * unsynced - a sync may be uploading that entry at this very moment.) Returns the same sync object.
  */
 export function recordChange(sync, change) {
   const at = change.at || new Date().toISOString();
   const pending = sync.pending;
 
   if (change.op === OPS.DELETE_ENTRY) {
-    const addedIndex = pending.findIndex((c) => c.op === OPS.ADD_ENTRY && c.entryId === change.entryId);
-    const wasSynced = addedIndex === -1;
-
     sync.pending = pending.filter((c) => c.entryId !== change.entryId);
-    if (wasSynced) {
-      sync.pending.push({ op: change.op, entryId: change.entryId, at });
-    }
+    sync.pending.push({ op: change.op, entryId: change.entryId, at });
     return sync;
   }
 

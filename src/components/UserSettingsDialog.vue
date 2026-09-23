@@ -311,6 +311,78 @@
             </div>
           </UiBox>
 
+          <!-- Cloud Storage Settings -->
+          <UiBox title="Cloud Storage (GitHub)">
+            <p class="text-xs text-dimmed">
+              Keep your Tuning Logs in a GitHub repository, so they're backed up and shared between
+              computers. Logs are grouped by craft name, and only the logs for the heli you're
+              working on are downloaded. Changes made offline are saved locally and uploaded next
+              time you're online. Leave blank to keep logs on this computer only.
+            </p>
+            <div class="flex flex-col gap-1">
+              <label class="text-sm">Repository</label>
+              <UInput
+                v-model="local.githubRepo"
+                autocomplete="off"
+                placeholder="owner/repo"
+                size="sm"
+                class="w-full"
+              />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-sm">Branch (optional)</label>
+              <UInput
+                v-model="local.githubBranch"
+                autocomplete="off"
+                placeholder="Repository's default branch"
+                size="sm"
+                class="w-full"
+              />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-sm">Access Token</label>
+              <UInput
+                v-model="local.githubToken"
+                type="password"
+                autocomplete="off"
+                placeholder="github_pat_..."
+                size="sm"
+                class="w-full"
+              />
+              <p class="text-xs text-dimmed">
+                A
+                <a
+                  href="https://github.com/settings/personal-access-tokens/new"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-primary underline"
+                  >fine-grained personal access token</a
+                >
+                with access to only this repository and "Contents: Read and write" permission. A
+                private repository is recommended. Stored locally on this computer only, and only
+                ever sent to GitHub.
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <UButton
+                variant="outline"
+                color="neutral"
+                size="xs"
+                icon="i-lucide-plug"
+                label="Test connection"
+                :loading="githubTesting"
+                :disabled="!local.githubRepo || !local.githubToken"
+                @click="onTestGithub"
+              />
+              <span
+                v-if="githubTestResult"
+                class="text-xs"
+                :class="githubTestResult.ok ? 'text-success' : 'text-error'"
+                >{{ githubTestResult.message }}</span
+              >
+            </div>
+          </UiBox>
+
           <!-- Map Settings (hidden for now, may be needed again later)
           <UiBox title="Map Settings">
             <SettingRow label="ACT" help="Use Altitude Colored Trail (slower at loading/changing logs)">
@@ -346,6 +418,7 @@ import PercentInput from "./PercentInput.vue";
 import { useSettingsStore } from "../stores/settings.js";
 import { FLIGHT_LOG_GOVSTATES, FLIGHT_LOG_AIRBORNE_STATES } from "../flightlog_fielddefs.js";
 import AI_MODELS from "../data/ai_models.json";
+import { createGitHubClient } from "../github_client.js";
 
 const open = defineModel("open", { type: Boolean, default: false });
 
@@ -395,6 +468,33 @@ watch(open, (val) => {
 });
 
 // Option data
+const githubTesting = ref(false);
+const githubTestResult = ref(null);
+
+watch(
+  () => [local.value.githubRepo, local.value.githubBranch, local.value.githubToken],
+  () => {
+    githubTestResult.value = null;
+  },
+);
+
+async function onTestGithub() {
+  githubTesting.value = true;
+  githubTestResult.value = null;
+  try {
+    const client = createGitHubClient({
+      repo: local.value.githubRepo,
+      branch: local.value.githubBranch,
+      token: local.value.githubToken,
+    });
+    githubTestResult.value = await client.testConnection();
+  } catch (error) {
+    githubTestResult.value = { ok: false, message: error.message };
+  } finally {
+    githubTesting.value = false;
+  }
+}
+
 const aiHistoryImageLimitOptions = [
   { label: "None", value: 0 },
   { label: "Last 3 entries", value: 3 },
@@ -481,6 +581,9 @@ function onLogoChange(e) {
 function onSave() {
   const raw = JSON.parse(JSON.stringify(toRaw(local.value))); // NOSONAR
   raw.aiSkillIds = (raw.aiSkillIds || []).map((id) => id.trim()).filter(Boolean);
+  for (const key of ["githubRepo", "githubBranch", "githubToken"]) {
+    raw[key] = (raw[key] || "").trim();
+  }
   emit("save", raw);
   open.value = false;
 }

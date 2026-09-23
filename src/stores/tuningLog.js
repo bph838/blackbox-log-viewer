@@ -1,10 +1,13 @@
 import { defineStore } from "pinia";
-import { ref, computed, toRaw } from "vue";
+import { ref, computed, toRaw, watch } from "vue";
 import { PrefStorage } from "../pref_storage.js";
 import { triggerDownload } from "../tools.js";
 import * as TuningLog from "../tuning_log.js";
 import { createTuningLogDb } from "../tuning_log_db.js";
-import { OPS, emptySyncState, recordChange, pendingCount } from "../tuning_log_sync.js";
+import { OPS, emptySyncState, recordChange, pendingCount, mergeLogs } from "../tuning_log_sync.js";
+import * as Cloud from "../tuning_log_cloud.js";
+import { createGitHubClient } from "../github_client.js";
+import { useSettingsStore } from "./settings.js";
 
 const prefs = new PrefStorage();
 
@@ -14,6 +17,30 @@ let db = createTuningLogDb();
 
 export function setTuningLogDb(newDb) {
   db = newDb;
+}
+
+// How long after the last change to wait before syncing (so a burst of edits is one commit), and
+// how long to wait before retrying after failing to reach GitHub.
+let syncDelayMs = 3000;
+let retryDelayMs = 60000;
+let clientFactory = createGitHubClient;
+
+/**
+ * For tests: replace the GitHub client factory, and the sync delays (null disables automatic
+ * syncing - call syncNow() instead).
+ */
+export function setTuningLogCloudForTests(options) {
+  if (options.clientFactory) clientFactory = options.clientFactory;
+  if ("syncDelayMs" in options) syncDelayMs = options.syncDelayMs;
+  if ("retryDelayMs" in options) retryDelayMs = options.retryDelayMs;
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function changeKey(c) {
+  return `${c.op}|${c.entryId || ""}|${c.at}`;
 }
 
 function prefGet(name) {
@@ -43,6 +70,30 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
   );
   const pendingChangeCount = computed(() => pendingCount(currentSync.value));
 
+  // --- Cloud (GitHub) sync - see tuning_log_cloud.js ---
+  const settingsStore = useSettingsStore();
+  const cloudEnabled = computed(
+    () => !!(settingsStore.userSettings.githubRepo && settingsStore.userSettings.githubToken),
+  );
+  const syncing = ref(false);
+  const syncError = ref(null); // { message, offline } from the last failed sync, cleared on success
+  const lastSyncedAt = ref(null);
+  // Unsynced changes across every log on this computer, not just the current one.
+  const totalPendingCount = computed(() => {
+    const others = localLogs.value
+      .filter((l) => !currentLog.value || l.logId !== currentLog.value.logId)
+      .reduce((sum, l) => sum + (l.pendingCount || 0), 0);
+    return others + pendingChangeCount.value;
+  });
+  // off | syncing | offline | error | pending | synced
+  const syncStatus = computed(() => {
+    if (!cloudEnabled.value) return "off";
+    if (syncing.value) return "syncing";
+    if (syncError.value) return syncError.value.offline ? "offline" : "error";
+    if (totalPendingCount.value) return "pending";
+    return "synced";
+  });
+
   async function refreshLocalLogs() {
     localLogs.value = await db.listLogs();
   }
@@ -61,7 +112,178 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
 
   function change(op, entryId) {
     recordChange(currentSync.value, { op, entryId });
+    scheduleSync();
     return persist();
+  }
+
+  let client = null;
+  let clientKey = "";
+
+  function getClient() {
+    const settings = settingsStore.userSettings;
+    if (!settings.githubRepo || !settings.githubToken) return null;
+
+    const key = `${settings.githubRepo}|${settings.githubBranch}|${settings.githubToken}`;
+    if (key !== clientKey) {
+      client = clientFactory({ repo: settings.githubRepo, branch: settings.githubBranch, token: settings.githubToken });
+      clientKey = key;
+    }
+    return client;
+  }
+
+  let syncTimer = null;
+
+  function scheduleSync(delay = syncDelayMs) {
+    // syncDelayMs null: automatic syncing is off (tests) - only syncNow() syncs.
+    if (!cloudEnabled.value || syncDelayMs === null || delay === null) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      syncTimer = null;
+      syncNow();
+    }, delay);
+  }
+
+  /**
+   * Stores what a sync of one log produced, keeping any changes made to that log while the sync
+   * was running: those are merged on top of the synced copy and stay pending for the next sync.
+   */
+  async function applySyncResult(start, result) {
+    const logId = start.log.logId;
+    const isCurrent = currentLog.value && currentLog.value.logId === logId;
+    const now = isCurrent
+      ? { log: clone(toRaw(currentLog.value)), sync: clone(currentSync.value) }
+      : await db.getLog(logId);
+    if (!now) return; // Deleted from this computer meanwhile.
+
+    const startKeys = new Set(start.sync.pending.map(changeKey));
+    const newPending = now.sync.pending.filter((c) => !startKeys.has(changeKey(c)));
+
+    const log = newPending.length ? mergeLogs(start.log, now.log, result.log) : result.log;
+    const sync = { ...result.sync, pending: newPending };
+
+    // Store images that arrived from the cloud; drop ones whose entries the cloud copy deleted.
+    const hadImage = new Set(start.log.entries.filter((e) => e.image).map((e) => e.id));
+    const finalIds = new Set(log.entries.map((e) => e.id));
+    for (const entry of log.entries) {
+      if (entry.image && !hadImage.has(entry.id)) await db.putImage(logId, entry.id, entry.image);
+    }
+    for (const id of hadImage) {
+      if (!finalIds.has(id)) await db.deleteImage(logId, id);
+    }
+
+    if (currentLog.value && currentLog.value.logId === logId) {
+      currentLog.value = log;
+      currentSync.value = sync;
+      await persist();
+    } else {
+      await db.putLog(log, sync);
+    }
+  }
+
+  async function syncOne(activeClient, logId) {
+    const isCurrent = currentLog.value && currentLog.value.logId === logId;
+    const start = isCurrent
+      ? { log: clone(toRaw(currentLog.value)), sync: clone(currentSync.value) }
+      : await db.getLog(logId);
+    if (!start) return;
+
+    const result = await Cloud.syncLog(activeClient, start.log, start.sync);
+    if (result.uploaded || result.downloaded || result.sync !== start.sync) {
+      await applySyncResult(start, result);
+    }
+  }
+
+  let syncPromise = null;
+  let syncAgain = false;
+
+  /**
+   * Syncs every log on this computer that has unsynced changes, plus the current log (to pick up
+   * changes made elsewhere). Never throws - a failure is reported through syncError/syncStatus and
+   * retried later; nothing local is lost either way.
+   */
+  function syncNow() {
+    if (syncPromise) {
+      syncAgain = true;
+      return syncPromise;
+    }
+
+    const activeClient = getClient();
+    if (!activeClient) return Promise.resolve();
+
+    clearTimeout(syncTimer);
+    syncing.value = true;
+    syncPromise = (async () => {
+      let failed = false;
+      try {
+        if (globalThis.navigator && globalThis.navigator.onLine === false) {
+          throw Object.assign(new Error("Offline"), { isNetwork: true });
+        }
+
+        const logs = await db.listLogs();
+        const ids = logs.filter((l) => l.pendingCount > 0).map((l) => l.logId);
+        if (currentLog.value && !ids.includes(currentLog.value.logId)) ids.unshift(currentLog.value.logId);
+
+        for (const id of ids) {
+          await syncOne(activeClient, id);
+        }
+
+        syncError.value = null;
+        lastSyncedAt.value = new Date().toISOString();
+      } catch (error) {
+        failed = true;
+        syncError.value = { message: error.message, offline: !!error.isNetwork };
+        if (!error.isNetwork) console.error("Tuning log sync failed", error);
+      } finally {
+        syncing.value = false;
+        syncPromise = null;
+        await refreshLocalLogs().catch(() => {});
+
+        if (syncAgain) {
+          syncAgain = false;
+          scheduleSync(0);
+        } else if (failed && totalPendingCount.value) {
+          scheduleSync(retryDelayMs);
+        }
+      }
+    })();
+
+    return syncPromise;
+  }
+
+  /**
+   * Every log in the cloud for a craft (by its name), most recently updated first, each marked
+   * with whether it's already on this computer. Rejects if GitHub can't be reached.
+   */
+  async function listCloudLogs(craftName) {
+    const activeClient = getClient();
+    if (!activeClient) return [];
+
+    const index = await Cloud.fetchIndex(activeClient);
+    const localIds = new Set(localLogs.value.map((l) => l.logId));
+    return Cloud.indexRowsForCraft(index, craftName).map((row) => ({ ...row, isLocal: localIds.has(row.logId) }));
+  }
+
+  /**
+   * Makes a cloud log (a row from listCloudLogs) the current log - from this computer's copy if it
+   * has one (then syncing it), otherwise downloading it with its images. Resolves false if it
+   * couldn't be found.
+   */
+  async function openCloudLog(row) {
+    if (await switchLog(row.logId)) {
+      return true;
+    }
+
+    const activeClient = getClient();
+    if (!activeClient) return false;
+
+    const downloaded = await Cloud.downloadLog(activeClient, row);
+    if (!downloaded) return false;
+
+    await saveImages(downloaded.log);
+    await db.putLog(downloaded.log, downloaded.sync);
+    setCurrent(downloaded.log, downloaded.sync);
+    await refreshLocalLogs();
+    return true;
   }
 
   function setCurrent(log, sync) {
@@ -82,6 +304,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     setCurrent(log, sync);
     await saveImages(log);
     await persist();
+    scheduleSync();
     return currentLog.value;
   }
 
@@ -138,6 +361,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     if (!stored) return false;
 
     setCurrent(stored.log, stored.sync);
+    scheduleSync(0);
     return true;
   }
 
@@ -267,8 +491,26 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     prefs.set("tuningLogApiKeyBannerDismissed", true);
   }
 
-  // Restore the persisted tuning log and prefs as soon as the store is created.
-  const ready = loadFromCache();
+  // Restore the persisted tuning log and prefs as soon as the store is created, then catch up with
+  // the cloud: upload anything done offline last time, and pick up changes made elsewhere.
+  const ready = loadFromCache().then(() => scheduleSync(0));
+
+  if (globalThis.addEventListener) {
+    globalThis.addEventListener("online", () => scheduleSync(0));
+  }
+
+  // New repo/token in Settings - start using it straight away.
+  watch(
+    () => [
+      settingsStore.userSettings.githubRepo,
+      settingsStore.userSettings.githubBranch,
+      settingsStore.userSettings.githubToken,
+    ],
+    () => {
+      syncError.value = null;
+      scheduleSync(0);
+    },
+  );
   prefs.get("tuningLogAiExpertMode", (value) => {
     aiExpertMode.value = !!value;
   });
@@ -290,7 +532,15 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     entries,
     totalCostUsd,
     pendingChangeCount,
+    totalPendingCount,
+    cloudEnabled,
+    syncStatus,
+    syncError,
+    lastSyncedAt,
     ready,
+    syncNow,
+    listCloudLogs,
+    openCloudLog,
     createLog,
     switchLog,
     closeLog,
