@@ -55,12 +55,30 @@ export function estimateCostUsd(model, usage) {
   return cost;
 }
 
+const NO_INSTRUCTIONS_PLACEHOLDER = "(No specific instructions given - provide general tuning suggestions.)";
+const INSTRUCTIONS_START = "User instructions: ";
+const INSTRUCTIONS_END = "\n\nAnalyse the attached step response graph";
+
+/**
+ * Pulls back out what the user actually typed from a prompt built by buildPromptText(), so the
+ * initial question can be shown in the conversation without the surrounding boilerplate/config.
+ * Returns "" when no instructions were given.
+ */
+export function extractInstructions(promptText) {
+  const text = String(promptText ?? "");
+  const start = text.indexOf(INSTRUCTIONS_START);
+  const end = text.lastIndexOf(INSTRUCTIONS_END);
+  if (start === -1 || end === -1 || end < start) return "";
+
+  const instructions = text.slice(start + INSTRUCTIONS_START.length, end);
+  return instructions === NO_INSTRUCTIONS_PLACEHOLDER ? "" : instructions;
+}
+
 /**
  * options: { configSummary, instructions, expertMode }
  */
 export function buildPromptText(options) {
-  const instructions =
-    (options.instructions || "").trim() || "(No specific instructions given - provide general tuning suggestions.)";
+  const instructions = (options.instructions || "").trim() || NO_INSTRUCTIONS_PLACEHOLDER;
 
   let text =
     "You are helping tune the PID controller of an RC helicopter flight controller running Rotorflight " +
@@ -68,7 +86,7 @@ export function buildPromptText(options) {
     "setpoint-vs-gyro tracking (Roll in red, Pitch in cyan, Yaw in yellow) for the 0-500ms period after a " +
     "stick input, with 1.0 on the y-axis representing perfect tracking.\n\n" +
     `Current flight controller configuration extracted from the log:\n${options.configSummary}\n\n` +
-    `User instructions: ${instructions}\n\n` +
+    `${INSTRUCTIONS_START}${instructions}${INSTRUCTIONS_END}` +
     "Analyse the attached step response graph and suggest specific, actionable PID changes " +
     "to address the user's instructions, referencing the actual curve shapes you see (overshoot, " +
     "settling time, oscillation, delay) for each axis.\n\n";

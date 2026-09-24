@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildHistoryMessages } from "./tuning_ai.js";
+import { buildHistoryMessages, buildPromptText, extractInstructions } from "./tuning_ai.js";
 
 function makeLog(count) {
   const entries = [];
@@ -54,5 +54,16 @@ describe("buildHistoryMessages", () => {
     const messages = buildHistoryMessages(log, null, 0);
     expect(messages.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
     expect(messages[1].content).toBe("answer");
+  });
+});
+
+describe("extractInstructions", () => {
+  it("returns what the user typed, including multiple lines", () => {
+    const text = buildPromptText({ configSummary: "p: 1", instructions: "  what do you see?\n\nsecond line  " });
+    expect(extractInstructions(text)).toBe("what do you see?\n\nsecond line");
+  });
+
+  it("returns an empty string when no instructions were given", () => {
+    expect(extractInstructions(buildPromptText({ configSummary: "p: 1", instructions: "", expertMode: true }))).toBe("");
   });
 });

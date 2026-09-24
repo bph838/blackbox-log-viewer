@@ -172,14 +172,17 @@
                     text="The current log is not the latest entry in this tuning log"
                     :delay-duration="0"
                   >
-                    <UIcon name="i-lucide-triangle-alert" class="size-3 text-warning" />
+                    <UIcon name="i-lucide-triangle-alert" class="size-3 text-error" />
                   </UTooltip>
                   <UTooltip
                     v-if="entryHasAnalysis(entry)"
                     text="AI tuning advice has already been generated for this entry"
                     :delay-duration="0"
                   >
-                    <UIcon name="i-lucide-check-circle-2" class="size-3 text-success" />
+                    <UIcon name="i-lucide-check-circle-2" class="size-3 text-primary" />
+                  </UTooltip>
+                  <UTooltip v-if="entry.notes?.trim()" text="Notes have been added to this entry" :delay-duration="0">
+                    <UIcon name="i-lucide-notebook-pen" class="size-3 text-warning" />
                   </UTooltip>
                 </div>
                 <div
@@ -337,13 +340,15 @@
             <div v-if="showNotes" class="flex flex-col gap-1">
               <label class="text-xs font-medium text-dimmed">Notes</label>
               <UTextarea
+                v-if="isCurrentFlightLog"
                 v-model="notesDraft"
                 :rows="2"
-                :disabled="!isCurrentFlightLog"
                 placeholder="What did you change? What are you trying to fix?"
                 class="w-full"
                 @blur="onNotesBlur"
               />
+              <!-- Past entries are read-only, so their notes are just shown as text. -->
+              <p v-else class="text-sm whitespace-pre-wrap break-words rounded p-2 bg-warning/10">{{ currentEntry.notes }}</p>
             </div>
 
             <div v-if="showAiPanel" class="border-t border-default pt-2 flex flex-col gap-2">
@@ -366,15 +371,15 @@
                   "
                 >
                   <template v-if="turn.role === 'user'">
-                    <div v-if="turnImages(turn).length" class="flex flex-wrap gap-1 mb-1">
+                    <div v-if="turn.images.length" class="flex flex-wrap gap-1" :class="{ 'mb-1': turn.text }">
                       <img
-                        v-for="(src, j) in turnImages(turn)"
+                        v-for="(src, j) in turn.images"
                         :key="j"
                         :src="src"
                         class="h-16 rounded border border-default"
                       />
                     </div>
-                    {{ turnText(turn) }}
+                    <div class="whitespace-pre-wrap">{{ turn.text }}</div>
                   </template>
                   <div v-else v-html="renderMarkdown(turn.content)" />
                 </div>
@@ -942,13 +947,29 @@ const showAiPanel = computed(
   () => hasImage.value && (hasConversation.value || isPending.value || (isCurrentFlightLog.value && (hasApiKey.value || !tuningLogStore.apiKeyBannerDismissed))),
 );
 
+// The question (and pasted images) sent with the in-flight request, keyed by entry id - shown as a
+// read-only user turn straight away rather than only once the response has finished.
+const pendingQuestionByEntryId = ref({});
+
 const conversationTurns = computed(() => {
-  const conversation = currentEntry.value?.ai?.conversation || [];
-  // The first turn is always the initial analyze() request (step response image + config text),
-  // already shown above via the image/config panels, so it's skipped here. Every later turn is
-  // shown as-is, whether it's a follow-up's plain string or an array of text/image blocks (a
-  // follow-up with pasted images attached).
-  return conversation.slice(1);
+  const entry = currentEntry.value;
+  const conversation = entry?.ai?.conversation || [];
+
+  // User turns are normalised to { text, images } for display. The first turn is always the
+  // initial analyze() request - the step response image + a prompt wrapping the config text, both
+  // already shown above - so only what the user typed and pasted is pulled out of it.
+  const turns = conversation.map((turn, i) => {
+    if (turn.role !== "user") return turn;
+    if (i === 0) {
+      return { role: "user", text: TuningAI.extractInstructions(turnText(turn)), images: turnImages(turn).slice(1) };
+    }
+    return { role: "user", text: turnText(turn), images: turnImages(turn) };
+  });
+
+  const pendingQuestion = entry && pendingQuestionByEntryId.value[entry.id];
+  if (pendingQuestion) turns.push({ role: "user", ...pendingQuestion });
+
+  return turns.filter((turn) => turn.role !== "user" || turn.text.trim() || turn.images.length);
 });
 
 const streamingText = computed(() => {
@@ -1060,7 +1081,14 @@ function onAskAi() {
   );
 
   pendingEntryIds.value = new Set(pendingEntryIds.value).add(entry.id);
+  pendingQuestionByEntryId.value = { ...pendingQuestionByEntryId.value, [entry.id]: { text: promptText.trim(), images } };
   aiError.value = "";
+
+  // The question now shows as a read-only turn above the response, so the input is cleared
+  // straight away (and restored in onError if the request fails).
+  aiPromptText.value = "";
+  pendingImages.value = [];
+  scrollToBottomIfStuck();
 
   function setStreamingText(entryId, text) {
     streamingTextByEntryId.value = { ...streamingTextByEntryId.value, [entryId]: text };
@@ -1074,6 +1102,10 @@ function onAskAi() {
     const nextStreaming = { ...streamingTextByEntryId.value };
     delete nextStreaming[entryId];
     streamingTextByEntryId.value = nextStreaming;
+
+    const nextQuestions = { ...pendingQuestionByEntryId.value };
+    delete nextQuestions[entryId];
+    pendingQuestionByEntryId.value = nextQuestions;
   }
 
   const callOptions = {
@@ -1090,13 +1122,6 @@ function onAskAi() {
   function onResult(text, entryMessages, costUsd) {
     clearPending(entry.id);
     tuningLogStore.setEntryAiResult(entry.id, { model: settings.aiModel, conversation: entryMessages, costUsd });
-
-    // aiPromptText/pendingImages are a single shared textarea+attachments, not per-entry - only
-    // worth clearing them if we're still looking at the entry this response belongs to.
-    if (currentEntry.value?.id === entry.id) {
-      aiPromptText.value = "";
-      pendingImages.value = [];
-    }
   }
 
   function onError(message) {
@@ -1106,6 +1131,13 @@ function onAskAi() {
     // if the user has since switched entries, the pending indicator just quietly clears.
     if (currentEntry.value?.id === entry.id) {
       aiError.value = message;
+
+      // Put the failed question back so it can be retried - unless the user has already started
+      // typing something else into the (shared, not per-entry) input.
+      if (!aiPromptText.value && !pendingImages.value.length) {
+        aiPromptText.value = promptText;
+        pendingImages.value = images.map((dataUrl, i) => ({ id: `${Date.now()}-${i}`, dataUrl }));
+      }
     }
   }
 
