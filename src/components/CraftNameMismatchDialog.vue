@@ -21,12 +21,22 @@
           label="Yes"
           @click="onYes"
         />
+        <div class="flex-1" />
+        <UButton
+          variant="soft"
+          color="error"
+          label="Clear Configuration"
+          title="Remove the loaded configuration"
+          @click="onClear"
+        />
       </div>
     </template>
   </UModal>
 </template>
 
 <script setup>
+import { useCraftConfigStore } from "../stores/craftConfig.js";
+
 const open = defineModel("open", { type: Boolean, default: false });
 
 defineProps({
@@ -35,8 +45,15 @@ defineProps({
 
 const emit = defineEmits(["confirm"]);
 
+const craftConfigStore = useCraftConfigStore();
+
 function onYes() {
   open.value = false;
   emit("confirm");
+}
+
+function onClear() {
+  open.value = false;
+  craftConfigStore.clear();
 }
 </script>
