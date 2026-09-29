@@ -1481,9 +1481,9 @@ GraphSpectrumPlot._drawRotorRpmLines = function (
 };
 
 /**
- * SHIFT-hover: draws the hovered frequency (1st harmonic) plus its 2nd, 3rd and 4th harmonics,
- * each labelled with its own Hz and RPM value, so the user can line them up against peaks in the
- * spectrum.
+ * SHIFT-hover: draws the hovered frequency (1st harmonic) plus its 2nd through 8th harmonics,
+ * each labelled with its harmonic number, Hz and RPM value and stacked vertically, so the user
+ * can line them up against peaks in the spectrum.
  */
 GraphSpectrumPlot._drawHarmonicLines = function (
   canvasCtx,
@@ -1494,29 +1494,15 @@ GraphSpectrumPlot._drawHarmonicLines = function (
   OFFSET,
 ) {
   const stroke = "rgba(30,144,255,0.85)";
+  const harmonicOrdinals = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
 
-  if (fundamentalFrequency <= maximalFrequency) {
-    const label = `${fundamentalFrequency.toFixed(1)}Hz (${Math.round(fundamentalFrequency * 60)}rpm)`;
-    this._drawVerticalMarkerLine(
-      canvasCtx,
-      fundamentalFrequency,
-      maximalFrequency,
-      label,
-      WIDTH,
-      HEIGHT,
-      OFFSET,
-      stroke,
-      2,
-    );
-  }
-
-  for (const harmonic of [2, 3, 4]) {
+  for (let harmonic = 1; harmonic <= harmonicOrdinals.length; harmonic++) {
     const frequency = fundamentalFrequency * harmonic;
     if (frequency > maximalFrequency) {
       continue;
     }
 
-    const label = `${frequency.toFixed(1)}Hz (${Math.round(frequency * 60)}rpm)`;
+    const label = `${frequency.toFixed(1)}Hz - ${harmonicOrdinals[harmonic - 1]} harmonic (${Math.round(frequency * 60)}rpm)`;
     this._drawVerticalMarkerLine(
       canvasCtx,
       frequency,
@@ -1524,7 +1510,8 @@ GraphSpectrumPlot._drawHarmonicLines = function (
       label,
       WIDTH,
       HEIGHT,
-      OFFSET + 15,
+      // Stack the labels so they stay readable when the harmonics are close together
+      OFFSET + (harmonic - 1) * 17,
       stroke,
       2,
     );
