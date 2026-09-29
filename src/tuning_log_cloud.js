@@ -4,7 +4,8 @@
 //   index.json                                  every log in the repo, grouped by craft - the only
 //                                               file read to find a heli's logs
 //   crafts/<craft-key>/<logId>/log.json         one log's text: entries, notes, AI conversations
-//   crafts/<craft-key>/<logId>/images/<id>.png  one step response graph per entry, written once
+//   crafts/<craft-key>/<logId>/images/<id>.png  one step response graph per entry, rewritten only
+//                                               when re-captured (entry.imageUpdatedAt changes)
 //
 // A log's folder is fixed when it's first uploaded (sync.cloudDir), so it stays put even if the
 // log is later re-linked to a different craft name - index.json always says where each log is.
@@ -199,13 +200,17 @@ export async function syncLog(client, local, sync, { now = () => new Date().toIS
       return { log: merged, sync: newSync, uploaded: false, downloaded };
     }
 
-    const remoteImageIds = new Set(
-      ((remote && remote.entries) || []).filter((entry) => entry.hasImage).map((entry) => entry.id),
+    const remoteImages = new Map(
+      ((remote && remote.entries) || [])
+        .filter((entry) => entry.hasImage)
+        .map((entry) => [entry.id, entry.imageUpdatedAt || ""]),
     );
+    const remoteImageIds = new Set(remoteImages.keys());
     const mergedIds = new Set(merged.entries.map((entry) => entry.id));
 
+    // New images, plus any re-captured here since the cloud copy's was uploaded.
     const files = merged.entries
-      .filter((entry) => entry.image && !remoteImageIds.has(entry.id))
+      .filter((entry) => entry.image && remoteImages.get(entry.id) !== (entry.imageUpdatedAt || ""))
       .map((entry) => ({ path: imagePath(dir, entry.id), base64: dataUrlToBase64(entry.image) }));
 
     const deletes = [...remoteImageIds].filter((id) => !mergedIds.has(id)).map((id) => imagePath(dir, id));

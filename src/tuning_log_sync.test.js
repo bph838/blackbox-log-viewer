@@ -168,6 +168,25 @@ describe("mergeLogs", () => {
     expect(mergeLogs(stripImages(local), local, remote).entries[0].image).toBe("data:image/png;base64,AAAA");
   });
 
+  describe("re-captured images", () => {
+    it("keeps the local image when it was re-captured here", () => {
+      const local = log([entry("e1", { image: "data:image/png;base64,BBBB", imageUpdatedAt: "2026-09-02T00:00:00.000Z" })]);
+      const remote = log([entry("e1", { hasImage: true })]);
+      const merged = mergeLogs(stripImages(remote), local, remote).entries[0];
+      expect(merged.image).toBe("data:image/png;base64,BBBB");
+      expect(merged.imageUpdatedAt).toBe("2026-09-02T00:00:00.000Z");
+    });
+
+    it("drops the stale local image when the cloud's was re-captured more recently", () => {
+      const local = log([entry("e1", { image: "data:image/png;base64,AAAA" })]);
+      const remote = log([entry("e1", { hasImage: true, imageUpdatedAt: "2026-09-02T00:00:00.000Z" })]);
+      const merged = mergeLogs(stripImages(local), local, remote).entries[0];
+      expect(merged.image).toBeUndefined();
+      expect(merged.hasImage).toBe(true);
+      expect(merged.imageUpdatedAt).toBe("2026-09-02T00:00:00.000Z");
+    });
+  });
+
   describe("notes", () => {
     const base = log([entry("e1", { notes: "original" })]);
 

@@ -286,6 +286,20 @@
                       :label="configVisible ? 'Hide config' : 'Expand config'"
                       @click="configVisible = !configVisible"
                     />
+                    <UTooltip
+                      v-if="hasImage && isCurrentFlightLog"
+                      text="Re-capture the step response using the Roll/Pitch/Yaw axes currently shown in the main window"
+                      :delay-duration="0"
+                    >
+                      <UButton
+                        variant="soft"
+                        color="neutral"
+                        size="xs"
+                        icon="i-lucide-refresh-cw"
+                        label="Reload Graph"
+                        @click="onReloadImage"
+                      />
+                    </UTooltip>
                     <UButton
                       v-if="hasImage"
                       variant="soft"
@@ -872,6 +886,19 @@ const configFilteredLines = computed(() => {
 
   return result;
 });
+
+// The image is captured once, with whichever Roll/Pitch/Yaw axes were toggled on in the main
+// window at the time - this re-captures it after changing them.
+function onReloadImage() {
+  if (!currentEntry.value || !isCurrentFlightLog.value) return;
+
+  const image = graphStore.graph?.getStepResponse()?.captureImage();
+  if (!image) {
+    aiError.value = "Could not reload the step response - the step response panel is not available.";
+    return;
+  }
+  tuningLogStore.updateEntryImage(currentEntry.value.id, image);
+}
 
 async function onCopyImage() {
   if (!currentEntry.value?.image) return;

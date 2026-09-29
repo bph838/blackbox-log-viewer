@@ -163,13 +163,14 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     const log = newPending.length ? mergeLogs(start.log, now.log, result.log) : result.log;
     const sync = { ...result.sync, pending: newPending };
 
-    // Store images that arrived from the cloud; drop ones whose entries the cloud copy deleted.
-    const hadImage = new Set(start.log.entries.filter((e) => e.image).map((e) => e.id));
+    // Store images that arrived from the cloud (new, or re-captured elsewhere); drop ones whose
+    // entries the cloud copy deleted.
+    const hadImage = new Map(start.log.entries.filter((e) => e.image).map((e) => [e.id, e.image]));
     const finalIds = new Set(log.entries.map((e) => e.id));
     for (const entry of log.entries) {
-      if (entry.image && !hadImage.has(entry.id)) await db.putImage(logId, entry.id, entry.image);
+      if (entry.image && entry.image !== hadImage.get(entry.id)) await db.putImage(logId, entry.id, entry.image);
     }
-    for (const id of hadImage) {
+    for (const id of hadImage.keys()) {
       if (!finalIds.has(id)) await db.deleteImage(logId, id);
     }
 
@@ -522,6 +523,22 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
   }
 
   /**
+   * Replaces an entry's step response image with a fresh capture (e.g. after changing which axes
+   * are shown in the main window). imageUpdatedAt lets the sync tell the newer capture apart.
+   */
+  function updateEntryImage(entryId, image) {
+    const entry = findEntry(entryId);
+    if (!entry || !image) return;
+
+    entry.image = image;
+    entry.imageUpdatedAt = new Date().toISOString();
+    db.putImage(currentLog.value.logId, entry.id, image).catch((error) =>
+      console.error("Could not save the step response image locally", error),
+    );
+    change(OPS.UPDATE_IMAGE, entryId);
+  }
+
+  /**
    * result: { model, conversation, costUsd } - costUsd is added to any cost already recorded for
    * this entry (a follow-up question adds to the running total, it doesn't replace it).
    */
@@ -648,6 +665,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     addEntry,
     deleteEntry,
     updateEntryNotes,
+    updateEntryImage,
     setEntryAiResult,
     importFromFile,
     exportToFile,

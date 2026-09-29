@@ -16,6 +16,7 @@ export const OPS = {
   ADD_ENTRY: "addEntry",
   DELETE_ENTRY: "deleteEntry",
   UPDATE_NOTES: "updateNotes",
+  UPDATE_IMAGE: "updateImage",
   SET_AI: "setAi",
 };
 
@@ -58,7 +59,7 @@ export function recordChange(sync, change) {
     return sync;
   }
 
-  if (change.op === OPS.UPDATE_NOTES || change.op === OPS.SET_AI) {
+  if (change.op === OPS.UPDATE_NOTES || change.op === OPS.UPDATE_IMAGE || change.op === OPS.SET_AI) {
     const existing = pending.find((c) => c.op === change.op && c.entryId === change.entryId);
     if (existing) {
       existing.at = at;
@@ -215,8 +216,15 @@ function mergeEntry(base, local, remote) {
 
   const merged = clone(remote);
 
-  // Image data is never in a remote/base copy - keep whatever the local copy already has loaded.
-  if (local.image && !merged.image) {
+  // A re-captured image (see stores/tuningLog.js updateEntryImage) is stamped with imageUpdatedAt -
+  // the newest capture wins. Image data is never in a remote/base copy, so keep whatever the local
+  // copy already has loaded unless the cloud's is newer (then it's left off, to be downloaded).
+  const localImageAt = String(local.imageUpdatedAt || "");
+  const remoteImageAt = String(remote.imageUpdatedAt || "");
+  if (localImageAt > remoteImageAt) {
+    merged.imageUpdatedAt = local.imageUpdatedAt;
+  }
+  if (local.image && !merged.image && localImageAt >= remoteImageAt) {
     merged.image = local.image;
   }
 

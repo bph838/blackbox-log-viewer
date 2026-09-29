@@ -97,6 +97,24 @@ describe("tuning log cloud sync", () => {
     expect(blobPosts() - before).toBe(3);
   });
 
+  it("re-uploads a re-captured image and passes it on to another computer", async () => {
+    const a = newLog();
+    const entry = add(a, "2026-09-01T00:00:00.000Z", IMG_A);
+    await sync(client, a);
+    const b = clone(a);
+
+    const aEntry = a.log.entries[0];
+    aEntry.image = IMG_B;
+    aEntry.imageUpdatedAt = "2026-09-03T00:00:00.000Z";
+    recordChange(a.sync, { op: OPS.UPDATE_IMAGE, entryId: entry.id });
+    expect((await sync(client, a)).uploaded).toBe(true);
+    expect(fake.fileBase64(`${defaultLogDir(a.log)}/images/${entry.id}.png`)).toBe("QkJCQg==");
+
+    const result = await sync(client, b);
+    expect(result.downloaded).toBe(true);
+    expect(b.log.entries[0].image).toBe(IMG_B);
+  });
+
   it("merges work done offline on two computers, keeping everything", async () => {
     // Computer 1 creates the log and syncs it.
     const pc1 = newLog();
