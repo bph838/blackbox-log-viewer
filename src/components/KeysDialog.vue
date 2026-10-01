@@ -113,6 +113,8 @@ const layout = [
         { keys: ["Alt", "M"], action: "Smart Sync at marker position" },
         { keys: ["I"], action: "Set IN point" },
         { keys: ["O"], action: "Set OUT point" },
+        { keys: ["Ctrl", "I"], action: "Set ISOLATE start (within IN/OUT)" },
+        { keys: ["Ctrl", "O"], action: "Set ISOLATE end (within IN/OUT)" },
       ],
     },
     {

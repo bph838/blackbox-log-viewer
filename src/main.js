@@ -20,6 +20,7 @@ import { restorePenDefaults, changePenSmoothing, changePenZoom, changePenExpo } 
 import { createKeydownHandler } from "./keyboard_handler.js";
 import { upgradeWorkspaceFormat, saveWorkspaces, loadWorkspaces } from "./workspace_io.js";
 import { exportCsv, exportGpx, exportSpectrumToCsv } from "./export_utils.js";
+import { clearIsolation } from "./isolation.js";
 import { syncLogToVideo, setVideoOffset, setVideoTime, setVideoInTime, setVideoOutTime, loadVideo, reportVideoError } from "./video_handler.js";
 import { renderLogFileInfo, renderSelectedLogInfo, setSeekBarMode } from "./log_lifecycle.js";
 import { applyAutoTrim } from "./auto_trim.js";
@@ -154,6 +155,7 @@ function BlackboxLogViewer() {
 
     setVideoInTime(false);
     setVideoOutTime(false);
+    clearIsolation();
     const autoTrimmed = applyAutoTrim(logStore.flightLog, userSettings);
 
     graphStore.activeGraphConfig.adaptGraphs(logStore.flightLog, graphStore.graphConfig);

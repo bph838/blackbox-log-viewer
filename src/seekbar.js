@@ -18,6 +18,16 @@ function getOutsideExportRangeStyle() {
   return "rgba(100, 100, 100, 0.5)"; // Dimming overlay works in both themes
 }
 
+// Isolated block (Ctrl+I / Ctrl+O): amber, so it stands apart from the lavender activity,
+// green events, grey trim dimming and red cursor.
+function getIsolateFillStyle() {
+  return "rgba(255, 176, 32, 0.35)";
+}
+
+function getIsolateEdgeStyle() {
+  return "rgba(255, 160, 0, 0.95)";
+}
+
 function getCursorStyle() {
   return "rgba(255, 64, 64, 0.75)"; // Red cursor works in both themes
 }
@@ -46,6 +56,8 @@ export function SeekBar(canvas) {
   const backgroundContext = background.getContext("2d");
   let inTime = false;
   let outTime = false;
+  let isolateIn = false;
+  let isolateOut = false;
   let backgroundValid = false;
   let dirtyRegion = false;
   //Current time cursor:
@@ -289,7 +301,38 @@ export function SeekBar(canvas) {
         }
       }
 
+      paintIsolatedBlock(pixelTimeStep);
+
       backgroundValid = true;
+    }
+  }
+
+  function paintIsolatedBlock(pixelTimeStep) {
+    if (isolateIn === false && isolateOut === false) {
+      return;
+    }
+    // Constrain to the trimmed range, which the isolated block always sits inside
+    const lower = inTime === false ? min : Math.max(inTime, min);
+    const upper = outTime === false ? max : Math.min(outTime, max);
+    const start = isolateIn === false ? lower : Math.max(isolateIn, lower);
+    const end = isolateOut === false ? upper : Math.min(isolateOut, upper);
+    if (end <= start) {
+      return;
+    }
+
+    const startX = (start - min) / pixelTimeStep + BAR_INSET;
+    const endX = (end - min) / pixelTimeStep + BAR_INSET;
+    const edgeWidth = Math.max(1, CURSOR_WIDTH * 0.8);
+
+    backgroundContext.fillStyle = getIsolateFillStyle();
+    backgroundContext.fillRect(startX, 0, endX - startX, canvas.height);
+
+    backgroundContext.fillStyle = getIsolateEdgeStyle();
+    if (isolateIn !== false) {
+      backgroundContext.fillRect(startX - edgeWidth / 2, 0, edgeWidth, canvas.height);
+    }
+    if (isolateOut !== false) {
+      backgroundContext.fillRect(endX - edgeWidth / 2, 0, edgeWidth, canvas.height);
     }
   }
 
@@ -368,6 +411,12 @@ export function SeekBar(canvas) {
 
   this.setOutTime = function (newOutTime) {
     outTime = newOutTime;
+    invalidateBackground();
+  };
+
+  this.setIsolateRange = function (newIn, newOut) {
+    isolateIn = newIn ?? false;
+    isolateOut = newOut ?? false;
     invalidateBackground();
   };
 

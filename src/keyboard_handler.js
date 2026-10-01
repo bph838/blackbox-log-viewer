@@ -1,5 +1,6 @@
 import { formatTime } from "./tools.js";
 import { GRAPH_MIN_ZOOM } from "./stores/graph.js";
+import { setIsolateInTime, setIsolateOutTime } from "./isolation.js";
 
 /**
  * Create a keydown event handler for the document.
@@ -88,8 +89,18 @@ export function createKeydownHandler(ctx) {
     }
   }
 
+  function isIsolateChord(e) {
+    return (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey;
+  }
+
   function handleKeyVideoIn(e, shifted) {
-    if (!shifted) {
+    if (isIsolateChord(e)) {
+      setIsolateInTime(
+        playbackStore.isolateInTime === logStore.currentBlackboxTime
+          ? null
+          : logStore.currentBlackboxTime,
+      );
+    } else if (!shifted) {
       setVideoInTime(
         playbackStore.videoExportInTime === logStore.currentBlackboxTime
           ? null
@@ -100,7 +111,13 @@ export function createKeydownHandler(ctx) {
   }
 
   function handleKeyVideoOut(e, shifted) {
-    if (!shifted) {
+    if (isIsolateChord(e)) {
+      setIsolateOutTime(
+        playbackStore.isolateOutTime === logStore.currentBlackboxTime
+          ? null
+          : logStore.currentBlackboxTime,
+      );
+    } else if (!shifted) {
       setVideoOutTime(
         playbackStore.videoExportOutTime === logStore.currentBlackboxTime
           ? null

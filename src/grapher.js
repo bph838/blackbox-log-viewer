@@ -78,6 +78,8 @@ export function FlightLogGrapher(
     graphs = [],
     inTime = false,
     outTime = false,
+    isolateIn = false,
+    isolateOut = false,
     lastMouseX,
     sticks = null,
     craft3D = null,
@@ -850,6 +852,45 @@ export function FlightLogGrapher(
     }
   }
 
+  /**
+   *  Tint the isolated block (Ctrl+I / Ctrl+O) and mark its edges with amber dashed lines.
+   *  The block is constrained to the trimmed in/out range.
+   */
+  function drawIsolatedRegion() {
+    if (isolateIn === false && isolateOut === false) {
+      return;
+    }
+    const lower = inTime === false ? -Infinity : inTime;
+    const upper = outTime === false ? Infinity : outTime;
+    const start = isolateIn === false ? lower : Math.max(isolateIn, lower);
+    const end = isolateOut === false ? upper : Math.min(isolateOut, upper);
+    if (end <= start || end < windowStartTime || start > windowEndTime) {
+      return;
+    }
+
+    const startX = Number.isFinite(start) ? Math.max(timeToCanvasX(start), 0) : 0;
+    const endX = Number.isFinite(end) ? Math.min(timeToCanvasX(end), canvas.width) : canvas.width;
+
+    canvasContext.save();
+    canvasContext.fillStyle = "rgba(255, 176, 32, 0.08)";
+    canvasContext.fillRect(startX, 0, endX - startX, canvas.height);
+
+    canvasContext.strokeStyle = "rgba(255, 160, 0, 0.9)";
+    canvasContext.lineWidth = 2;
+    canvasContext.setLineDash([8, 6]);
+    for (const [time, edge] of [[isolateIn, start], [isolateOut, end]]) {
+      if (time === false) continue;
+      const x = timeToCanvasX(edge);
+      if (x >= 0 && x <= canvas.width) {
+        canvasContext.beginPath();
+        canvasContext.moveTo(x, 0);
+        canvasContext.lineTo(x, canvas.height);
+        canvasContext.stroke();
+      }
+    }
+    canvasContext.restore();
+  }
+
   function computeDrawingParameters() {
     const fontSizeBase = Math.max(8, canvas.height / 60),
       newParams = {
@@ -1084,6 +1125,7 @@ export function FlightLogGrapher(
     }
 
     drawInOutRegion();
+    drawIsolatedRegion();
   };
 
   this.refreshGraphConfig = function () {
@@ -1224,6 +1266,19 @@ export function FlightLogGrapher(
       analyser.setInTime(inTime);
       if (stepResponse) stepResponse.setInTime(inTime);
     }
+  };
+
+  this.setIsolateRange = function (newIn, newOut) {
+    isolateIn = newIn ?? false;
+    isolateOut = newOut ?? false;
+  };
+
+  this.getIsolatedInTime = function () {
+    return isolateIn;
+  };
+
+  this.getIsolatedOutTime = function () {
+    return isolateOut;
   };
 
   // New function to return the current window scale.

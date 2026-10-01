@@ -14,6 +14,9 @@ export const usePlaybackStore = defineStore("playback", () => {
   const videoOffset = ref(0);
   const videoExportInTime = ref(null);
   const videoExportOutTime = ref(null);
+  // Isolated block (Ctrl+I / Ctrl+O) - a refined selection inside the trimmed range
+  const isolateInTime = ref(null);
+  const isolateOutTime = ref(null);
   const videoConfig = ref({ width: 1280, height: 720, frameRate: 30, videoDim: 0.4 });
 
   // Video DOM element — registered by main.js
@@ -59,6 +62,8 @@ export const usePlaybackStore = defineStore("playback", () => {
     videoOffset,
     videoExportInTime,
     videoExportOutTime,
+    isolateInTime,
+    isolateOutTime,
     videoConfig,
     videoElement,
     offsetCache,
