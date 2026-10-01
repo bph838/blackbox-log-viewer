@@ -1,5 +1,153 @@
 [
-    null,
+    {
+        "title": "Tracking PRY",
+        "graphConfig": [
+            {
+                "label": "Roll",
+                "height": 1,
+                "fields": [
+                    {
+                        "name": "setpoint[0]",
+                        "smoothing": 0,
+                        "curve": {
+                            "power": 0.25,
+                            "MinMax": {
+                                "min": -347,
+                                "max": 347
+                            }
+                        },
+                        "default": {
+                            "smoothing": 0,
+                            "power": 0.25,
+                            "MinMax": {
+                                "min": -347,
+                                "max": 347
+                            }
+                        },
+                        "color": "#fb8072",
+                        "lineWidth": 1
+                    },
+                    {
+                        "name": "gyroADC[0]",
+                        "smoothing": 3000,
+                        "curve": {
+                            "power": 0.25,
+                            "MinMax": {
+                                "min": -347,
+                                "max": 347
+                            }
+                        },
+                        "default": {
+                            "smoothing": 3000,
+                            "power": 0.25,
+                            "MinMax": {
+                                "min": -347,
+                                "max": 347
+                            }
+                        },
+                        "color": "#8dd3c7",
+                        "lineWidth": 1
+                    }
+                ]
+            },
+            {
+                "label": "Pitch",
+                "height": 1,
+                "fields": [
+                    {
+                        "name": "setpoint[1]",
+                        "smoothing": 0,
+                        "curve": {
+                            "power": 0.25,
+                            "MinMax": {
+                                "min": -347,
+                                "max": 347
+                            }
+                        },
+                        "default": {
+                            "smoothing": 0,
+                            "power": 0.25,
+                            "MinMax": {
+                                "min": -347,
+                                "max": 347
+                            }
+                        },
+                        "color": "#fb8072",
+                        "lineWidth": 1
+                    },
+                    {
+                        "name": "gyroADC[1]",
+                        "smoothing": 3000,
+                        "curve": {
+                            "power": 0.25,
+                            "MinMax": {
+                                "min": -347,
+                                "max": 347
+                            }
+                        },
+                        "default": {
+                            "smoothing": 3000,
+                            "power": 0.25,
+                            "MinMax": {
+                                "min": -347,
+                                "max": 347
+                            }
+                        },
+                        "color": "#8dd3c7",
+                        "lineWidth": 1
+                    }
+                ]
+            },
+            {
+                "label": "Yaw",
+                "height": 1,
+                "fields": [
+                    {
+                        "name": "setpoint[2]",
+                        "smoothing": 0,
+                        "curve": {
+                            "power": 0.25,
+                            "MinMax": {
+                                "min": -583,
+                                "max": 583
+                            }
+                        },
+                        "default": {
+                            "smoothing": 0,
+                            "power": 0.25,
+                            "MinMax": {
+                                "min": -583,
+                                "max": 583
+                            }
+                        },
+                        "color": "#fb8072",
+                        "lineWidth": 1
+                    },
+                    {
+                        "name": "gyroADC[2]",
+                        "smoothing": 3000,
+                        "curve": {
+                            "power": 0.25,
+                            "MinMax": {
+                                "min": -583,
+                                "max": 583
+                            }
+                        },
+                        "default": {
+                            "smoothing": 3000,
+                            "power": 0.25,
+                            "MinMax": {
+                                "min": -583,
+                                "max": 583
+                            }
+                        },
+                        "color": "#8dd3c7",
+                        "lineWidth": 1
+                    }
+                ]
+            }
+        ]
+    },
     {
         "title": "PRY Gyro",
         "graphConfig": [
@@ -1732,16 +1880,16 @@
                         "curve": {
                             "power": 0.25,
                             "MinMax": {
-                                "min": -263,
-                                "max": 263
+                                "min": -347,
+                                "max": 347
                             }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 0.25,
                             "MinMax": {
-                                "min": -336,
-                                "max": 336
+                                "min": -347,
+                                "max": 347
                             }
                         },
                         "color": "#fb8072",
@@ -1753,16 +1901,16 @@
                         "curve": {
                             "power": 0.25,
                             "MinMax": {
-                                "min": -263,
-                                "max": 263
+                                "min": -347,
+                                "max": 347
                             }
                         },
                         "default": {
                             "smoothing": 3000,
                             "power": 0.25,
                             "MinMax": {
-                                "min": -336,
-                                "max": 336
+                                "min": -347,
+                                "max": 347
                             }
                         },
                         "color": "#8dd3c7",
@@ -1788,27 +1936,6 @@
                         },
                         "color": "#ffffb3",
                         "lineWidth": 1
-                    },
-                    {
-                        "name": "axisError[0]",
-                        "smoothing": 3000,
-                        "curve": {
-                            "power": 1,
-                            "MinMax": {
-                                "min": -263,
-                                "max": 263
-                            }
-                        },
-                        "default": {
-                            "smoothing": 3000,
-                            "power": 1,
-                            "MinMax": {
-                                "min": -336,
-                                "max": 336
-                            }
-                        },
-                        "color": "#bebada",
-                        "lineWidth": 1
                     }
                 ]
             },
@@ -1822,16 +1949,16 @@
                         "curve": {
                             "power": 0.25,
                             "MinMax": {
-                                "min": -263,
-                                "max": 263
+                                "min": -347,
+                                "max": 347
                             }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 0.25,
                             "MinMax": {
-                                "min": -336,
-                                "max": 336
+                                "min": -347,
+                                "max": 347
                             }
                         },
                         "color": "#fb8072",
@@ -1843,16 +1970,16 @@
                         "curve": {
                             "power": 0.25,
                             "MinMax": {
-                                "min": -263,
-                                "max": 263
+                                "min": -347,
+                                "max": 347
                             }
                         },
                         "default": {
                             "smoothing": 3000,
                             "power": 0.25,
                             "MinMax": {
-                                "min": -336,
-                                "max": 336
+                                "min": -347,
+                                "max": 347
                             }
                         },
                         "color": "#8dd3c7",
@@ -1878,27 +2005,6 @@
                         },
                         "color": "#ffffb3",
                         "lineWidth": 1
-                    },
-                    {
-                        "name": "axisError[1]",
-                        "smoothing": 3000,
-                        "curve": {
-                            "power": 1,
-                            "MinMax": {
-                                "min": -263,
-                                "max": 263
-                            }
-                        },
-                        "default": {
-                            "smoothing": 3000,
-                            "power": 1,
-                            "MinMax": {
-                                "min": -336,
-                                "max": 336
-                            }
-                        },
-                        "color": "#bebada",
-                        "lineWidth": 1
                     }
                 ]
             },
@@ -1912,16 +2018,16 @@
                         "curve": {
                             "power": 0.25,
                             "MinMax": {
-                                "min": -420,
-                                "max": 420
+                                "min": -583,
+                                "max": 583
                             }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 0.25,
                             "MinMax": {
-                                "min": -404,
-                                "max": 404
+                                "min": -583,
+                                "max": 583
                             }
                         },
                         "color": "#fb8072",
@@ -1933,16 +2039,16 @@
                         "curve": {
                             "power": 0.25,
                             "MinMax": {
-                                "min": -420,
-                                "max": 420
+                                "min": -583,
+                                "max": 583
                             }
                         },
                         "default": {
                             "smoothing": 3000,
                             "power": 0.25,
                             "MinMax": {
-                                "min": -404,
-                                "max": 404
+                                "min": -583,
+                                "max": 583
                             }
                         },
                         "color": "#8dd3c7",
@@ -1967,27 +2073,6 @@
                             }
                         },
                         "color": "#ffffb3",
-                        "lineWidth": 1
-                    },
-                    {
-                        "name": "axisError[2]",
-                        "smoothing": 3000,
-                        "curve": {
-                            "power": 1,
-                            "MinMax": {
-                                "min": -420,
-                                "max": 420
-                            }
-                        },
-                        "default": {
-                            "smoothing": 3000,
-                            "power": 1,
-                            "MinMax": {
-                                "min": -404,
-                                "max": 404
-                            }
-                        },
-                        "color": "#bebada",
                         "lineWidth": 1
                     }
                 ]

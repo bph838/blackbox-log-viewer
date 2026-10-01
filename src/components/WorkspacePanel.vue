@@ -2,7 +2,7 @@
   <div class="toolbar-panel log-workspace-panel">
     <h4>Workspace</h4>
 
-    <UDropdownMenu :items="workspaceItems" class="w-full">
+    <UDropdownMenu v-model:open="menuOpen" :items="workspaceItems" class="w-full">
       <UButton variant="outline" color="neutral" size="xs" block class="justify-between font-mono"
         trailing-icon="i-lucide-chevron-down">
         <span v-if="activeEntry" class="flex items-center gap-1 truncate">
@@ -14,26 +14,72 @@
 
       <template #ws-trailing="{ item }">
         <UIcon v-if="item.wsActive" name="i-lucide-check" class="size-4 text-green-500" />
-        <UIcon name="i-lucide-save" class="size-4 opacity-40 hover:opacity-100 cursor-pointer"
-          title="Save current graph setup to this workspace" @click.stop.prevent="onSaveClick(item)" />
+        <UButton v-if="!item.disabled" variant="ghost" color="neutral" size="xs" icon="i-lucide-pencil"
+          aria-label="Rename this workspace" title="Rename this workspace" class="opacity-40 hover:opacity-100"
+          @click.stop.prevent="openRename(item.wsId, item.wsTitle)" />
+        <UButton variant="ghost" color="neutral" size="xs" icon="i-lucide-save"
+          aria-label="Save current graph setup to this workspace" title="Save current graph setup to this workspace"
+          class="opacity-40 hover:opacity-100" @click.stop.prevent="onSaveClick(item)" />
       </template>
     </UDropdownMenu>
+
+    <UModal v-model:open="renameOpen" :ui="{ content: 'sm:max-w-sm' }">
+      <template #header>
+        <h4 class="font-semibold">Rename workspace {{ renameId }}</h4>
+      </template>
+
+      <template #body>
+        <UInput v-model="renameTitle" autofocus placeholder="Workspace name" class="w-full"
+          @keydown.enter="commitRename" />
+      </template>
+
+      <template #footer>
+        <div class="flex justify-end gap-2 w-full">
+          <UButton variant="outline" color="neutral" label="Cancel" @click="renameOpen = false" />
+          <UButton color="primary" label="Rename" :disabled="!renameTitle.trim()" @click="commitRename" />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useToast } from "@nuxt/ui/composables";
 import { useWorkspaceStore } from "../stores/workspace.js";
 
 const emit = defineEmits([
   "switch-workspace",
   "save-workspace",
+  "rename-workspace",
   "apply-default",
 ]);
 
 const workspaceStore = useWorkspaceStore();
 const toast = useToast();
+
+const menuOpen = ref(false);
+
+const renameOpen = ref(false);
+const renameId = ref(null);
+const renameTitle = ref("");
+
+function openRename(id, title) {
+  renameId.value = id;
+  // Offer an empty field rather than making the user clear the "Unnamed" placeholder.
+  renameTitle.value = title === "Unnamed" ? "" : title;
+  menuOpen.value = false;
+  renameOpen.value = true;
+}
+
+function commitRename() {
+  const title = renameTitle.value.trim();
+  if (!title) {
+    return;
+  }
+  emit("rename-workspace", renameId.value, title);
+  renameOpen.value = false;
+}
 
 function onSaveClick(item) {
   emit("save-workspace", item.wsId, item.wsTitle);

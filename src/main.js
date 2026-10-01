@@ -360,6 +360,19 @@ function BlackboxLogViewer() {
     }
   }
 
+  // Rename a workspace slot without touching its saved graph config
+  function onRenameWorkspace(id, title) {
+    const entry = workspaceStore.workspaceGraphConfigs[id];
+    if (!entry) {
+      return;
+    }
+    workspaceStore.workspaceGraphConfigs[id] = { ...entry, title };
+    prefs.set("workspaceGraphConfigs", workspaceStore.workspaceGraphConfigs);
+    if (id === workspaceStore.activeWorkspace) {
+      graphStore.legendTitle = title;
+    }
+  }
+
   // Save current config
   function onSaveWorkspace(id, title) {
     workspaceStore.workspaceGraphConfigs[id] = {
@@ -689,6 +702,7 @@ function BlackboxLogViewer() {
       }
     };
     workspaceStore.saveWorkspace = (id, title) => onSaveWorkspace(id, title);
+    workspaceStore.renameWorkspace = (id, title) => onRenameWorkspace(id, title);
     workspaceStore.applyDefaultWorkspace = (index) => {
       const presets = [null, structuredClone(workspace_Ben), 
                             structuredClone(workspace_UAVTech),

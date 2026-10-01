@@ -78,6 +78,7 @@
         <WorkspacePanel
           @switch-workspace="onSwitchWorkspace"
           @save-workspace="onSaveWorkspace"
+          @rename-workspace="onRenameWorkspace"
           @apply-default="onApplyDefaultWorkspace"
         />
       </Teleport>
@@ -412,6 +413,10 @@ function onSwitchWorkspace(id) {
 
 function onSaveWorkspace(id, title) {
   workspaceStore.saveWorkspace?.(id, title);
+}
+
+function onRenameWorkspace(id, title) {
+  workspaceStore.renameWorkspace?.(id, title);
 }
 
 function onApplyDefaultWorkspace(index) {
