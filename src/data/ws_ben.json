@@ -1732,16 +1732,16 @@
                         "curve": {
                             "power": 0.25,
                             "MinMax": {
-                                "min": -315,
-                                "max": 315
+                                "min": -263,
+                                "max": 263
                             }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 0.25,
                             "MinMax": {
-                                "min": -315,
-                                "max": 315
+                                "min": -336,
+                                "max": 336
                             }
                         },
                         "color": "#fb8072",
@@ -1753,16 +1753,16 @@
                         "curve": {
                             "power": 0.25,
                             "MinMax": {
-                                "min": -315,
-                                "max": 315
+                                "min": -263,
+                                "max": 263
                             }
                         },
                         "default": {
                             "smoothing": 3000,
                             "power": 0.25,
                             "MinMax": {
-                                "min": -315,
-                                "max": 315
+                                "min": -336,
+                                "max": 336
                             }
                         },
                         "color": "#8dd3c7",
@@ -1788,6 +1788,27 @@
                         },
                         "color": "#ffffb3",
                         "lineWidth": 1
+                    },
+                    {
+                        "name": "axisError[0]",
+                        "smoothing": 3000,
+                        "curve": {
+                            "power": 1,
+                            "MinMax": {
+                                "min": -263,
+                                "max": 263
+                            }
+                        },
+                        "default": {
+                            "smoothing": 3000,
+                            "power": 1,
+                            "MinMax": {
+                                "min": -336,
+                                "max": 336
+                            }
+                        },
+                        "color": "#bebada",
+                        "lineWidth": 1
                     }
                 ]
             },
@@ -1801,16 +1822,16 @@
                         "curve": {
                             "power": 0.25,
                             "MinMax": {
-                                "min": -315,
-                                "max": 315
+                                "min": -263,
+                                "max": 263
                             }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 0.25,
                             "MinMax": {
-                                "min": -315,
-                                "max": 315
+                                "min": -336,
+                                "max": 336
                             }
                         },
                         "color": "#fb8072",
@@ -1822,16 +1843,16 @@
                         "curve": {
                             "power": 0.25,
                             "MinMax": {
-                                "min": -315,
-                                "max": 315
+                                "min": -263,
+                                "max": 263
                             }
                         },
                         "default": {
                             "smoothing": 3000,
                             "power": 0.25,
                             "MinMax": {
-                                "min": -315,
-                                "max": 315
+                                "min": -336,
+                                "max": 336
                             }
                         },
                         "color": "#8dd3c7",
@@ -1857,6 +1878,27 @@
                         },
                         "color": "#ffffb3",
                         "lineWidth": 1
+                    },
+                    {
+                        "name": "axisError[1]",
+                        "smoothing": 3000,
+                        "curve": {
+                            "power": 1,
+                            "MinMax": {
+                                "min": -263,
+                                "max": 263
+                            }
+                        },
+                        "default": {
+                            "smoothing": 3000,
+                            "power": 1,
+                            "MinMax": {
+                                "min": -336,
+                                "max": 336
+                            }
+                        },
+                        "color": "#bebada",
+                        "lineWidth": 1
                     }
                 ]
             },
@@ -1870,16 +1912,16 @@
                         "curve": {
                             "power": 0.25,
                             "MinMax": {
-                                "min": -578,
-                                "max": 578
+                                "min": -420,
+                                "max": 420
                             }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 0.25,
                             "MinMax": {
-                                "min": -578,
-                                "max": 578
+                                "min": -404,
+                                "max": 404
                             }
                         },
                         "color": "#fb8072",
@@ -1891,16 +1933,16 @@
                         "curve": {
                             "power": 0.25,
                             "MinMax": {
-                                "min": -578,
-                                "max": 578
+                                "min": -420,
+                                "max": 420
                             }
                         },
                         "default": {
                             "smoothing": 3000,
                             "power": 0.25,
                             "MinMax": {
-                                "min": -578,
-                                "max": 578
+                                "min": -404,
+                                "max": 404
                             }
                         },
                         "color": "#8dd3c7",
@@ -1926,53 +1968,26 @@
                         },
                         "color": "#ffffb3",
                         "lineWidth": 1
-                    }
-                ]
-            },
-            {
-                "label": "RPM",
-                "height": 1,
-                "fields": [
-                    {
-                        "name": "headspeed",
-                        "smoothing": 0,
-                        "curve": {
-                            "power": 1,
-                            "MinMax": {
-                                "min": 0,
-                                "max": 63018
-                            }
-                        },
-                        "default": {
-                            "smoothing": 0,
-                            "power": 1,
-                            "MinMax": {
-                                "min": 0,
-                                "max": 63018
-                            }
-                        },
-                        "color": "#fb8072",
-                        "lineWidth": 1
                     },
                     {
-                        "name": "motor[0]",
-                        "smoothing": 5000,
+                        "name": "axisError[2]",
+                        "smoothing": 3000,
                         "curve": {
                             "power": 1,
                             "MinMax": {
-                                "min": 0,
-                                "max": 100
+                                "min": -420,
+                                "max": 420
                             }
                         },
                         "default": {
-                            "smoothing": 5000,
+                            "smoothing": 3000,
                             "power": 1,
                             "MinMax": {
-                                "min": 0,
-                                "max": 100
+                                "min": -404,
+                                "max": 404
                             }
                         },
-                        "color": "#ffffb3",
+                        "color": "#bebada",
                         "lineWidth": 1
                     }
                 ]
