@@ -187,6 +187,32 @@ describe("mergeLogs", () => {
     });
   });
 
+  describe("isolated flight slices", () => {
+    const slice = { capturedAt: "2026-09-02T00:00:00.000Z", csv: "t_ms,gyroADC[0]\n0,1" };
+
+    it("keeps a slice attached here that the cloud doesn't have yet", () => {
+      const base = log([entry("e1")]);
+      const local = log([entry("e1", { slice, sliceUpdatedAt: "2026-09-02T00:00:00.000Z" })]);
+      const merged = mergeLogs(base, local, clone(base)).entries[0];
+      expect(merged.slice).toEqual(slice);
+      expect(merged.sliceUpdatedAt).toBe("2026-09-02T00:00:00.000Z");
+    });
+
+    it("keeps a removal made here over an older attach in the cloud", () => {
+      const remote = log([entry("e1", { slice, sliceUpdatedAt: "2026-09-02T00:00:00.000Z" })]);
+      const local = log([entry("e1", { sliceUpdatedAt: "2026-09-03T00:00:00.000Z" })]);
+      const merged = mergeLogs(clone(remote), local, remote).entries[0];
+      expect(merged.slice).toBeUndefined();
+    });
+
+    it("takes the cloud's slice when it was attached more recently", () => {
+      const newer = { ...slice, capturedAt: "2026-09-04T00:00:00.000Z" };
+      const local = log([entry("e1", { slice, sliceUpdatedAt: "2026-09-02T00:00:00.000Z" })]);
+      const remote = log([entry("e1", { slice: newer, sliceUpdatedAt: "2026-09-04T00:00:00.000Z" })]);
+      expect(mergeLogs(null, local, remote).entries[0].slice).toEqual(newer);
+    });
+  });
+
   describe("notes", () => {
     const base = log([entry("e1", { notes: "original" })]);
 

@@ -7,6 +7,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import AI_MODELS from "./data/ai_models.json";
+import { sliceToPromptText, sliceToSummaryText } from "./flight_slice.js";
 
 const MODELS_BY_ID = {};
 for (const m of AI_MODELS.models) {
@@ -75,7 +76,8 @@ export function extractInstructions(promptText) {
 }
 
 /**
- * options: { configSummary, instructions, expertMode }
+ * options: { configSummary, instructions, expertMode, hasSlice }
+ * hasSlice: an isolated-flight CSV block (see flight_slice.js) is attached to the same message.
  */
 export function buildPromptText(options) {
   const instructions = (options.instructions || "").trim() || NO_INSTRUCTIONS_PLACEHOLDER;
@@ -90,6 +92,14 @@ export function buildPromptText(options) {
     "Analyse the attached step response graph and suggest specific, actionable PID changes " +
     "to address the user's instructions, referencing the actual curve shapes you see (overshoot, " +
     "settling time, oscillation, delay) for each axis.\n\n";
+
+  if (options.hasSlice) {
+    text +=
+      "Also attached is CSV data for a block of the flight the user isolated, with the fields they " +
+      "were looking at. Use it alongside the step response graph - e.g. compare setpoint against gyro " +
+      "for tracking error, overshoot and bounce-back on real stick inputs, and look for oscillation, " +
+      "I-term windup or saturation - and cite times (t_ms) from it where it supports a recommendation.\n\n";
+  }
 
   if (options.expertMode) {
     text +=
@@ -134,6 +144,9 @@ function entryToHistoryContent(entry, includeImage) {
   text += `\n\nConfiguration:\n${entry.config || "(none)"}`;
   if (entry.notes) {
     text += `\n\nUser notes: ${entry.notes}`;
+  }
+  if (entry.slice) {
+    text += `\n\n${sliceToSummaryText(entry.slice)}`;
   }
 
   content.push({ type: "text", text });
@@ -286,7 +299,8 @@ function sendMessages(options, messages, onResult, onError) {
  * the rest of the tuning log's history prepended as context.
  *
  * options: { apiKey, model, effort, skillIds, historyMessages, entry: {image,
- * config}, instructions, expertMode, images, onChunk }
+ * config}, instructions, expertMode, images, slice, onChunk }
+ * slice, if given, is an isolated-flight slice (see flight_slice.js) sent as a CSV text block.
  * images, if given, is an array of extra data-URL images (e.g. pasted screenshots) to attach
  * alongside the entry's own step response image.
  * effort, if given, is passed through as output_config.effort ('low'/'medium'/'high'/'xhigh'/
@@ -320,9 +334,18 @@ export function analyze(options, onResult, onError) {
 
   content.push(...imageBlocksFromDataUrls(options.images));
 
+  if (options.slice) {
+    content.push({ type: "text", text: sliceToPromptText(options.slice) });
+  }
+
   content.push({
     type: "text",
-    text: buildPromptText({ configSummary: options.entry.config, instructions: options.instructions, expertMode: options.expertMode }),
+    text: buildPromptText({
+      configSummary: options.entry.config,
+      instructions: options.instructions,
+      expertMode: options.expertMode,
+      hasSlice: !!options.slice,
+    }),
   });
 
   const initialMessage = { role: "user", content };
@@ -341,7 +364,8 @@ export function analyze(options, onResult, onError) {
  * Continues an existing entry's conversation with a follow-up question.
  *
  * options: { apiKey, model, effort, skillIds, historyMessages, messages, question,
- * images, onChunk }
+ * images, slice, onChunk }
+ * slice, if given, is an isolated-flight slice (see flight_slice.js) sent as a CSV text block.
  * `messages` is this entry's own conversation so far (as returned by a previous analyze()/ask() call).
  * effort, if given, is passed through as output_config.effort on models that support it.
  * skillIds behaves as documented on analyze().
@@ -360,16 +384,22 @@ export function ask(options, onResult, onError) {
 
   const question = (options.question || "").trim();
   const imageBlocks = imageBlocksFromDataUrls(options.images);
-  if (!question && !imageBlocks.length) {
+  const sliceBlocks = options.slice ? [{ type: "text", text: sliceToPromptText(options.slice) }] : [];
+  if (!question && !imageBlocks.length && !sliceBlocks.length) {
     onError("Please enter a question.");
     return;
   }
 
-  // Plain text when there are no attached images, keeping the stored conversation shape
-  // unchanged for the common case - an array of blocks only when there's something to attach.
-  const content = imageBlocks.length
-    ? [...imageBlocks, { type: "text", text: question || "(No question given - see attached image(s).)" }]
-    : question;
+  // Plain text when there's nothing attached, keeping the stored conversation shape unchanged for
+  // the common case - an array of blocks only when there's something to attach.
+  const content =
+    imageBlocks.length || sliceBlocks.length
+      ? [
+          ...imageBlocks,
+          ...sliceBlocks,
+          { type: "text", text: question || "(No question given - see the attached data.)" },
+        ]
+      : question;
 
   const historyMessages = options.historyMessages || [];
   const messages = (options.messages || []).concat([{ role: "user", content }]);

@@ -276,6 +276,22 @@
               </p>
             </div>
             <div class="flex flex-col gap-1">
+              <SettingRow label="Isolated flight rate">
+                <USelect
+                  v-model="local.aiSliceSampleRate"
+                  :items="aiSliceSampleRateOptions"
+                  :ui="{ content: 'z-[300]' }"
+                  size="sm"
+                  class="min-w-44"
+                />
+              </SettingRow>
+              <p class="text-xs text-dimmed">
+                When you attach the isolated block (Ctrl+I / Ctrl+O) to an AI request, the fields
+                shown in the current workspace are averaged down to this rate. Higher rates keep
+                more detail but cost more tokens - 100 Hz is plenty for setpoint tracking.
+              </p>
+            </div>
+            <div class="flex flex-col gap-1">
               <label class="text-sm">Custom Skill IDs (optional)</label>
               <div v-for="(skillId, idx) in local.aiSkillIds" :key="idx" class="flex items-center gap-2">
                 <UInput
@@ -419,6 +435,7 @@ import { useSettingsStore } from "../stores/settings.js";
 import { FLIGHT_LOG_GOVSTATES, FLIGHT_LOG_AIRBORNE_STATES } from "../flightlog_fielddefs.js";
 import AI_MODELS from "../data/ai_models.json";
 import { createGitHubClient } from "../github_client.js";
+import { FLIGHT_SLICE_SAMPLE_RATES, DEFAULT_FLIGHT_SLICE_SAMPLE_RATE } from "../flight_slice.js";
 
 const open = defineModel("open", { type: Boolean, default: false });
 
@@ -534,6 +551,11 @@ const aiEffortOptions = [
   { label: "X-High", value: "xhigh" },
   { label: "Max (most thorough, slowest)", value: "max" },
 ];
+
+const aiSliceSampleRateOptions = FLIGHT_SLICE_SAMPLE_RATES.map((hz) => ({
+  label: hz === DEFAULT_FLIGHT_SLICE_SAMPLE_RATE ? `${hz} Hz (default)` : `${hz} Hz`,
+  value: hz,
+}));
 
 const darkModeOptions = [
   { label: "Auto (system)", value: 2 },

@@ -17,6 +17,7 @@ export const OPS = {
   DELETE_ENTRY: "deleteEntry",
   UPDATE_NOTES: "updateNotes",
   UPDATE_IMAGE: "updateImage",
+  UPDATE_SLICE: "updateSlice",
   SET_AI: "setAi",
 };
 
@@ -226,6 +227,17 @@ function mergeEntry(base, local, remote) {
   }
   if (local.image && !merged.image && localImageAt >= remoteImageAt) {
     merged.image = local.image;
+  }
+
+  // An attached isolated-flight slice (see flight_slice.js) is stamped with sliceUpdatedAt, which is
+  // also set when one is removed - the newest attach/remove wins.
+  if (String(local.sliceUpdatedAt || "") > String(remote.sliceUpdatedAt || "")) {
+    merged.sliceUpdatedAt = local.sliceUpdatedAt;
+    if (local.slice) {
+      merged.slice = clone(local.slice);
+    } else {
+      delete merged.slice;
+    }
   }
 
   const notes = mergeNotes(base && base.notes, local.notes, remote.notes);

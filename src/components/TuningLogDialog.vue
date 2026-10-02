@@ -369,7 +369,7 @@
               <h4 class="text-xs font-semibold flex items-center gap-1">
                 PID tuning advice
                 <HelpIcon
-                  text="Sends the step response image and configuration for this entry, plus whatever you type below. As context, it also sends the images, configs, notes and past AI answers from every other entry already saved in this tuning log."
+                  text="Sends the step response image and configuration for this entry, plus whatever you type below - and, if attached, the isolated block of the flight (Ctrl+I / Ctrl+O) with the current workspace's fields. As context, it also sends the images, configs, notes and past AI answers from every other entry already saved in this tuning log."
                 />
               </h4>
 
@@ -385,6 +385,10 @@
                   "
                 >
                   <template v-if="turn.role === 'user'">
+                    <div v-if="turn.hasSlice" class="flex items-center gap-1 text-dimmed" :class="{ 'mb-1': turn.text || turn.images.length }">
+                      <UIcon name="i-lucide-scissors" class="size-3 text-warning" />
+                      Isolated flight data attached
+                    </div>
                     <div v-if="turn.images.length" class="flex flex-wrap gap-1" :class="{ 'mb-1': turn.text }">
                       <img
                         v-for="(src, j) in turn.images"
@@ -428,6 +432,25 @@
                     text="Load your custom Agent Skills (configured under Settings → AI Analysis Settings) into this request via a code-execution container. Adds a small amount of extra cost/latency. Applies to follow-up questions too."
                   />
                 </label>
+                <!-- Only while the slice is waiting to go out - once AI Analysis is clicked it's shown
+                     as a badge on the sent message instead (and comes back here if the request fails). -->
+                <div
+                  v-if="currentEntry.slice && !currentEntry.slice.sentAt && !isPending"
+                  class="flex items-center gap-2 rounded border border-warning/60 bg-warning/10 px-2 py-1 text-xs"
+                >
+                  <UIcon name="i-lucide-scissors" class="size-3.5 shrink-0 text-warning" />
+                  <span class="flex-1 min-w-0 truncate">
+                    Isolated flight attached: {{ describeSlice(currentEntry.slice) }}
+                  </span>
+                  <UButton
+                    variant="ghost"
+                    color="neutral"
+                    size="2xs"
+                    icon="i-lucide-x"
+                    title="Remove the isolated flight from the next message"
+                    @click="onRemoveSlice"
+                  />
+                </div>
                 <div v-if="pendingImages.length" class="flex flex-wrap gap-2">
                   <div v-for="img in pendingImages" :key="img.id" class="relative group/thumb">
                     <img :src="img.dataUrl" class="h-14 w-14 object-cover rounded border border-default" />
@@ -472,6 +495,28 @@
                     class="w-52"
                   />
                 </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <UTooltip :text="attachSliceTooltip" :delay-duration="0">
+                    <UButton
+                      variant="soft"
+                      color="neutral"
+                      size="xs"
+                      icon="i-lucide-scissors"
+                      :label="currentEntry.slice && !currentEntry.slice.sentAt ? 'Re-attach Isolated Flight' : 'Attach Isolated Flight'"
+                      :disabled="isPending || !isolatedRange"
+                      @click="onAttachSlice"
+                    />
+                  </UTooltip>
+                  <span class="text-xs text-dimmed">at</span>
+                  <USelect
+                    v-model="sliceRateModel"
+                    :items="sliceRateOptions"
+                    :ui="{ content: 'z-[300]' }"
+                    size="xs"
+                    :disabled="isPending"
+                    class="w-28"
+                  />
+                </div>
                 <p v-if="aiError" class="text-xs text-error">{{ aiError }}</p>
               </div>
             </div>
@@ -502,6 +547,10 @@ import { useSettingsStore } from "../stores/settings.js";
 import * as TuningLog from "../tuning_log.js";
 import { craftKey } from "../tuning_log_sync.js";
 import * as TuningAI from "../tuning_ai.js";
+import * as FlightSlice from "../flight_slice.js";
+import { getIsolatedRange } from "../isolation.js";
+import { usePlaybackStore } from "../stores/playback.js";
+import { useWorkspaceStore } from "../stores/workspace.js";
 import AI_MODELS from "../data/ai_models.json";
 
 const open = defineModel("open", { type: Boolean, default: false });
@@ -510,6 +559,8 @@ const tuningLogStore = useTuningLogStore();
 const logStore = useLogStore();
 const graphStore = useGraphStore();
 const settingsStore = useSettingsStore();
+const playbackStore = usePlaybackStore();
+const workspaceStore = useWorkspaceStore();
 
 const modelOptions = AI_MODELS.models.map((m) => ({
   label: m.displayName + (m.description ? ` (${m.description})` : ""),
@@ -982,21 +1033,28 @@ const conversationTurns = computed(() => {
   const entry = currentEntry.value;
   const conversation = entry?.ai?.conversation || [];
 
-  // User turns are normalised to { text, images } for display. The first turn is always the
-  // initial analyze() request - the step response image + a prompt wrapping the config text, both
-  // already shown above - so only what the user typed and pasted is pulled out of it.
+  // User turns are normalised to { text, images, hasSlice } for display. The first turn is always
+  // the initial analyze() request - the step response image + a prompt wrapping the config text,
+  // both already shown above - so only what the user typed and pasted is pulled out of it. An
+  // attached isolated-flight CSV is shown as a badge rather than its raw text.
   const turns = conversation.map((turn, i) => {
     if (turn.role !== "user") return turn;
+    const hasSlice = turnHasSlice(turn);
     if (i === 0) {
-      return { role: "user", text: TuningAI.extractInstructions(turnText(turn)), images: turnImages(turn).slice(1) };
+      return {
+        role: "user",
+        text: TuningAI.extractInstructions(turnText(turn)),
+        images: turnImages(turn).slice(1),
+        hasSlice,
+      };
     }
-    return { role: "user", text: turnText(turn), images: turnImages(turn) };
+    return { role: "user", text: turnText(turn), images: turnImages(turn), hasSlice };
   });
 
   const pendingQuestion = entry && pendingQuestionByEntryId.value[entry.id];
   if (pendingQuestion) turns.push({ role: "user", ...pendingQuestion });
 
-  return turns.filter((turn) => turn.role !== "user" || turn.text.trim() || turn.images.length);
+  return turns.filter((turn) => turn.role !== "user" || turn.text.trim() || turn.images.length || turn.hasSlice);
 });
 
 const streamingText = computed(() => {
@@ -1077,9 +1135,81 @@ function turnText(turn) {
   if (typeof turn.content === "string") return turn.content;
   if (!Array.isArray(turn.content)) return "";
   return turn.content
-    .filter((block) => block.type === "text")
+    .filter((block) => block.type === "text" && !FlightSlice.isFlightSliceText(block.text))
     .map((block) => block.text)
     .join("\n");
+}
+
+function turnHasSlice(turn) {
+  return (
+    Array.isArray(turn.content) &&
+    turn.content.some((block) => block.type === "text" && FlightSlice.isFlightSliceText(block.text))
+  );
+}
+
+// ---- Isolated flight slice ----
+
+const sliceRateOptions = FlightSlice.FLIGHT_SLICE_SAMPLE_RATES.map((hz) => ({ label: `${hz} Hz`, value: hz }));
+
+const sliceRateModel = computed({
+  get: () => settingsStore.userSettings.aiSliceSampleRate || FlightSlice.DEFAULT_FLIGHT_SLICE_SAMPLE_RATE,
+  set: (val) => settingsStore.saveSetting("aiSliceSampleRate", val),
+});
+
+// Depends on the isolate/trim refs read inside getIsolatedRange, so it follows Ctrl+I / Ctrl+O
+const isolatedRange = computed(() => {
+  logStore.activeLogIndex; // dependency - see sysConfig above for why this is needed
+  return logStore.flightLog ? getIsolatedRange(logStore.flightLog) : null;
+});
+
+const attachSliceTooltip = computed(() =>
+  isolatedRange.value
+    ? "Attach the isolated block of the flight (Ctrl+I / Ctrl+O), with the fields shown in the current workspace, to the next message"
+    : "Isolate a block of the flight first: close this dialog and mark it with Ctrl+I and Ctrl+O",
+);
+
+function describeSlice(slice) {
+  const tokens = FlightSlice.estimateSliceTokens(slice);
+  return (
+    `${(slice.durationMs / 1000).toFixed(1)} s · ${slice.fields.length} fields · ${slice.sampleRateHz} Hz` +
+    `${slice.workspace ? ` · ${slice.workspace}` : ""} · ~${tokens >= 1000 ? `${Math.round(tokens / 1000)}k` : tokens} tokens`
+  );
+}
+
+function workspaceGraphs() {
+  const config = graphStore.activeGraphConfig;
+  if (!config) return [];
+  return config.getGraphs().map((graph, gi) => ({
+    label: graph.label,
+    fields: graph.fields.map((field, fi) => ({
+      name: field.name,
+      friendlyName: field.friendlyName,
+      hidden: config.isGraphFieldHidden(gi, fi),
+    })),
+  }));
+}
+
+function onAttachSlice() {
+  const entry = currentEntry.value;
+  if (!entry || !isCurrentFlightLog.value) return;
+
+  aiError.value = "";
+  try {
+    const slice = FlightSlice.buildFlightSlice({
+      flightLog: logStore.flightLog,
+      range: isolatedRange.value,
+      graphs: workspaceGraphs(),
+      sampleRateHz: sliceRateModel.value,
+      workspace: workspaceStore.workspaceGraphConfigs[workspaceStore.activeWorkspace]?.title || "",
+    });
+    tuningLogStore.updateEntrySlice(entry.id, slice);
+  } catch (e) {
+    aiError.value = `Could not attach the isolated flight: ${e.message}`;
+  }
+}
+
+function onRemoveSlice() {
+  if (currentEntry.value) tuningLogStore.updateEntrySlice(currentEntry.value.id, null);
 }
 
 function turnImages(turn) {
@@ -1101,6 +1231,8 @@ function onAskAi() {
   const promptText = aiPromptText.value;
   const images = pendingImages.value.map((img) => img.dataUrl);
   const hadConversation = hasConversation.value;
+  // An attached slice goes out once, with the next message - not again on every follow-up
+  const slice = entry.slice && !entry.slice.sentAt ? entry.slice : null;
   const historyMessages = TuningAI.buildHistoryMessages(
     tuningLogStore.currentLog,
     entry.id,
@@ -1108,7 +1240,10 @@ function onAskAi() {
   );
 
   pendingEntryIds.value = new Set(pendingEntryIds.value).add(entry.id);
-  pendingQuestionByEntryId.value = { ...pendingQuestionByEntryId.value, [entry.id]: { text: promptText.trim(), images } };
+  pendingQuestionByEntryId.value = {
+    ...pendingQuestionByEntryId.value,
+    [entry.id]: { text: promptText.trim(), images, hasSlice: !!slice },
+  };
   aiError.value = "";
 
   // The question now shows as a read-only turn above the response, so the input is cleared
@@ -1143,12 +1278,14 @@ function onAskAi() {
     historyMessages,
     expertMode: expertModeModel.value,
     images,
+    slice,
     onChunk: (textSnapshot) => setStreamingText(entry.id, textSnapshot),
   };
 
   function onResult(text, entryMessages, costUsd) {
     clearPending(entry.id);
     tuningLogStore.setEntryAiResult(entry.id, { model: settings.aiModel, conversation: entryMessages, costUsd });
+    if (slice) tuningLogStore.markEntrySliceSent(entry.id);
   }
 
   function onError(message) {

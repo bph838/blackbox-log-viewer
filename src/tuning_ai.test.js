@@ -55,6 +55,29 @@ describe("buildHistoryMessages", () => {
     expect(messages.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
     expect(messages[1].content).toBe("answer");
   });
+
+  it("sends an entry's isolated flight as a stats summary, not the raw CSV", () => {
+    const log = makeLog(1);
+    log.entries[0].slice = {
+      workspace: "Tracking",
+      range: { offsetMs: 2000 },
+      durationMs: 3000,
+      sampleRateHz: 100,
+      fields: [{ name: "gyroADC[0]", label: "Gyro [roll]", unit: "°/s" }],
+      stats: { "gyroADC[0]": { min: -10, max: 12, mean: 1, rms: 4 } },
+      csv: "t_ms,gyroADC[0]\n0,1",
+    };
+    const text = buildHistoryMessages(log, null, 0)[0].content.find((block) => block.type === "text").text;
+    expect(text).toContain("Gyro [roll]: min -10, max 12, mean 1, rms 4 °/s");
+    expect(text).not.toContain("t_ms,");
+  });
+});
+
+describe("buildPromptText", () => {
+  it("mentions the attached isolated flight data only when there is some", () => {
+    expect(buildPromptText({ configSummary: "", hasSlice: true })).toContain("CSV data for a block of the flight");
+    expect(buildPromptText({ configSummary: "" })).not.toContain("CSV data");
+  });
 });
 
 describe("extractInstructions", () => {

@@ -539,6 +539,36 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
   }
 
   /**
+   * Attaches (or with slice = null, removes) an isolated-flight slice on an entry - see
+   * flight_slice.js. sliceUpdatedAt lets the sync tell the newer attach/remove apart.
+   */
+  function updateEntrySlice(entryId, slice) {
+    const entry = findEntry(entryId);
+    if (!entry) return;
+
+    if (slice) {
+      entry.slice = slice;
+    } else {
+      delete entry.slice;
+    }
+    entry.sliceUpdatedAt = new Date().toISOString();
+    change(OPS.UPDATE_SLICE, entryId);
+  }
+
+  /**
+   * Marks an entry's attached slice as sent to the AI, so it isn't sent again with every
+   * follow-up question.
+   */
+  function markEntrySliceSent(entryId) {
+    const entry = findEntry(entryId);
+    if (!entry?.slice) return;
+
+    entry.slice.sentAt = new Date().toISOString();
+    entry.sliceUpdatedAt = entry.slice.sentAt;
+    change(OPS.UPDATE_SLICE, entryId);
+  }
+
+  /**
    * result: { model, conversation, costUsd } - costUsd is added to any cost already recorded for
    * this entry (a follow-up question adds to the running total, it doesn't replace it).
    */
@@ -666,6 +696,8 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     deleteEntry,
     updateEntryNotes,
     updateEntryImage,
+    updateEntrySlice,
+    markEntrySliceSent,
     setEntryAiResult,
     importFromFile,
     exportToFile,

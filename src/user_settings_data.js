@@ -85,6 +85,9 @@ export const defaultUserSettings = {
   // How many earlier entries' step response graphs go into the AI history (most recent first);
   // older entries are sent as text only. -1 sends them all.
   aiHistoryImageLimit: 10,
+  // Sample rate (Hz) the isolated flight block is averaged down to when attached to an AI request
+  // (see flight_slice.js) - higher keeps more detail but costs more tokens.
+  aiSliceSampleRate: 100,
   // Cloud Storage - a GitHub repo the Tuning Log keeps its logs in (see github_client.js).
   // githubToken is stored locally only, and only ever sent to api.github.com. A blank
   // githubBranch means the repo's default branch.
