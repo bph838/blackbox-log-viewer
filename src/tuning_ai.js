@@ -201,6 +201,9 @@ export function buildHistoryMessages(log, excludingEntryId, maxImages) {
  * options may include an `onChunk(textSnapshot)` callback - if given, it's called every time more
  * response text arrives, with the full text accumulated so far (not just the latest delta), so
  * callers can render progressively instead of waiting for the whole response.
+ *
+ * Returns a cancel() function that aborts the request - after which neither onResult nor onError
+ * is called (the caller already knows it cancelled).
  */
 function sendMessages(options, messages, onResult, onError) {
   let client;
@@ -208,7 +211,7 @@ function sendMessages(options, messages, onResult, onError) {
     client = createClient(options.apiKey);
   } catch (e) {
     onError(`Could not load the Anthropic SDK: ${e.message}`);
-    return;
+    return NO_CANCEL;
   }
 
   const model = options.model || DEFAULT_MODEL;
@@ -261,16 +264,19 @@ function sendMessages(options, messages, onResult, onError) {
     stream = client.beta.messages.stream(requestParams);
   } catch (e) {
     onError(e && e.message ? e.message : String(e));
-    return;
+    return NO_CANCEL;
   }
+
+  let cancelled = false;
 
   if (typeof options.onChunk === "function") {
     stream.on("text", (textDelta, textSnapshot) => {
-      options.onChunk(textSnapshot);
+      if (!cancelled) options.onChunk(textSnapshot);
     });
   }
 
   stream.on("finalMessage", (response) => {
+    if (cancelled) return;
     let text = "";
     for (const block of response.content) {
       if (block.type === "text") {
@@ -290,9 +296,20 @@ function sendMessages(options, messages, onResult, onError) {
   });
 
   stream.on("error", (error) => {
-    onError(error && error.message ? error.message : String(error));
+    if (!cancelled) onError(error && error.message ? error.message : String(error));
   });
+
+  // stream.abort() emits "abort" rather than "error" - nothing to report, the caller cancelled
+  stream.on("abort", () => {});
+
+  return function cancel() {
+    if (cancelled) return;
+    cancelled = true;
+    stream.abort();
+  };
 }
+
+const NO_CANCEL = () => {};
 
 /**
  * Starts a new tuning-advice conversation about a single entry (its image + config summary), with
@@ -315,11 +332,13 @@ function sendMessages(options, messages, onResult, onError) {
  * (not including historyMessages/repeats of it) - keep it and pass it back into ask() for
  * follow-ups, and persist it as entry.ai.conversation. costUsd is this call's estimated price -
  * add it to any running total you're keeping for the entry.
+ *
+ * Returns a cancel() function that aborts the request (see sendMessages).
  */
 export function analyze(options, onResult, onError) {
   if (!options.apiKey) {
     onError("No Anthropic API key configured. Add one under Settings → AI Analysis Settings.");
-    return;
+    return NO_CANCEL;
   }
 
   const historyMessages = options.historyMessages || [];
@@ -350,7 +369,7 @@ export function analyze(options, onResult, onError) {
 
   const initialMessage = { role: "user", content };
 
-  sendMessages(
+  return sendMessages(
     options,
     historyMessages.concat([initialMessage]),
     (text, updatedMessages, costUsd) => {
@@ -375,11 +394,13 @@ export function analyze(options, onResult, onError) {
  * response text accumulated so far.
  * onResult(resultText, entryMessages, costUsd) - pass the updated entryMessages back in for the
  * next follow-up; costUsd is this call's estimated price.
+ *
+ * Returns a cancel() function that aborts the request (see sendMessages).
  */
 export function ask(options, onResult, onError) {
   if (!options.apiKey) {
     onError("No Anthropic API key configured. Add one under Settings → AI Analysis Settings.");
-    return;
+    return NO_CANCEL;
   }
 
   const question = (options.question || "").trim();
@@ -387,7 +408,7 @@ export function ask(options, onResult, onError) {
   const sliceBlocks = options.slice ? [{ type: "text", text: sliceToPromptText(options.slice) }] : [];
   if (!question && !imageBlocks.length && !sliceBlocks.length) {
     onError("Please enter a question.");
-    return;
+    return NO_CANCEL;
   }
 
   // Plain text when there's nothing attached, keeping the stored conversation shape unchanged for
@@ -404,7 +425,7 @@ export function ask(options, onResult, onError) {
   const historyMessages = options.historyMessages || [];
   const messages = (options.messages || []).concat([{ role: "user", content }]);
 
-  sendMessages(
+  return sendMessages(
     options,
     historyMessages.concat(messages),
     (text, updatedMessages, costUsd) => {

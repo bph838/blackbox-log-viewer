@@ -485,6 +485,16 @@
                     :disabled="isPending"
                     @click="onAskAi"
                   />
+                  <UButton
+                    v-if="isPending"
+                    variant="soft"
+                    color="error"
+                    size="xs"
+                    icon="i-lucide-square"
+                    label="Cancel"
+                    title="Stop this AI request - nothing is saved, and your question comes back to edit or resend"
+                    @click="onCancelAi"
+                  />
                   <span class="text-xs text-dimmed">Will use:</span>
                   <USelect
                     v-model="modelModel"
@@ -1288,32 +1298,61 @@ function onAskAi() {
     if (slice) tuningLogStore.markEntrySliceSent(entry.id);
   }
 
+  // Put the question back so it can be retried or edited - unless the user has already started
+  // typing something else into the (shared, not per-entry) input.
+  function restoreQuestion() {
+    if (!aiPromptText.value && !pendingImages.value.length) {
+      aiPromptText.value = promptText;
+      pendingImages.value = images.map((dataUrl, i) => ({ id: `${Date.now()}-${i}`, dataUrl }));
+    }
+  }
+
   function onError(message) {
     clearPending(entry.id);
+    delete cancelByEntryId[entry.id];
 
     // Only worth surfacing the error inline if we're still looking at the entry it belongs to -
     // if the user has since switched entries, the pending indicator just quietly clears.
     if (currentEntry.value?.id === entry.id) {
       aiError.value = message;
-
-      // Put the failed question back so it can be retried - unless the user has already started
-      // typing something else into the (shared, not per-entry) input.
-      if (!aiPromptText.value && !pendingImages.value.length) {
-        aiPromptText.value = promptText;
-        pendingImages.value = images.map((dataUrl, i) => ({ id: `${Date.now()}-${i}`, dataUrl }));
-      }
+      restoreQuestion();
     }
   }
 
+  let cancelRequest;
   if (hadConversation) {
     callOptions.messages = entry.ai.conversation;
     callOptions.question = promptText;
-    TuningAI.ask(callOptions, onResult, onError);
+    cancelRequest = TuningAI.ask(callOptions, onResultAndForget, onError);
   } else {
     callOptions.entry = entry;
     callOptions.instructions = promptText;
-    TuningAI.analyze(callOptions, onResult, onError);
+    cancelRequest = TuningAI.analyze(callOptions, onResultAndForget, onError);
   }
+
+  function onResultAndForget(...args) {
+    delete cancelByEntryId[entry.id];
+    onResult(...args);
+  }
+
+  // Cancelling drops whatever has streamed in so far and nothing is saved to the conversation -
+  // the question (and any attached isolated flight, which stays unsent) comes back to resend.
+  if (pendingEntryIds.value.has(entry.id)) {
+    cancelByEntryId[entry.id] = () => {
+      cancelRequest();
+      delete cancelByEntryId[entry.id];
+      clearPending(entry.id);
+      if (currentEntry.value?.id === entry.id) restoreQuestion();
+    };
+  }
+}
+
+// Cancel functions for in-flight requests, keyed by entry id (see onAskAi)
+const cancelByEntryId = {};
+
+function onCancelAi() {
+  const entry = currentEntry.value;
+  if (entry) cancelByEntryId[entry.id]?.();
 }
 
 // ---- Formatting ----

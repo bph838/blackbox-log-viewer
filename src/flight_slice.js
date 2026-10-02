@@ -12,8 +12,8 @@
 import { FlightLogParser } from "./flightlog_parser.js";
 import { FlightLogFieldPresenter } from "./flightlog_fields_presenter.js";
 
-export const FLIGHT_SLICE_SAMPLE_RATES = [25, 50, 100, 200, 250, 500, 1000];
-export const DEFAULT_FLIGHT_SLICE_SAMPLE_RATE = 100;
+export const FLIGHT_SLICE_SAMPLE_RATES = [ 250, 500, 1000];
+export const DEFAULT_FLIGHT_SLICE_SAMPLE_RATE = 500;
 // Refuse to build a slice bigger than this many rows - roughly 200k+ tokens with a typical field
 // count, already well past what's sensible to send in one request.
 export const FLIGHT_SLICE_MAX_ROWS = 20000;

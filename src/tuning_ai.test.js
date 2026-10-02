@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { buildHistoryMessages, buildPromptText, extractInstructions } from "./tuning_ai.js";
 
 function makeLog(count) {
@@ -88,5 +88,63 @@ describe("extractInstructions", () => {
 
   it("returns an empty string when no instructions were given", () => {
     expect(extractInstructions(buildPromptText({ configSummary: "p: 1", instructions: "", expertMode: true }))).toBe("");
+  });
+});
+
+describe("cancelling a request", () => {
+  // A stand-in for the SDK's message stream: records handlers, and abort() emits "abort" like the
+  // real one does
+  function makeStream() {
+    const handlers = {};
+    return {
+      handlers,
+      aborted: false,
+      on(event, handler) {
+        handlers[event] = handler;
+        return this;
+      },
+      abort() {
+        this.aborted = true;
+        handlers.abort?.();
+      },
+    };
+  }
+
+  it("aborts the stream and suppresses any later result or error", async () => {
+    const stream = makeStream();
+    vi.resetModules();
+    vi.doMock("@anthropic-ai/sdk", () => ({
+      default: class {
+        constructor() {
+          this.beta = { messages: { stream: () => stream } };
+        }
+      },
+    }));
+    const { ask } = await import("./tuning_ai.js");
+
+    const onResult = vi.fn();
+    const onError = vi.fn();
+    const onChunk = vi.fn();
+    const cancel = ask({ apiKey: "k", question: "why?", onChunk }, onResult, onError);
+
+    cancel();
+    expect(stream.aborted).toBe(true);
+
+    stream.handlers.text("x", "partial");
+    stream.handlers.finalMessage({ content: [{ type: "text", text: "late" }], usage: {} });
+    stream.handlers.error(new Error("boom"));
+    expect(onChunk).not.toHaveBeenCalled();
+    expect(onResult).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+
+    vi.doUnmock("@anthropic-ai/sdk");
+  });
+
+  it("returns a harmless cancel function when the request never starts", async () => {
+    const { ask } = await import("./tuning_ai.js");
+    const onError = vi.fn();
+    const cancel = ask({ apiKey: "" }, vi.fn(), onError);
+    expect(onError).toHaveBeenCalled();
+    expect(() => cancel()).not.toThrow();
   });
 });
