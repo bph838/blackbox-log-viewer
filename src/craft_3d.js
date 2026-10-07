@@ -279,8 +279,10 @@ export function Craft3D(flightLog, canvas, propColors) {
   // Rotate the craft mesh and props to bring the board's direction arrow to the right direction
   craft.rotation.z = yawOffset;
 
-  // axis: "roll" or "pitch" to show only that axis's movement, or null for both (yaw isn't shown).
-  this.render = function (frame, frameFieldIndexes, axis = null) {
+  // isolated: { axis: "roll" | "pitch", degrees } to show just that axis's movement (see
+  // craft_axis_motion.js) on an otherwise level craft, or null to show its attitude (yaw isn't
+  // shown either way).
+  this.render = function (frame, frameFieldIndexes, isolated = null) {
     for (let i = 0; i < numMotors; i++) {
       if (props[i]) propShells[i].remove(props[i]);
 
@@ -310,9 +312,14 @@ export function Craft3D(flightLog, canvas, propColors) {
     }
 
     // Display the craft's attitude
-    craftParent.rotation.x =
-      axis && axis !== "pitch" ? 0 : -frame[frameFieldIndexes["heading[1]"]] /*- Math.PI / 2*/; // pitch
-    craftParent.rotation.y = axis && axis !== "roll" ? 0 : frame[frameFieldIndexes["heading[0]"]]; // roll
+    if (isolated) {
+      const radians = (isolated.degrees * Math.PI) / 180;
+      craftParent.rotation.x = isolated.axis === "pitch" ? -radians : 0;
+      craftParent.rotation.y = isolated.axis === "roll" ? radians : 0;
+    } else {
+      craftParent.rotation.x = -frame[frameFieldIndexes["heading[1]"]] /*- Math.PI / 2*/; // pitch
+      craftParent.rotation.y = frame[frameFieldIndexes["heading[0]"]]; // roll
+    }
 
     //craftParent.rotation.z = -frame[frameFieldIndexes['heading[2]']]; // yaw
 

@@ -13,6 +13,7 @@ import {
 import { Craft2D } from "./craft_2d";
 import { Craft3D } from "./craft_3d";
 import { Craft3DHeli, heliModelHasAttitude } from "./craft_3d_heli";
+import { createAxisMotion, hasAxisMotion } from "./craft_axis_motion";
 import { FlightLogAnalyser } from "./graph_spectrum";
 import { FlightLogStepResponse } from "./graph_stepresponse";
 import { GraphConfig } from "./graph_config";
@@ -84,6 +85,7 @@ export function FlightLogGrapher(
     sticks = null,
     craft3D = null,
     craft2D = null,
+    axisMotion = null /* gyro-integrated movement per axis, for the craft's isolated-axis view */,
     analyser = null /* define a new spectrum analyser */,
     stepResponse = null /* define a new step response graph */,
     watermarkLogo /* Watermark feature */;
@@ -1102,11 +1104,13 @@ export function FlightLogGrapher(
         }
 
         if (options.craftType === "3D" && craft3D) {
-          craft3D.render(
-            centerFrame,
-            flightLog.getMainFieldIndexes(),
-            graphStore.craftEnlarged ? graphStore.craftAxis : null,
-          );
+          const axis = graphStore.craftEnlarged ? graphStore.craftAxis : null;
+          let isolated = null;
+          if (axis) {
+            axisMotion = axisMotion || createAxisMotion(flightLog);
+            isolated = { axis, degrees: axisMotion.at(windowCenterTime, axis, graphStore.craftAxisWindow) };
+          }
+          craft3D.render(centerFrame, flightLog.getMainFieldIndexes(), isolated);
         } else if (craft2D) {
           craft2D.render(centerFrame, flightLog.getMainFieldIndexes());
         }
@@ -1243,9 +1247,11 @@ export function FlightLogGrapher(
       craft2D = new Craft2D(flightLog, craftCanvas, idents.motorColors);
     }
 
-    // Axes the craft model can show on their own (see graphStore.craftAxis) - the 2D craft has no
-    // attitude, and the multirotor 3D craft doesn't show yaw.
-    if (craft3D instanceof Craft3DHeli) {
+    // Axes the craft model can show on their own (see graphStore.craftAxis) - from the gyro, so
+    // none without it; the 2D craft has no attitude, and the multirotor 3D craft doesn't show yaw.
+    if (!hasAxisMotion(flightLog)) {
+      graphStore.craftAxes = [];
+    } else if (craft3D instanceof Craft3DHeli) {
       graphStore.craftAxes = ["roll", "pitch", "yaw"];
     } else if (craft3D) {
       graphStore.craftAxes = ["roll", "pitch"];

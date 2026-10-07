@@ -28,6 +28,21 @@
         :title="option.title"
         @click="graphStore.setCraftAxis(option.value)"
       />
+      <!-- How slow a change still counts as movement: changes slower than this are taken out -->
+      <template v-if="graphStore.craftAxis">
+        <span class="craft-axis-divider" />
+        <UButton
+          v-for="seconds in WINDOW_OPTIONS"
+          :key="seconds"
+          size="xs"
+          :variant="graphStore.craftAxisWindow === seconds ? 'solid' : 'ghost'"
+          :color="graphStore.craftAxisWindow === seconds ? 'primary' : 'neutral'"
+          :class="{ 'craft-axis-unselected': graphStore.craftAxisWindow !== seconds }"
+          :label="`${seconds}s`"
+          :title="`Show movement relative to the average over ${seconds} s - slower changes, like flips or holding inverted, are left out`"
+          @click="graphStore.setCraftAxisWindow(seconds)"
+        />
+      </template>
     </div>
   </template>
 </template>
@@ -47,6 +62,7 @@ const INSET = 4;
 const BUTTON_SIZE = 24;
 
 const AXIS_LABELS = { roll: "Roll", pitch: "Pitch", yaw: "Yaw" };
+const WINDOW_OPTIONS = [0.5, 1, 2];
 
 const visible = computed(() => logStore.hasLog && graphStore.hasCraft && graphStore.craftLayout.size > BUTTON_SIZE * 2);
 
@@ -55,7 +71,7 @@ const axisOptions = computed(() => [
   ...graphStore.craftAxes.map((axis) => ({
     label: AXIS_LABELS[axis],
     value: axis,
-    title: `Show only ${axis} movement`,
+    title: `Show only ${axis} movement (from the gyro), on an otherwise level craft`,
   })),
 ]);
 
@@ -93,6 +109,12 @@ const axisStyle = computed(() => {
   color: #fff;
   background-color: rgb(0 0 0 / 0.55);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.45);
+}
+
+.craft-axis-divider {
+  width: 1px;
+  margin: 2px 4px;
+  background-color: rgb(255 255 255 / 0.45);
 }
 
 .craft-axis-unselected:hover {

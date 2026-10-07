@@ -197,16 +197,27 @@ export function Craft3DHeli(flightLog, canvas, facing) {
   };
 
   // Matches the Craft3D (multirotor) call signature so grapher.js doesn't need to special-case
-  // this renderer at the call site. axis: "roll", "pitch" or "yaw" to show only that axis's
-  // movement (the others held level/facing forward), or null for all of them.
-  this.render = function (frame, frameFieldIndexes, axis = null) {
-    const angle = (fieldIndex, name) =>
-      axis && axis !== name ? 0 : (-frame[fieldIndex] / 1800) * Math.PI;
+  // this renderer at the call site. isolated: { axis, degrees } to show just one axis's movement
+  // (see craft_axis_motion.js) on an otherwise level, forward-facing craft, or null to show the
+  // logged attitude.
+  this.render = function (frame, frameFieldIndexes, isolated = null) {
+    let x, y, z;
+    if (isolated) {
+      // Signs match the logged attitude's: it follows +gyro on roll and pitch, -gyro on yaw.
+      const radians = (isolated.degrees * Math.PI) / 180;
+      x = isolated.axis === "pitch" ? -radians : 0;
+      y = isolated.axis === "yaw" ? radians : 0;
+      z = isolated.axis === "roll" ? -radians : 0;
+    } else {
+      x = (-frame[attitudeFrameIndex.x] / 1800) * Math.PI;
+      y = (-frame[attitudeFrameIndex.y] / 1800) * Math.PI;
+      z = (-frame[attitudeFrameIndex.z] / 1800) * Math.PI;
+    }
 
     rotateTo(
-      angle(attitudeFrameIndex.x, "pitch"),
-      angle(attitudeFrameIndex.y, "yaw"),
-      angle(attitudeFrameIndex.z, "roll"),
+      x,
+      y,
+      z,
       typeof collectiveFieldIndex === "number" ? frame[collectiveFieldIndex] : undefined,
       typeof cyclicRollFieldIndex === "number" ? frame[cyclicRollFieldIndex] : undefined,
       typeof cyclicPitchFieldIndex === "number" ? frame[cyclicPitchFieldIndex] : undefined,
