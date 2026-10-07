@@ -734,6 +734,22 @@ function dismissCraftMismatch() {
   dismissedMismatch.value = mismatchKey();
 }
 
+// A selected entry belongs to the tuning log it was picked in. Opening another log - especially
+// one being downloaded, which shows before the picker's "opened" event arrives - would otherwise
+// leave the selection pointing at an entry that log doesn't have, and the dialog would fail to
+// render. So on every switch, select the current flight log's entry in the new log, if it has
+// one. This can't wait for onLogOpened: the mismatch banner's picker is unmounted as soon as the
+// log switches, so its "opened" event never arrives. flush: "sync" so it happens before any
+// re-render, and before onCreateConfirm / import set their own selection (a "pre" watcher would
+// run after them and undo it).
+watch(
+  currentLogId,
+  () => {
+    selectedEntryId.value = currentFlightLogEntry.value?.id ?? null;
+  },
+  { flush: "sync" },
+);
+
 function onLogOpened() {
   switcherOpen.value = false;
   creatingNew.value = false;
@@ -947,7 +963,9 @@ const hasImage = computed(() => !!currentEntry.value?.image);
 const hasConfig = computed(() => !!currentEntry.value?.config);
 
 const mainTitle = computed(() => {
-  if (selectedEntryId.value === null) return "Current flight log";
+  // No entry also covers a selection left over from the previous tuning log for a moment while
+  // another one opens (see the currentLogId watch)
+  if (selectedEntryId.value === null || !currentEntry.value) return "Current flight log";
   if (isCurrentFlightLog.value) return `Current flight log — ${formatTimestamp(currentEntry.value.timestamp)}`;
   return formatTimestamp(currentEntry.value.timestamp);
 });
