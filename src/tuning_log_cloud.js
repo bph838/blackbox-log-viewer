@@ -7,6 +7,9 @@
 //   crafts/<craft-key>/<logId>/images/<id>.png  one step response graph per entry, rewritten only
 //                                               when re-captured (entry.imageUpdatedAt changes)
 //
+// sync.cloudUpdated is the log's index.json "updated" stamp when this computer was last in step with
+// the cloud copy, so a different stamp in the index means another computer has changed it since.
+//
 // A log's folder is fixed when it's first uploaded (sync.cloudDir), so it stays put even if the
 // log is later re-linked to a different craft name - index.json always says where each log is.
 //
@@ -124,6 +127,26 @@ export function indexRowsForCraft(index, craftName) {
     .sort((a, b) => String(b.updated || "").localeCompare(String(a.updated || "")));
 }
 
+function indexRowUpdated(index, logId) {
+  for (const group of Object.values(index.crafts)) {
+    const row = group.logs && group.logs[logId];
+    if (row) return row.updated || null;
+  }
+  return null;
+}
+
+/**
+ * Whether the cloud copy of a log (its row from indexRowsForCraft) has changed since this computer
+ * was last in step with it. `summary` is this computer's tuning_log_db.js listLogs() summary.
+ */
+export function isNewerInCloud(row, summary) {
+  if (!row || !row.updated || !summary.lastSyncedAt) return false;
+  // Synced before cloudUpdated was recorded - fall back to comparing times (across computers'
+  // clocks, so only roughly).
+  if (!summary.cloudUpdated) return row.updated > summary.lastSyncedAt;
+  return row.updated !== summary.cloudUpdated;
+}
+
 async function inBatches(items, limit, action) {
   for (let i = 0; i < items.length; i += limit) {
     await Promise.all(items.slice(i, i + limit).map(action));
@@ -161,6 +184,7 @@ export async function downloadLog(client, row) {
 
   const sync = markSynced({ pending: [] }, log, file.sha);
   sync.cloudDir = row.path;
+  sync.cloudUpdated = row.updated || null;
   return { log, sync };
 }
 
@@ -197,6 +221,7 @@ export async function syncLog(client, local, sync, { now = () => new Date().toIS
     if (!needsUpload) {
       const newSync = markSynced(clone(sync), merged, remoteFile.sha);
       newSync.cloudDir = dir;
+      newSync.cloudUpdated = indexRowUpdated(await fetchIndex(client), local.logId);
       return { log: merged, sync: newSync, uploaded: false, downloaded };
     }
 
@@ -218,7 +243,8 @@ export async function syncLog(client, local, sync, { now = () => new Date().toIS
     files.push({ path: logPath(dir), text: JSON.stringify(mergedText, null, 2) });
 
     const index = await fetchIndex(client);
-    setIndexRow(index, merged, dir, now());
+    const updated = now();
+    setIndexRow(index, merged, dir, updated);
     files.push({ path: INDEX_PATH, text: JSON.stringify(index, null, 2) });
 
     let result;
@@ -235,6 +261,7 @@ export async function syncLog(client, local, sync, { now = () => new Date().toIS
 
     const newSync = markSynced(clone(sync), merged, result.shas[logPath(dir)]);
     newSync.cloudDir = dir;
+    newSync.cloudUpdated = updated;
     return { log: merged, sync: newSync, uploaded: true, downloaded };
   }
 }

@@ -54,6 +54,25 @@
       <div class="flex flex-col gap-3 text-sm">
         <p v-if="importError" class="text-xs text-error">{{ importError }}</p>
 
+        <!-- Opening the dialog synced in changes made to the open log on another computer -->
+        <div
+          v-if="tuningLogStore.hasLog && tuningLogStore.cloudUpdate?.logId === currentLogId"
+          class="flex items-center gap-2 rounded-md border border-default bg-elevated px-3 py-2 text-xs"
+        >
+          <UIcon name="i-lucide-cloud-download" class="size-4 text-info shrink-0" />
+          <span class="flex-1">
+            “{{ tuningLogStore.currentLog.name }}” was updated from GitHub with changes made on another computer.
+          </span>
+          <UButton
+            size="2xs"
+            variant="ghost"
+            color="neutral"
+            icon="i-lucide-x"
+            title="Dismiss"
+            @click="tuningLogStore.dismissCloudUpdate()"
+          />
+        </div>
+
         <!-- The loaded flight log is for a different heli than the open tuning log -->
         <div v-if="showCraftMismatch" class="flex flex-col gap-2 rounded-md border border-default bg-elevated p-3">
           <p class="flex items-start gap-2">
@@ -843,7 +862,11 @@ watch(open, (isOpen) => {
   aiError.value = "";
   confirmDeleteId.value = null;
 
-  if (!isOpen) return;
+  if (!isOpen) {
+    // Seen it - only mention updates that arrive after the dialog is next opened.
+    tuningLogStore.dismissCloudUpdate();
+    return;
+  }
 
   // Pick up anything changed on another computer (and upload anything waiting).
   tuningLogStore.syncNow();

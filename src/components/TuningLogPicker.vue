@@ -47,6 +47,13 @@
                 <span v-if="!log.inCloud && tuningLogStore.cloudEnabled">· This computer only</span>
                 <span v-else-if="!log.isLocal">· In the cloud</span>
                 <span v-if="log.pendingCount && tuningLogStore.cloudEnabled" class="text-warning">· {{ log.pendingCount }} unsynced</span>
+                <span
+                  v-if="log.newerInCloud && log.logId !== currentLogId"
+                  class="text-info flex items-center gap-1"
+                  title="This log was changed on another computer since it was last synced here"
+                >
+                  · <UIcon name="i-lucide-cloud-download" class="size-3.5" /> Newer copy on GitHub
+                </span>
               </div>
             </div>
             <UBadge v-if="log.logId === currentLogId" color="neutral" variant="subtle" size="sm">Open</UBadge>
@@ -55,7 +62,7 @@
               size="xs"
               color="primary"
               variant="soft"
-              :label="log.isLocal ? 'Open' : 'Download & open'"
+              :label="openLabel(log)"
               :loading="openingId === log.logId"
               :disabled="!!openingId"
               @click="onOpen(log)"
@@ -123,7 +130,8 @@ let loadId = 0;
 
 async function load() {
   const id = ++loadId;
-  loading.value = true;
+  // Only show the spinner the first time - a refresh after a sync keeps the list in place.
+  loading.value = !logs.value.length;
   openError.value = "";
   try {
     const result = await tuningLogStore.listLogsForCraft(props.craftName);
@@ -138,6 +146,13 @@ async function load() {
 watch(() => props.craftName, load, { immediate: true });
 // A log deleted here or in another list (e.g. the dialog's switcher) - show the list without it.
 watch(() => tuningLogStore.deletedLogsVersion, load);
+// A sync finished - a log may have been brought up to date (or changed in the cloud).
+watch(() => tuningLogStore.lastSyncedAt, load);
+
+function openLabel(log) {
+  if (!log.isLocal) return "Download & open";
+  return log.newerInCloud ? "Update & open" : "Open";
+}
 
 async function onOpen(log) {
   openingId.value = log.logId;

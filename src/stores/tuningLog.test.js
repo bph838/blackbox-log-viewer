@@ -279,6 +279,43 @@ describe("useTuningLogStore cloud sync", () => {
     expect(pc2.currentLog.name).toBe("Tail");
   });
 
+  it("flags a log changed on another computer, and brings the changes in when it's opened", async () => {
+    const pc1 = await configuredStore();
+    const cyclic = pc1.createLog("Cyclic", "TRON 7.0");
+    await settle();
+    pc1.createLog("Tail", "TRON 7.0");
+    await settle();
+    await pc1.syncNow();
+    const pc1Db = db;
+
+    // Another computer downloads Cyclic and adds an entry to it.
+    setTuningLogDb(createTuningLogDb(createMemoryBackend()));
+    localStorage.clear();
+    const pc2 = await configuredStore();
+    const row = (await pc2.listCloudLogs("TRON 7.0")).find((r) => r.name === "Cyclic");
+    await pc2.openCloudLog(row);
+    let before = (await pc2.listLogsForCraft("TRON 7.0")).logs.find((l) => l.name === "Cyclic");
+    expect(before.newerInCloud).toBe(false);
+    pc2.addEntry({ image: IMAGE, timestamp: "2026-09-02T00:00:00.000Z" });
+    await settle();
+    await pc2.syncNow();
+    expect((await pc2.listLogsForCraft("TRON 7.0")).logs.find((l) => l.name === "Cyclic").newerInCloud).toBe(false);
+
+    // Back on the first computer, with Tail open.
+    setTuningLogDb(pc1Db);
+    const { logs } = await pc1.listLogsForCraft("TRON 7.0");
+    const stale = logs.find((l) => l.name === "Cyclic");
+    expect(stale).toMatchObject({ isLocal: true, newerInCloud: true });
+    expect(logs.find((l) => l.name === "Tail").newerInCloud).toBe(false);
+
+    expect(await pc1.openLog(stale)).toBe(true);
+    expect(pc1.currentLog.logId).toBe(cyclic.logId);
+    expect(pc1.entries).toHaveLength(1);
+    expect(pc1.cloudUpdate).toMatchObject({ logId: cyclic.logId });
+    before = (await pc1.listLogsForCraft("TRON 7.0")).logs.find((l) => l.name === "Cyclic");
+    expect(before.newerInCloud).toBe(false);
+  });
+
   it("still lists this computer's logs when offline", async () => {
     const store = await configuredStore();
     store.createLog("Cyclic", "TRON 7.0");

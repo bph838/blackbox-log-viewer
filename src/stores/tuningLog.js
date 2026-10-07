@@ -80,6 +80,9 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
   const syncing = ref(false);
   const syncError = ref(null); // { message, offline } from the last failed sync, cleared on success
   const lastSyncedAt = ref(null);
+  // { logId, at } when a sync last brought changes made on another computer into the current log,
+  // so the dialog can say so. Cleared by dismissCloudUpdate() or switching logs.
+  const cloudUpdate = ref(null);
   // Unsynced changes across every log on this computer, not just the current one.
   const totalPendingCount = computed(() => {
     const others = localLogs.value
@@ -199,6 +202,9 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     if (result.uploaded || result.downloaded || result.sync !== start.sync) {
       await applySyncResult(start, result);
     }
+    if (result.downloaded && currentLog.value && currentLog.value.logId === logId) {
+      cloudUpdate.value = { logId, at: new Date().toISOString() };
+    }
   }
 
   let syncPromise = null;
@@ -273,9 +279,10 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
 
   /**
    * Every log for a heli (by craft name) - on this computer and in the cloud - newest first:
-   * { logs: [{ logId, name, craftName, entryCount, updated, isLocal, inCloud, pendingCount, row }],
-   *   cloudError } where cloudError says why cloud logs couldn't be listed (e.g. offline), in which
-   * case only this computer's logs are included.
+   * { logs: [{ logId, name, craftName, entryCount, updated, isLocal, inCloud, newerInCloud,
+   *   pendingCount, row }], cloudError } where cloudError says why cloud logs couldn't be listed
+   * (e.g. offline), in which case only this computer's logs are included. newerInCloud: this
+   * computer has the log, but it's been changed on another computer since it was last synced here.
    */
   async function listLogsForCraft(craftName) {
     await refreshLocalLogs();
@@ -291,8 +298,10 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
         updated: local.updatedAt,
         isLocal: true,
         inCloud: !!local.lastSyncedAt,
+        newerInCloud: false,
         pendingCount: local.pendingCount,
         row: null,
+        summary: local,
       });
     }
 
@@ -303,6 +312,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
           const existing = byId.get(row.logId);
           if (existing) {
             existing.inCloud = true;
+            existing.newerInCloud = Cloud.isNewerInCloud(row, existing.summary);
             existing.row = row;
             if (row.updated > (existing.updated || "")) existing.updated = row.updated;
           } else {
@@ -314,6 +324,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
               updated: row.updated,
               isLocal: false,
               inCloud: true,
+              newerInCloud: false,
               pendingCount: 0,
               row,
             });
@@ -324,6 +335,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
       }
     }
 
+    for (const item of byId.values()) delete item.summary;
     const logs = [...byId.values()].sort((a, b) => String(b.updated || "").localeCompare(String(a.updated || "")));
     return { logs, cloudError };
   }
@@ -331,8 +343,12 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
   /**
    * Makes a log from listLogsForCraft the current log. Resolves false if it couldn't be opened.
    */
-  function openLog(item) {
-    return item.isLocal ? switchLog(item.logId) : openCloudLog(item.row);
+  async function openLog(item) {
+    if (!item.isLocal) return openCloudLog(item.row);
+    if (!(await switchLog(item.logId))) return false;
+    // Changed on another computer - bring those changes in before showing it.
+    if (item.newerInCloud) await syncNow();
+    return true;
   }
 
   /**
@@ -359,6 +375,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
   }
 
   function setCurrent(log, sync) {
+    if (!log || !currentLog.value || currentLog.value.logId !== log.logId) cloudUpdate.value = null;
     currentLog.value = log;
     currentSync.value = sync;
     prefs.set("tuningLogCurrentId", log ? log.logId : null);
@@ -629,6 +646,10 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     prefs.set("tuningLogAiUseSkills", value);
   }
 
+  function dismissCloudUpdate() {
+    cloudUpdate.value = null;
+  }
+
   function dismissApiKeyBanner() {
     apiKeyBannerDismissed.value = true;
     prefs.set("tuningLogApiKeyBannerDismissed", true);
@@ -681,6 +702,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     syncStatus,
     syncError,
     lastSyncedAt,
+    cloudUpdate,
     ready,
     syncNow,
     listCloudLogs,
@@ -703,6 +725,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     exportToFile,
     setAiExpertMode,
     setAiUseSkills,
+    dismissCloudUpdate,
     dismissApiKeyBanner,
   };
 });

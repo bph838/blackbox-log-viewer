@@ -102,6 +102,7 @@ function summarize(record) {
     entryCount: (log.entries || []).length,
     pendingCount: pendingCount(record.sync),
     lastSyncedAt: (record.sync && record.sync.lastSyncedAt) || null,
+    cloudUpdated: (record.sync && record.sync.cloudUpdated) || null,
     updatedAt: record.updatedAt,
   };
 }
