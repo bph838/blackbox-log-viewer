@@ -746,11 +746,14 @@ export function FlightLogGrapher(
           );
         }
 
+        // Frequency if the marker-to-cursor gap is one full cycle - more decimals at low
+        // frequencies, where whole Hz would round e.g. 0.69 Hz up to "1Hz"
         const timeDelta = windowCenterTime - markerEvent.time;
+        const frequency = Math.abs(1000000 / timeDelta);
         const markerFrequency =
           timeDelta === 0
             ? ""
-            : `${(1000000 / timeDelta).toFixed(0)}Hz`;
+            : ` · ${frequency.toFixed(frequency < 10 ? 2 : frequency < 100 ? 1 : 0)}Hz`;
         drawEvent(
           {
             event: FlightLogEvent.CUSTOM_BLANK, // Blank doesnt show a vertical line
@@ -758,7 +761,7 @@ export function FlightLogGrapher(
             label: `${formatTime(
               (windowCenterTime - markerEvent.time) / 1000,
               true,
-            )}ms ${markerFrequency}`,
+            )}${markerFrequency}`,
             align: markerEvent.time < windowCenterTime ? "right" : "left",
           },
           sequenceNum++,
