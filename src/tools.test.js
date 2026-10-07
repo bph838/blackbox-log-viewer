@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { estimateBlackBoxRate } from "./tools.js";
+import { estimateBlackBoxRate, formatLogDateTime } from "./tools.js";
 
 function fakeFlightLog({ actualLoggedTimeMicros, rowCount }) {
   return {
@@ -72,5 +72,24 @@ describe("estimateBlackBoxRate", () => {
     const { rate, configuredRate } = estimateBlackBoxRate(flightLog, sysConfig);
 
     expect(rate).toBe(configuredRate);
+  });
+});
+
+describe("formatLogDateTime", () => {
+  const now = new Date("2026-10-07T09:00:00Z");
+
+  it("says Today or Yesterday for recent logs", () => {
+    expect(formatLogDateTime("2026-10-07T12:35:00Z", now)).toMatch(/^Today, 12:35$/);
+    expect(formatLogDateTime("2026-10-06T12:35:00Z", now)).toMatch(/^Yesterday, 12:35$/);
+  });
+
+  it("gives the full date for older logs", () => {
+    const text = formatLogDateTime("2026-10-05T12:35:00Z", now);
+    expect(text).toContain("2026");
+    expect(text).not.toMatch(/Today|Yesterday/);
+  });
+
+  it("returns an empty string for an invalid date", () => {
+    expect(formatLogDateTime("nope", now)).toBe("");
   });
 });

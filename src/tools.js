@@ -212,11 +212,29 @@ export function formatTime(msec, displayMsec) {
  * string for display next to a flight log entry. Reads UTC components rather than the viewer's
  * local timezone - see TuningLogDialog.vue's formatTimestamp for why: the digits should match the
  * "Log start datetime" header verbatim rather than shifting with the viewer's timezone.
+ *
+ * Logs from today or yesterday read "Today, 12:35" / "Yesterday, 12:35" instead of the full date.
+ * Like formatTimestamp, the day is compared on UTC components. now is overridable for tests.
  */
-export function formatLogDateTime(iso) {
+export function formatLogDateTime(iso, now = new Date()) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
     return "";
+  }
+
+  const sameDay = (a, b) =>
+    a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth() && a.getUTCDate() === b.getUTCDate();
+  const yesterday = new Date(now);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const dayName = sameDay(date, now) ? "Today" : sameDay(date, yesterday) ? "Yesterday" : null;
+  if (dayName) {
+    const time = new Intl.DateTimeFormat(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "UTC",
+    }).format(date);
+    return `${dayName}, ${time}`;
   }
 
   return new Intl.DateTimeFormat(undefined, {
