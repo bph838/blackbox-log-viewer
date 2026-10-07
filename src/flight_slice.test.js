@@ -9,7 +9,8 @@ import {
   parseSliceSeries,
   decimateMinMax,
   parseSlicePromptText,
-  mergeSliceColors,
+  mergeSliceDisplay,
+  smoothSeries,
   FLIGHT_SLICE_MARKER,
 } from "./flight_slice.js";
 
@@ -296,7 +297,61 @@ describe("parseSlicePromptText", () => {
   });
 
   it("takes colours from a matching slice", () => {
-    const merged = mergeSliceColors(parseSlicePromptText(sliceToPromptText(slice)), slice);
+    const merged = mergeSliceDisplay(parseSlicePromptText(sliceToPromptText(slice)), slice);
     expect(merged.fields.map((f) => f.color)).toEqual(["#fb8072", undefined]);
+  });
+});
+
+describe("smoothSeries", () => {
+  it("averages over the radius either side, skipping nulls", () => {
+    expect(smoothSeries([0, 1, 2, 3], [0, 3, null, 9], 1)).toEqual([1.5, 1.5, null, 9]);
+  });
+
+  it("leaves values alone with no radius", () => {
+    const values = [1, 2];
+    expect(smoothSeries([0, 1], values, 0)).toBe(values);
+  });
+});
+
+describe("display settings", () => {
+  const graphs = [
+    {
+      label: "Roll",
+      height: 2,
+      fields: [
+        {
+          name: "setpoint[0]",
+          friendlyName: "Setpoint [roll]",
+          hidden: false,
+          color: "#fb8072",
+          curve: { power: 0.25, MinMax: { min: -500, max: 500 }, steps: 12 },
+          smoothing: 3000,
+        },
+      ],
+    },
+    { label: "Unused", height: 1, fields: [] },
+  ];
+  const slice = buildFlightSlice({
+    flightLog: makeFlightLog(rampFrames()),
+    range: { start: 0, end: 1e6 },
+    graphs,
+    sampleRateHz: 10,
+    decode,
+  });
+
+  it("keeps each field's curve and smoothing, and the used graphs' heights", () => {
+    expect(slice.fields[0]).toMatchObject({
+      color: "#fb8072",
+      curve: { min: -500, max: 500, power: 0.25, steps: 12 },
+      smoothing: 3000,
+    });
+    expect(slice.graphs).toEqual([{ label: "Roll", height: 2 }]);
+    expect(parseSliceSeries(slice).series[0]).toMatchObject({ curve: { min: -500 }, smoothing: 3000 });
+  });
+
+  it("carries them onto a slice read back from its prompt text", () => {
+    const merged = mergeSliceDisplay(parseSlicePromptText(sliceToPromptText(slice)), slice);
+    expect(merged.fields[0]).toMatchObject({ curve: { power: 0.25 }, smoothing: 3000 });
+    expect(merged.graphs).toEqual([{ label: "Roll", height: 2 }]);
   });
 });

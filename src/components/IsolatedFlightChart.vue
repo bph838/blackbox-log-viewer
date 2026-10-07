@@ -1,7 +1,8 @@
 <template>
   <!-- Redraws a saved isolated-flight slice (see flight_slice.js) from its CSV, so the block the
        user isolated can be seen on any Tuning Log entry, with or without the flight log open.
-       Drawn on black with the workspace's line colours to match the main graph. -->
+       Drawn like the main graph - black, the workspace's colours, each field on its own curve
+       (range + expo) and smoothing, and the graphs' relative heights - when the slice saved them. -->
   <div class="flex flex-col gap-1">
     <div v-if="!strips.length" class="text-xs text-dimmed">No numeric fields to draw in this slice.</div>
 
@@ -12,17 +13,17 @@
       @mousemove="onMouseMove"
       @mouseleave="hoverIndex = null"
     >
-      <div v-for="strip in strips" :key="strip.graph" class="relative" :style="{ height: `${STRIP_HEIGHT}px` }">
+      <div v-for="strip in strips" :key="strip.graph" class="relative" :style="{ height: `${strip.height}px` }">
         <svg
-          :viewBox="`0 0 ${VIEW_WIDTH} ${STRIP_HEIGHT}`"
+          :viewBox="`0 0 ${VIEW_WIDTH} ${strip.height}`"
           preserveAspectRatio="none"
           class="absolute inset-0 w-full h-full"
         >
           <line
             x1="0"
             :x2="VIEW_WIDTH"
-            :y1="STRIP_HEIGHT / 2"
-            :y2="STRIP_HEIGHT / 2"
+            :y1="strip.height / 2"
+            :y2="strip.height / 2"
             stroke="#555"
             stroke-dasharray="4 4"
             vector-effect="non-scaling-stroke"
@@ -38,9 +39,11 @@
             vector-effect="non-scaling-stroke"
           />
         </svg>
-        <div class="absolute top-0.5 left-1 text-[10px] leading-tight text-neutral-400 pointer-events-none">
-          <span class="text-neutral-200">{{ strip.graph || "Fields" }}</span>
-          <span v-for="scale in strip.scales" :key="scale.unit"> · ±{{ formatValue(scale.max) }}{{ scale.unit ? ` ${scale.unit}` : "" }}</span>
+        <div class="absolute top-0.5 right-1.5 text-[11px] font-semibold leading-tight text-neutral-200 pointer-events-none">
+          {{ strip.graph }}
+          <span v-for="scale in strip.scales" :key="scale.unit" class="font-normal text-neutral-400">
+            · ±{{ formatValue(scale.max) }}{{ scale.unit ? ` ${scale.unit}` : "" }}</span
+          >
         </div>
       </div>
 
@@ -84,17 +87,20 @@
 
 <script setup>
 import { ref, computed } from "vue";
-import { parseSliceSeries, decimateMinMax } from "../flight_slice.js";
+import { parseSliceSeries, decimateMinMax, smoothSeries } from "../flight_slice.js";
 import { GraphConfig } from "../graph_config.js";
+import { ExpoCurve } from "../expo.js";
 
 const props = defineProps({
   slice: { type: Object, required: true },
 });
 
 const VIEW_WIDTH = 1000;
-const STRIP_HEIGHT = 110;
+// Average strip height - graphs with a saved height share this out in proportion, as the main
+// graph does
+const STRIP_HEIGHT = 120;
 // Each strip keeps a little headroom so peaks don't touch the strip edges
-const STRIP_PADDING = 8;
+const STRIP_PADDING = 3;
 // min/max buckets per line - comfortably more than the chart's pixel width
 const DECIMATE_BUCKETS = 800;
 
@@ -123,8 +129,10 @@ const durationMs = computed(() => {
   return Math.max(props.slice.durationMs || 0, last) || 1;
 });
 
-// One strip per workspace graph. Like the main graph each strip is centred on zero, and fields
-// that share a unit share a scale (so setpoint and gyro line up), with one scale per unit.
+// One strip per workspace graph, centred on its zero line. A field with a saved curve is scaled
+// exactly as the main graph scales it (its range maps to the strip's full height, through the
+// expo). Older slices have no curves, so their fields that share a unit share a scale instead
+// (shown in the strip's label).
 const strips = computed(() => {
   const groups = new Map();
   for (const series of allSeries.value) {
@@ -132,14 +140,21 @@ const strips = computed(() => {
     groups.get(series.graph).push(series);
   }
 
-  const half = STRIP_HEIGHT / 2 - STRIP_PADDING;
+  const savedHeights = new Map((props.slice.graphs || []).map((graph) => [graph.label, graph.height]));
+  const heightSum = [...groups.keys()].reduce((sum, graph) => sum + (savedHeights.get(graph) || 1), 0);
+  const totalHeight = STRIP_HEIGHT * groups.size;
   const xScale = VIEW_WIDTH / durationMs.value;
+  const bucketMs = 1000 / (props.slice.sampleRateHz || 1000);
 
   return [...groups.entries()].map(([graph, seriesList]) => {
+    const height = Math.max(40, Math.round((totalHeight * (savedHeights.get(graph) || 1)) / heightSum));
+    const mid = height / 2;
+    const half = mid - STRIP_PADDING;
     const visible = seriesList.filter((series) => !hidden.value.has(series.name));
 
     const maxByUnit = new Map();
     for (const series of visible) {
+      if (series.curve) continue;
       let max = maxByUnit.get(series.unit) || 0;
       for (const value of series.values) {
         if (value !== null && Math.abs(value) > max) max = Math.abs(value);
@@ -148,16 +163,27 @@ const strips = computed(() => {
     }
 
     const lines = visible.map((series) => {
-      const max = maxByUnit.get(series.unit) || 1;
-      const points = decimateMinMax(times.value, series.values, DECIMATE_BUCKETS);
+      let scale;
+      if (series.curve) {
+        const { min, max, power, steps } = series.curve;
+        const curve = new ExpoCurve(-(max + min) / 2, power, (max - min) / 2, 1, steps);
+        scale = (v) => Math.max(-1, Math.min(1, curve.lookup(v)));
+      } else {
+        const max = maxByUnit.get(series.unit) || 1;
+        scale = (v) => v / max;
+      }
+      // smoothing is a radius in us; it's only worth applying when wider than a sample
+      const radiusMs = series.smoothing / 1000;
+      const values = radiusMs > bucketMs / 2 ? smoothSeries(times.value, series.values, radiusMs) : series.values;
+      const points = decimateMinMax(times.value, values, DECIMATE_BUCKETS);
       const path = points
-        .map((p, i) => `${i ? "L" : "M"}${(p.t * xScale).toFixed(1)},${(STRIP_HEIGHT / 2 - (p.v / max) * half).toFixed(1)}`)
+        .map((p, i) => `${i ? "L" : "M"}${(p.t * xScale).toFixed(1)},${(mid - scale(p.v) * half).toFixed(1)}`)
         .join("");
       return { name: series.name, color: series.color, path };
     });
 
     const scales = [...maxByUnit.entries()].map(([unit, max]) => ({ unit, max }));
-    return { graph, lines, scales };
+    return { graph, height, lines, scales };
   });
 });
 

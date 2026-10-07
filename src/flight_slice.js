@@ -47,10 +47,26 @@ function csvCell(value) {
 }
 
 /**
+ * How the main graph draws a field - its colour, curve (display-unit range + expo) and smoothing
+ * radius in us - kept on the slice so the Tuning Log can redraw it the same way. Only what's set.
+ */
+function displaySettings(field) {
+  const settings = {};
+  if (field.color) settings.color = field.color;
+  const minMax = field.curve?.MinMax;
+  if (minMax && Number.isFinite(minMax.min) && Number.isFinite(minMax.max) && minMax.max > minMax.min) {
+    settings.curve = { min: minMax.min, max: minMax.max, power: field.curve.power ?? 1, steps: field.curve.steps };
+  }
+  if (field.smoothing > 0) settings.smoothing = field.smoothing;
+  return settings;
+}
+
+/**
  * The fields to include: every visible (not eye-toggled-off) field of the workspace's graphs that
  * exists in this log, de-duplicated by field name.
  *
- * graphs: [{ label, fields: [{ name, friendlyName, hidden }] }] - e.g. graphStore.legendGraphs.
+ * graphs: [{ label, height, fields: [{ name, friendlyName, hidden, color, curve, smoothing }] }] - e.g.
+ * the active graph config's getGraphs(). Everything after hidden is optional.
  */
 export function selectSliceFields(graphs, flightLog) {
   const seen = new Set();
@@ -67,12 +83,20 @@ export function selectSliceFields(graphs, flightLog) {
         name: field.name,
         label: field.friendlyName || field.name,
         index,
-        ...(field.color ? { color: field.color } : {}),
+        ...displaySettings(field),
       });
     }
   }
 
   return fields;
+}
+
+// The graphs the slice's fields come from, in order, with their relative heights
+function sliceGraphs(graphs, fields) {
+  const used = new Set(fields.map((field) => field.graph));
+  return (graphs || [])
+    .filter((graph) => used.has(graph.label || ""))
+    .map((graph) => ({ label: graph.label || "", height: graph.height > 0 ? graph.height : 1 }));
 }
 
 /**
@@ -186,8 +210,18 @@ export function buildFlightSlice(options) {
     durationMs: round((range.end - range.start) / 1000),
     sampleRateHz,
     rowCount: rows.length,
-    // color is the workspace's line colour, kept so the Tuning Log can redraw the slice to match
-    fields: fields.map(({ graph, name, label, unit, color }) => ({ graph, name, label, unit, ...(color ? { color } : {}) })),
+    // color/curve/smoothing (and graphs' heights) are how the main graph draws them, kept so the
+    // Tuning Log can redraw the slice to match
+    fields: fields.map(({ graph, name, label, unit, color, curve, smoothing }) => ({
+      graph,
+      name,
+      label,
+      unit,
+      ...(color ? { color } : {}),
+      ...(curve ? { curve } : {}),
+      ...(smoothing ? { smoothing } : {}),
+    })),
+    graphs: sliceGraphs(options.graphs, fields),
     stats,
     csv,
   };
@@ -252,7 +286,7 @@ const FIELD_LINE_RE = /^- (.+?): (.*?)(?: \((.*) graph\))?(?:, ([^,]*))?$/;
  * conversation can show each slice where it was sent, even after the entry's slice has been
  * replaced. Returns a slice-like object ({ durationMs, range: { offsetMs }, sampleRateHz,
  * workspace, fields, csv }) for parseSliceSeries, or null if the text isn't a full slice.
- * Field colours aren't in the text - see mergeSliceColors.
+ * How the fields were drawn (colours etc.) isn't in the text - see mergeSliceDisplay.
  */
 export function parseSlicePromptText(text) {
   text = String(text ?? "");
@@ -278,16 +312,21 @@ export function parseSlicePromptText(text) {
 }
 
 /**
- * Copies line colours onto a parsed slice's fields from another slice (e.g. the entry's saved one)
- * wherever the field names match.
+ * Copies how fields are drawn (colour, curve, smoothing, graph heights) onto a parsed slice from
+ * another slice (e.g. the entry's saved one) wherever the field and graph names match.
  */
-export function mergeSliceColors(slice, source) {
-  const colors = new Map((source?.fields || []).filter((field) => field.color).map((field) => [field.name, field.color]));
-  if (!colors.size) return slice;
-  return {
-    ...slice,
-    fields: slice.fields.map((field) => (colors.has(field.name) ? { ...field, color: colors.get(field.name) } : field)),
-  };
+export function mergeSliceDisplay(slice, source) {
+  if (!source?.fields?.length) return slice;
+  const byName = new Map(source.fields.map((field) => [field.name, field]));
+  const fields = slice.fields.map((field) => {
+    const from = byName.get(field.name);
+    if (!from) return field;
+    const { color, curve, smoothing } = from;
+    return { ...field, ...(color ? { color } : {}), ...(curve ? { curve } : {}), ...(smoothing ? { smoothing } : {}) };
+  });
+  const used = new Set(fields.map((field) => field.graph));
+  const graphs = (source.graphs || []).filter((graph) => used.has(graph.label));
+  return { ...slice, fields, ...(graphs.length ? { graphs } : {}) };
 }
 
 // Splits one CSV line as written by csvCell - only text cells are ever quoted
@@ -353,10 +392,43 @@ export function parseSliceSeries(slice) {
       graph: field?.graph || "",
       unit: field?.unit || "",
       color: field?.color || null,
+      curve: field?.curve || null,
+      smoothing: field?.smoothing || 0,
       values,
     }));
 
   return { times, series };
+}
+
+/**
+ * Centred moving average over +/- radiusMs, like the main graph's field smoothing (whose radius
+ * is in us). Nulls are skipped and stay null. times must be ascending.
+ */
+export function smoothSeries(times, values, radiusMs) {
+  if (!(radiusMs > 0)) return values;
+  const out = new Array(values.length).fill(null);
+  let lo = 0;
+  let hi = 0;
+  let sum = 0;
+  let count = 0;
+  for (let i = 0; i < times.length; i++) {
+    while (hi < times.length && times[hi] <= times[i] + radiusMs) {
+      if (values[hi] !== null) {
+        sum += values[hi];
+        count++;
+      }
+      hi++;
+    }
+    while (times[lo] < times[i] - radiusMs) {
+      if (values[lo] !== null) {
+        sum -= values[lo];
+        count--;
+      }
+      lo++;
+    }
+    if (values[i] !== null && count) out[i] = sum / count;
+  }
+  return out;
 }
 
 /**

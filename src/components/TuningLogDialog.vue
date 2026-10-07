@@ -1251,10 +1251,13 @@ function workspaceGraphs() {
   if (!config) return [];
   return config.getGraphs().map((graph, gi) => ({
     label: graph.label,
+    height: graph.height,
     fields: graph.fields.map((field, fi) => ({
       name: field.name,
       friendlyName: field.friendlyName,
       color: field.color,
+      curve: field.curve,
+      smoothing: field.smoothing,
       hidden: config.isGraphFieldHidden(gi, fi),
     })),
   }));
@@ -1300,13 +1303,13 @@ function toggleSliceCollapsed(turnIndex) {
 }
 
 // The slice sent in a conversation turn, read back from the text it was sent as. When it's the
-// entry's own saved slice, that's used as-is for its exact range and line colours.
+// entry's own saved slice, that's used as-is for its exact range and display settings.
 function turnSlice(turn, entry) {
   const block = turn.content.find((b) => b.type === "text" && FlightSlice.isFlightSliceText(b.text));
   const parsed = FlightSlice.parseSlicePromptText(block?.text);
   if (!parsed) return null;
   if (entry?.slice && entry.slice.csv === parsed.csv) return entry.slice;
-  return FlightSlice.mergeSliceColors(parsed, entry?.slice);
+  return FlightSlice.mergeSliceDisplay(parsed, entry?.slice);
 }
 
 function describeSliceRange(slice) {
