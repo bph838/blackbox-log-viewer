@@ -695,7 +695,7 @@ function onImportFileChange(e) {
 
 const selectedEntryId = ref(null); // null = the pinned "current flight log" slot
 const configVisible = ref(false);
-const imageExpanded = ref(false);
+const imageExpanded = ref(true);
 const confirmDeleteId = ref(null);
 
 // logStore.flightLog is the same object reference for every sub-log of a multi-log file - only
