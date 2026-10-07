@@ -62,7 +62,13 @@ export function selectSliceFields(graphs, flightLog) {
       const index = flightLog.getMainFieldIndexByName(field.name);
       if (index === undefined) continue;
       seen.add(field.name);
-      fields.push({ graph: graph.label || "", name: field.name, label: field.friendlyName || field.name, index });
+      fields.push({
+        graph: graph.label || "",
+        name: field.name,
+        label: field.friendlyName || field.name,
+        index,
+        ...(field.color ? { color: field.color } : {}),
+      });
     }
   }
 
@@ -180,7 +186,8 @@ export function buildFlightSlice(options) {
     durationMs: round((range.end - range.start) / 1000),
     sampleRateHz,
     rowCount: rows.length,
-    fields: fields.map(({ graph, name, label, unit }) => ({ graph, name, label, unit })),
+    // color is the workspace's line colour, kept so the Tuning Log can redraw the slice to match
+    fields: fields.map(({ graph, name, label, unit, color }) => ({ graph, name, label, unit, ...(color ? { color } : {}) })),
     stats,
     csv,
   };
@@ -232,6 +239,104 @@ export function sliceToSummaryText(slice) {
 
 export function isFlightSliceText(text) {
   return String(text ?? "").startsWith(FLIGHT_SLICE_MARKER);
+}
+
+// Splits one CSV line as written by csvCell - only text cells are ever quoted
+function parseCsvLine(line) {
+  const cells = [];
+  let i = 0;
+  while (i <= line.length) {
+    if (line[i] === '"') {
+      let text = "";
+      i++;
+      while (i < line.length) {
+        if (line[i] === '"' && line[i + 1] === '"') {
+          text += '"';
+          i += 2;
+        } else if (line[i] === '"') {
+          i++;
+          break;
+        } else {
+          text += line[i++];
+        }
+      }
+      cells.push(text);
+      i++; // the comma
+    } else {
+      const end = line.indexOf(",", i);
+      cells.push(line.slice(i, end === -1 ? line.length : end));
+      i = end === -1 ? line.length + 1 : end + 1;
+    }
+  }
+  return cells;
+}
+
+/**
+ * The numeric series of a slice, read back from its CSV, for drawing it in the Tuning Log.
+ * Returns { times, series: [{ name, label, graph, unit, color, values }] } - times in ms from the
+ * block start, values aligned to times with null for gaps. Non-numeric fields are left out.
+ */
+export function parseSliceSeries(slice) {
+  const lines = String(slice?.csv ?? "").split("\n").filter(Boolean);
+  if (lines.length < 2) return { times: [], series: [] };
+
+  const header = parseCsvLine(lines[0]);
+  const fieldsByName = new Map((slice.fields || []).map((field) => [field.name, field]));
+  const columns = header.slice(1).map((name) => ({ name, field: fieldsByName.get(name), values: [] }));
+  const times = [];
+
+  for (const line of lines.slice(1)) {
+    const cells = parseCsvLine(line);
+    times.push(Number(cells[0]));
+    columns.forEach((column, c) => {
+      const cell = cells[c + 1];
+      const value = cell === "" || cell === undefined ? null : Number(cell);
+      column.values.push(Number.isFinite(value) ? value : null);
+    });
+  }
+
+  const series = columns
+    // A text column (flags, enums) parses to all nulls
+    .filter((column) => column.values.some((value) => value !== null))
+    .map(({ name, field, values }) => ({
+      name,
+      label: field?.label || name,
+      graph: field?.graph || "",
+      unit: field?.unit || "",
+      color: field?.color || null,
+      values,
+    }));
+
+  return { times, series };
+}
+
+/**
+ * Reduces a series to at most ~2 x buckets points, keeping each bucket's min and max (in time
+ * order) so spikes and peaks survive. Returns [{ t, v }]; null values are dropped.
+ */
+export function decimateMinMax(times, values, buckets) {
+  const points = [];
+  for (let i = 0; i < times.length; i++) {
+    if (values[i] !== null) points.push({ t: times[i], v: values[i] });
+  }
+  if (points.length <= buckets * 2 || buckets < 1) return points;
+
+  const size = points.length / buckets;
+  const out = [];
+  for (let b = 0; b < buckets; b++) {
+    const from = Math.floor(b * size);
+    const to = Math.min(points.length, Math.floor((b + 1) * size));
+    let min = points[from];
+    let max = points[from];
+    for (let i = from + 1; i < to; i++) {
+      if (points[i].v < min.v) min = points[i];
+      if (points[i].v > max.v) max = points[i];
+    }
+    if (min === max) out.push(min);
+    else if (min.t <= max.t) out.push(min, max);
+    else out.push(max, min);
+  }
+  return out;
 }
 
 /**

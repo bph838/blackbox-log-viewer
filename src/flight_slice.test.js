@@ -6,6 +6,8 @@ import {
   sliceToPromptText,
   sliceToSummaryText,
   isFlightSliceText,
+  parseSliceSeries,
+  decimateMinMax,
   FLIGHT_SLICE_MARKER,
 } from "./flight_slice.js";
 
@@ -188,5 +190,66 @@ describe("slice prompt text", () => {
 
   it("doesn't mistake ordinary text for a slice", () => {
     expect(isFlightSliceText("What about the tail?")).toBe(false);
+  });
+});
+
+describe("parseSliceSeries", () => {
+  it("reads numeric columns back with their field details", () => {
+    const slice = buildFlightSlice({
+      flightLog: makeFlightLog(rampFrames()),
+      range: { start: 0, end: 1e6 },
+      graphs: [
+        {
+          label: "Roll",
+          fields: [
+            { name: "setpoint[0]", friendlyName: "Setpoint [roll]", hidden: false, color: "#fb8072" },
+            { name: "flightModeFlags", friendlyName: "Flight mode", hidden: false },
+          ],
+        },
+      ],
+      sampleRateHz: 10,
+      decode,
+    });
+    const { times, series } = parseSliceSeries(slice);
+    expect(times).toEqual([0, 100, 200, 300, 400, 500, 600, 700, 800, 900]);
+    expect(series).toHaveLength(1);
+    expect(series[0]).toMatchObject({ name: "setpoint[0]", label: "Setpoint [roll]", graph: "Roll", unit: "°/s", color: "#fb8072" });
+    expect(series[0].values.every((v) => v === 100)).toBe(true);
+  });
+
+  it("keeps gaps as null and handles quoted text cells", () => {
+    const slice = {
+      fields: [{ name: "a", label: "A", graph: "G", unit: "%" }],
+      csv: 't_ms,a,mode\n0,1.5,"X, Y"\n10,,ACRO\n20,-2,',
+    };
+    const { times, series } = parseSliceSeries(slice);
+    expect(times).toEqual([0, 10, 20]);
+    expect(series.map((s) => s.name)).toEqual(["a"]);
+    expect(series[0].values).toEqual([1.5, null, -2]);
+    expect(series[0].color).toBeNull();
+  });
+
+  it("returns nothing for an empty slice", () => {
+    expect(parseSliceSeries({ csv: "" })).toEqual({ times: [], series: [] });
+  });
+});
+
+describe("decimateMinMax", () => {
+  it("returns the points as-is when there are few enough", () => {
+    expect(decimateMinMax([0, 1, 2], [5, null, 7], 10)).toEqual([
+      { t: 0, v: 5 },
+      { t: 2, v: 7 },
+    ]);
+  });
+
+  it("keeps each bucket's min and max in time order", () => {
+    const times = [0, 1, 2, 3, 4, 5, 6, 7];
+    const values = [0, 9, 1, 2, 3, -5, 4, 4];
+    expect(decimateMinMax(times, values, 2)).toEqual([
+      { t: 0, v: 0 },
+      { t: 1, v: 9 },
+      { t: 5, v: -5 },
+      { t: 6, v: 4 },
+    ]);
   });
 });

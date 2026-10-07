@@ -370,6 +370,39 @@
               </ul>
             </div>
 
+            <div v-if="currentEntry && currentEntry.slice" class="flex flex-col gap-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <UIcon name="i-lucide-scissors" class="size-3.5 shrink-0 text-warning" />
+                <span class="text-xs font-medium">Isolated flight</span>
+                <span class="text-xs text-dimmed flex-1 min-w-0 truncate">
+                  {{ describeSliceRange(currentEntry.slice) }} ·
+                  {{ currentEntry.slice.sentAt ? "sent to AI" : "not sent yet" }}
+                </span>
+                <UButton
+                  variant="soft"
+                  color="neutral"
+                  size="xs"
+                  :label="sliceChartVisible ? 'Hide graph' : 'Show graph'"
+                  @click="sliceChartVisible = !sliceChartVisible"
+                />
+                <UTooltip
+                  v-if="isCurrentFlightLog && logStore.flightLog"
+                  text="Close this dialog and mark this block as the isolated block (Ctrl+I / Ctrl+O) in the main graph, zoomed to fit"
+                  :delay-duration="0"
+                >
+                  <UButton
+                    variant="soft"
+                    color="neutral"
+                    size="xs"
+                    icon="i-lucide-locate"
+                    label="Show in log"
+                    @click="onShowSliceInLog"
+                  />
+                </UTooltip>
+              </div>
+              <IsolatedFlightChart v-if="sliceChartVisible" :slice="currentEntry.slice" />
+            </div>
+
             <div v-if="showNotes" class="flex flex-col gap-1">
               <label class="text-xs font-medium text-dimmed">Notes</label>
               <UTextarea
@@ -569,6 +602,7 @@ import DOMPurify from "dompurify";
 import HelpIcon from "./HelpIcon.vue";
 import TuningLogPicker from "./TuningLogPicker.vue";
 import TuningLogSyncStatus from "./TuningLogSyncStatus.vue";
+import IsolatedFlightChart from "./IsolatedFlightChart.vue";
 import { useTuningLogStore } from "../stores/tuningLog.js";
 import { useLogStore } from "../stores/log.js";
 import { useGraphStore } from "../stores/graph.js";
@@ -577,7 +611,9 @@ import * as TuningLog from "../tuning_log.js";
 import { craftKey } from "../tuning_log_sync.js";
 import * as TuningAI from "../tuning_ai.js";
 import * as FlightSlice from "../flight_slice.js";
-import { getIsolatedRange } from "../isolation.js";
+import { getIsolatedRange, setIsolateInTime, setIsolateOutTime } from "../isolation.js";
+import { setCurrentBlackboxTime, setGraphZoom } from "../playback_controls.js";
+import { GRAPH_MIN_ZOOM, GRAPH_MAX_ZOOM } from "../stores/graph.js";
 import { usePlaybackStore } from "../stores/playback.js";
 import { useWorkspaceStore } from "../stores/workspace.js";
 import AI_MODELS from "../data/ai_models.json";
@@ -1217,6 +1253,7 @@ function workspaceGraphs() {
     fields: graph.fields.map((field, fi) => ({
       name: field.name,
       friendlyName: field.friendlyName,
+      color: field.color,
       hidden: config.isGraphFieldHidden(gi, fi),
     })),
   }));
@@ -1243,6 +1280,31 @@ function onAttachSlice() {
 
 function onRemoveSlice() {
   if (currentEntry.value) tuningLogStore.updateEntrySlice(currentEntry.value.id, null);
+}
+
+const sliceChartVisible = ref(true);
+
+function describeSliceRange(slice) {
+  const start = slice.range.offsetMs / 1000;
+  return `${start.toFixed(1)}–${(start + slice.durationMs / 1000).toFixed(1)} s into the log · ${describeSlice(slice)}`;
+}
+
+// Puts the saved block back as the isolated block on the main graph and zooms to fit it, with a
+// little margin either side. The trim range (I / O) still constrains it, as it does for Ctrl+I / O.
+function onShowSliceInLog() {
+  const slice = currentEntry.value?.slice;
+  if (!slice || !isCurrentFlightLog.value || !logStore.flightLog) return;
+
+  const { start, end } = slice.range;
+  setIsolateInTime(start);
+  setIsolateOutTime(end);
+
+  // The graph window is 1 s wide at 100% zoom
+  const zoom = Math.round(100 / (((end - start) / 1e6) * 1.2));
+  setGraphZoom(Math.min(GRAPH_MAX_ZOOM, Math.max(GRAPH_MIN_ZOOM, zoom)));
+  setCurrentBlackboxTime((start + end) / 2);
+
+  open.value = false;
 }
 
 function turnImages(turn) {
