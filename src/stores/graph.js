@@ -59,6 +59,10 @@ export const useGraphStore = defineStore("graph", () => {
   const stepResponseShiftActive = ref(false);
 
   const isFullscreen = ref(false);
+  // Craft overlay: where grapher.js last drew it (for the size toggle button), and whether it's
+  // shown at double its configured size.
+  const craftLayout = shallowRef({ left: 0, top: 0, size: 0 });
+  const craftEnlarged = ref(false);
   const markerTime = ref(0);
   const seekBarMode = ref("avgThrottle");
 
@@ -129,6 +133,17 @@ export const useGraphStore = defineStore("graph", () => {
     buildLegendGraphs();
     invalidateGraph.value?.();
   }
+
+  function toggleCraftEnlarged() {
+    craftEnlarged.value = !craftEnlarged.value;
+    prefs.set("craftEnlarged", craftEnlarged.value);
+    updateCanvasSize.value?.();
+  }
+
+  prefs.get("craftEnlarged", (value) => {
+    craftEnlarged.value = !!value;
+    if (craftEnlarged.value) updateCanvasSize.value?.();
+  });
 
   function legendVisibilityChange(hidden) {
     prefs.set("log-legend-hidden", hidden);
@@ -247,6 +262,9 @@ export const useGraphStore = defineStore("graph", () => {
     seekBarMode,
     invalidateGraph,
     updateCanvasSize,
+    craftLayout,
+    craftEnlarged,
+    toggleCraftEnlarged,
     zoomGraphConfig,
     expandGraphConfig,
     reorderGraphs,

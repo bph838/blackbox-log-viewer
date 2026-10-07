@@ -930,7 +930,13 @@ export function FlightLogGrapher(
       0,
     )}px`;
 
-    const craftSize = canvas.height * (Number.parseInt(options.craft.size, 10) / 100);
+    // Double size when enlarged with the craft's size toggle, but never bigger than the graph.
+    const craftScale = graphStore.craftEnlarged ? 2 : 1;
+    const craftSize = Math.min(
+      canvas.height * (Number.parseInt(options.craft.size, 10) / 100) * craftScale,
+      canvas.width,
+      canvas.height,
+    );
 
     if (craft2D) {
       craft2D.resize(craftSize, craftSize);
@@ -947,6 +953,11 @@ export function FlightLogGrapher(
       (canvas.height * Number.parseInt(options.craft.top, 10)) / 100 - craftSize / 2,
       0,
     )}px`;
+    graphStore.craftLayout = {
+      left: Number.parseFloat(craftCanvas.style.left) || 0,
+      top: Number.parseFloat(craftCanvas.style.top) || 0,
+      size: craftSize,
+    };
 
     if (analyser != null) analyser.resize();
 

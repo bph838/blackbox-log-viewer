@@ -83,6 +83,9 @@
         />
       </Teleport>
 
+      <Teleport to="#vue-craft-size">
+        <CraftSizeToggle />
+      </Teleport>
       <Teleport to="#vue-analyser">
         <SpectrumAnalyser />
       </Teleport>
@@ -163,6 +166,7 @@ import GraphConfigDialog from "./components/GraphConfigDialog.vue";
 import HeaderDialog from "./components/HeaderDialog.vue";
 import VideoExportDialog from "./components/VideoExportDialog.vue";
 import TuningLogDialog from "./components/TuningLogDialog.vue";
+import CraftSizeToggle from "./components/CraftSizeToggle.vue";
 import SpectrumAnalyser from "./components/SpectrumAnalyser.vue";
 import StepResponseAnalyser from "./components/StepResponseAnalyser.vue";
 import LegendPanel from "./components/LegendPanel.vue";
