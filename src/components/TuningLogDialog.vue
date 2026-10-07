@@ -370,39 +370,6 @@
               </ul>
             </div>
 
-            <div v-if="currentEntry && currentEntry.slice" class="flex flex-col gap-1">
-              <div class="flex items-center gap-2 flex-wrap">
-                <UIcon name="i-lucide-scissors" class="size-3.5 shrink-0 text-warning" />
-                <span class="text-xs font-medium">Isolated flight</span>
-                <span class="text-xs text-dimmed flex-1 min-w-0 truncate">
-                  {{ describeSliceRange(currentEntry.slice) }} ·
-                  {{ currentEntry.slice.sentAt ? "sent to AI" : "not sent yet" }}
-                </span>
-                <UButton
-                  variant="soft"
-                  color="neutral"
-                  size="xs"
-                  :label="sliceChartVisible ? 'Hide graph' : 'Show graph'"
-                  @click="sliceChartVisible = !sliceChartVisible"
-                />
-                <UTooltip
-                  v-if="isCurrentFlightLog && logStore.flightLog"
-                  text="Close this dialog and mark this block as the isolated block (Ctrl+I / Ctrl+O) in the main graph, zoomed to fit"
-                  :delay-duration="0"
-                >
-                  <UButton
-                    variant="soft"
-                    color="neutral"
-                    size="xs"
-                    icon="i-lucide-locate"
-                    label="Show in log"
-                    @click="onShowSliceInLog"
-                  />
-                </UTooltip>
-              </div>
-              <IsolatedFlightChart v-if="sliceChartVisible" :slice="currentEntry.slice" />
-            </div>
-
             <div v-if="showNotes" class="flex flex-col gap-1">
               <label class="text-xs font-medium text-dimmed">Notes</label>
               <UTextarea
@@ -432,12 +399,44 @@
                   class="rounded p-2"
                   :class="
                     turn.role === 'user'
-                      ? 'text-xs bg-elevated self-end max-w-[85%] ml-auto'
+                      ? ['text-xs bg-elevated self-end max-w-[85%] ml-auto', { 'w-[85%]': turn.slice && !isSliceCollapsed(i) }]
                       : 'bg-primary/10 prose prose-sm dark:prose-invert max-w-none tuning-log-ai-turn'
                   "
                 >
                   <template v-if="turn.role === 'user'">
-                    <div v-if="turn.hasSlice" class="flex items-center gap-1 text-dimmed" :class="{ 'mb-1': turn.text || turn.images.length }">
+                    <div v-if="turn.slice" class="flex flex-col gap-1" :class="{ 'mb-1': turn.text || turn.images.length }">
+                      <div class="flex items-center gap-1 text-dimmed">
+                        <UIcon name="i-lucide-scissors" class="size-3 shrink-0 text-warning" />
+                        <button
+                          type="button"
+                          class="flex-1 min-w-0 truncate text-left cursor-pointer hover:text-default"
+                          :title="isSliceCollapsed(i) ? 'Show the isolated flight graph' : 'Hide the isolated flight graph'"
+                          @click="toggleSliceCollapsed(i)"
+                        >
+                          <UIcon
+                            :name="isSliceCollapsed(i) ? 'i-lucide-chevron-right' : 'i-lucide-chevron-down'"
+                            class="size-3 align-middle"
+                          />
+                          Isolated flight: {{ describeSliceRange(turn.slice) }}
+                        </button>
+                        <UTooltip
+                          v-if="isCurrentFlightLog && logStore.flightLog"
+                          text="Close this dialog and mark this block as the isolated block (Ctrl+I / Ctrl+O) in the main graph, zoomed to fit"
+                          :delay-duration="0"
+                        >
+                          <UButton
+                            variant="soft"
+                            color="neutral"
+                            size="2xs"
+                            icon="i-lucide-locate"
+                            label="Show in log"
+                            @click="onShowSliceInLog(turn.slice)"
+                          />
+                        </UTooltip>
+                      </div>
+                      <IsolatedFlightChart v-if="!isSliceCollapsed(i)" :slice="turn.slice" />
+                    </div>
+                    <div v-else-if="turn.hasSlice" class="flex items-center gap-1 text-dimmed" :class="{ 'mb-1': turn.text || turn.images.length }">
                       <UIcon name="i-lucide-scissors" class="size-3 text-warning" />
                       Isolated flight data attached
                     </div>
@@ -1109,15 +1108,17 @@ const conversationTurns = computed(() => {
   const turns = conversation.map((turn, i) => {
     if (turn.role !== "user") return turn;
     const hasSlice = turnHasSlice(turn);
+    const slice = hasSlice ? turnSlice(turn, entry) : null;
     if (i === 0) {
       return {
         role: "user",
         text: TuningAI.extractInstructions(turnText(turn)),
         images: turnImages(turn).slice(1),
         hasSlice,
+        slice,
       };
     }
-    return { role: "user", text: turnText(turn), images: turnImages(turn), hasSlice };
+    return { role: "user", text: turnText(turn), images: turnImages(turn), hasSlice, slice };
   });
 
   const pendingQuestion = entry && pendingQuestionByEntryId.value[entry.id];
@@ -1282,20 +1283,49 @@ function onRemoveSlice() {
   if (currentEntry.value) tuningLogStore.updateEntrySlice(currentEntry.value.id, null);
 }
 
-const sliceChartVisible = ref(true);
+// Graphs of the slices sent in the conversation are shown expanded; collapsed ones are tracked
+// by entry id + turn index
+const collapsedSliceTurns = ref(new Set());
+
+function isSliceCollapsed(turnIndex) {
+  return collapsedSliceTurns.value.has(`${currentEntry.value?.id}:${turnIndex}`);
+}
+
+function toggleSliceCollapsed(turnIndex) {
+  const key = `${currentEntry.value?.id}:${turnIndex}`;
+  const next = new Set(collapsedSliceTurns.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  collapsedSliceTurns.value = next;
+}
+
+// The slice sent in a conversation turn, read back from the text it was sent as. When it's the
+// entry's own saved slice, that's used as-is for its exact range and line colours.
+function turnSlice(turn, entry) {
+  const block = turn.content.find((b) => b.type === "text" && FlightSlice.isFlightSliceText(b.text));
+  const parsed = FlightSlice.parseSlicePromptText(block?.text);
+  if (!parsed) return null;
+  if (entry?.slice && entry.slice.csv === parsed.csv) return entry.slice;
+  return FlightSlice.mergeSliceColors(parsed, entry?.slice);
+}
 
 function describeSliceRange(slice) {
   const start = slice.range.offsetMs / 1000;
-  return `${start.toFixed(1)}–${(start + slice.durationMs / 1000).toFixed(1)} s into the log · ${describeSlice(slice)}`;
+  const end = start + slice.durationMs / 1000;
+  return (
+    `${start.toFixed(1)}–${end.toFixed(1)} s into the log · ${slice.fields.length} fields · ${slice.sampleRateHz} Hz` +
+    `${slice.workspace ? ` · ${slice.workspace}` : ""}`
+  );
 }
 
-// Puts the saved block back as the isolated block on the main graph and zooms to fit it, with a
+// Puts a sent block back as the isolated block on the main graph and zooms to fit it, with a
 // little margin either side. The trim range (I / O) still constrains it, as it does for Ctrl+I / O.
-function onShowSliceInLog() {
-  const slice = currentEntry.value?.slice;
+function onShowSliceInLog(slice) {
   if (!slice || !isCurrentFlightLog.value || !logStore.flightLog) return;
 
-  const { start, end } = slice.range;
+  // Slices read back from a message only carry their offset into the log, not the raw times
+  const start = slice.range.start ?? logStore.flightLog.getMinTime() + slice.range.offsetMs * 1000;
+  const end = slice.range.end ?? start + slice.durationMs * 1000;
   setIsolateInTime(start);
   setIsolateOutTime(end);
 
@@ -1337,7 +1367,7 @@ function onAskAi() {
   pendingEntryIds.value = new Set(pendingEntryIds.value).add(entry.id);
   pendingQuestionByEntryId.value = {
     ...pendingQuestionByEntryId.value,
-    [entry.id]: { text: promptText.trim(), images, hasSlice: !!slice },
+    [entry.id]: { text: promptText.trim(), images, hasSlice: !!slice, slice },
   };
   aiError.value = "";
 

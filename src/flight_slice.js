@@ -241,6 +241,55 @@ export function isFlightSliceText(text) {
   return String(text ?? "").startsWith(FLIGHT_SLICE_MARKER);
 }
 
+const HEADING_RE = new RegExp(
+  `^${FLIGHT_SLICE_MARKER.replace(/[[\]]/g, "\\$&")} (-?[\\d.]+) s isolated from (-?[\\d.]+) s into the log` +
+    `(?:, "(.*)" workspace)?, averaged to (\\d+) Hz`,
+);
+const FIELD_LINE_RE = /^- (.+?): (.*?)(?: \((.*) graph\))?(?:, ([^,]*))?$/;
+
+/**
+ * Reads a slice back out of the text block it was sent to the AI in (sliceToPromptText), so a
+ * conversation can show each slice where it was sent, even after the entry's slice has been
+ * replaced. Returns a slice-like object ({ durationMs, range: { offsetMs }, sampleRateHz,
+ * workspace, fields, csv }) for parseSliceSeries, or null if the text isn't a full slice.
+ * Field colours aren't in the text - see mergeSliceColors.
+ */
+export function parseSlicePromptText(text) {
+  text = String(text ?? "");
+  const heading = HEADING_RE.exec(text);
+  const csv = /```csv\n([\s\S]*?)\n```/.exec(text);
+  if (!heading || !csv) return null;
+
+  const fields = [];
+  const legend = /\nFields:\n([\s\S]*?)\n\n/.exec(text);
+  for (const line of legend ? legend[1].split("\n") : []) {
+    const match = FIELD_LINE_RE.exec(line);
+    if (match) fields.push({ name: match[1], label: match[2], graph: match[3] || "", unit: match[4] || "" });
+  }
+
+  return {
+    durationMs: Number(heading[1]) * 1000,
+    range: { offsetMs: Number(heading[2]) * 1000 },
+    workspace: heading[3] || "",
+    sampleRateHz: Number(heading[4]),
+    fields,
+    csv: csv[1],
+  };
+}
+
+/**
+ * Copies line colours onto a parsed slice's fields from another slice (e.g. the entry's saved one)
+ * wherever the field names match.
+ */
+export function mergeSliceColors(slice, source) {
+  const colors = new Map((source?.fields || []).filter((field) => field.color).map((field) => [field.name, field.color]));
+  if (!colors.size) return slice;
+  return {
+    ...slice,
+    fields: slice.fields.map((field) => (colors.has(field.name) ? { ...field, color: colors.get(field.name) } : field)),
+  };
+}
+
 // Splits one CSV line as written by csvCell - only text cells are ever quoted
 function parseCsvLine(line) {
   const cells = [];

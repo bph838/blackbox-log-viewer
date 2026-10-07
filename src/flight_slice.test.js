@@ -8,6 +8,8 @@ import {
   isFlightSliceText,
   parseSliceSeries,
   decimateMinMax,
+  parseSlicePromptText,
+  mergeSliceColors,
   FLIGHT_SLICE_MARKER,
 } from "./flight_slice.js";
 
@@ -251,5 +253,50 @@ describe("decimateMinMax", () => {
       { t: 5, v: -5 },
       { t: 6, v: 4 },
     ]);
+  });
+});
+
+describe("parseSlicePromptText", () => {
+  const slice = buildFlightSlice({
+    flightLog: makeFlightLog(rampFrames(), 0),
+    range: { start: 200000, end: 700000 },
+    graphs: [
+      {
+        label: "Roll",
+        fields: [
+          { name: "setpoint[0]", friendlyName: "Setpoint [roll]", hidden: false, color: "#fb8072" },
+          { name: "gyroADC[0]", friendlyName: "Gyro [roll]", hidden: false },
+        ],
+      },
+    ],
+    sampleRateHz: 10,
+    workspace: "Tracking",
+    decode,
+  });
+
+  it("reads back what sliceToPromptText wrote", () => {
+    const parsed = parseSlicePromptText(sliceToPromptText(slice));
+    expect(parsed).toMatchObject({
+      durationMs: 500,
+      range: { offsetMs: 200 },
+      workspace: "Tracking",
+      sampleRateHz: 10,
+      csv: slice.csv,
+    });
+    expect(parsed.fields).toEqual([
+      { name: "setpoint[0]", label: "Setpoint [roll]", graph: "Roll", unit: "°/s" },
+      { name: "gyroADC[0]", label: "Gyro [roll]", graph: "Roll", unit: "°/s" },
+    ]);
+    expect(parseSliceSeries(parsed).series).toHaveLength(2);
+  });
+
+  it("returns null for other text, including the stats-only summary", () => {
+    expect(parseSlicePromptText("What about the tail?")).toBeNull();
+    expect(parseSlicePromptText(sliceToSummaryText(slice))).toBeNull();
+  });
+
+  it("takes colours from a matching slice", () => {
+    const merged = mergeSliceColors(parseSlicePromptText(sliceToPromptText(slice)), slice);
+    expect(merged.fields.map((f) => f.color)).toEqual(["#fb8072", undefined]);
   });
 });
