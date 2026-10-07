@@ -1,20 +1,41 @@
 <template>
-  <UButton
-    v-if="visible"
-    variant="ghost"
-    color="neutral"
-    size="xs"
-    class="craft-size-toggle absolute"
-    :style="style"
-    :icon="graphStore.craftEnlarged ? 'i-lucide-minimize-2' : 'i-lucide-maximize-2'"
-    :title="graphStore.craftEnlarged ? 'Back to normal size' : 'Double the craft size'"
-    @click="graphStore.toggleCraftEnlarged()"
-  />
+  <template v-if="visible">
+    <UButton
+      variant="ghost"
+      color="neutral"
+      size="xs"
+      class="craft-overlay-control absolute"
+      :style="toggleStyle"
+      :icon="graphStore.craftEnlarged ? 'i-lucide-minimize-2' : 'i-lucide-maximize-2'"
+      :title="graphStore.craftEnlarged ? 'Back to normal size' : 'Double the craft size'"
+      @click="graphStore.toggleCraftEnlarged()"
+    />
+
+    <!-- While enlarged: show the movement of just one axis -->
+    <div
+      v-if="graphStore.craftEnlarged && graphStore.craftAxes.length"
+      class="craft-axis-picker absolute flex gap-0.5"
+      :style="axisStyle"
+    >
+      <UButton
+        v-for="option in axisOptions"
+        :key="option.label"
+        size="xs"
+        :variant="graphStore.craftAxis === option.value ? 'solid' : 'ghost'"
+        :color="graphStore.craftAxis === option.value ? 'primary' : 'neutral'"
+        :class="{ 'craft-axis-unselected': graphStore.craftAxis !== option.value }"
+        :label="option.label"
+        :title="option.title"
+        @click="graphStore.setCraftAxis(option.value)"
+      />
+    </div>
+  </template>
 </template>
 
 <script setup>
-// Sits in the top right corner of the craft overlay (#craftCanvas, drawn by grapher.js) and
-// switches it between its configured size and double that.
+// Controls on the craft overlay (#craftCanvas, drawn by grapher.js): a button in its top right
+// corner that switches it between its configured size and double that, and - while doubled - a
+// picker to show the movement of just one axis.
 import { computed } from "vue";
 import { useGraphStore } from "../stores/graph.js";
 import { useLogStore } from "../stores/log.js";
@@ -22,28 +43,60 @@ import { useLogStore } from "../stores/log.js";
 const graphStore = useGraphStore();
 const logStore = useLogStore();
 
-const BUTTON_INSET = 4;
+const INSET = 4;
 const BUTTON_SIZE = 24;
+
+const AXIS_LABELS = { roll: "Roll", pitch: "Pitch", yaw: "Yaw" };
 
 const visible = computed(() => logStore.hasLog && graphStore.hasCraft && graphStore.craftLayout.size > BUTTON_SIZE * 2);
 
-const style = computed(() => {
+const axisOptions = computed(() => [
+  { label: "All", value: null, title: "Show the movement of every axis" },
+  ...graphStore.craftAxes.map((axis) => ({
+    label: AXIS_LABELS[axis],
+    value: axis,
+    title: `Show only ${axis} movement`,
+  })),
+]);
+
+const toggleStyle = computed(() => {
   const { left, top, size } = graphStore.craftLayout;
   return {
-    left: `${left + size - BUTTON_SIZE - BUTTON_INSET}px`,
-    top: `${top + BUTTON_INSET}px`,
+    left: `${left + size - BUTTON_SIZE - INSET}px`,
+    top: `${top + INSET}px`,
+  };
+});
+
+const axisStyle = computed(() => {
+  const { left, top, size } = graphStore.craftLayout;
+  return {
+    left: `${left + INSET}px`,
+    top: `${top + size - BUTTON_SIZE - INSET}px`,
   };
 });
 </script>
 
 <style scoped>
 /* Comes straight after #craftCanvas in the DOM, so it sits on the craft and under later overlays. */
-.craft-size-toggle {
+.craft-overlay-control {
   color: #fff;
   opacity: 0.6;
 }
 
-.craft-size-toggle:hover {
+.craft-overlay-control:hover {
   opacity: 1;
+}
+
+/* Unselected axes: a dark chip with a light outline, so they read as buttons over both the
+   craft's grey backdrop and the graph lines behind it. */
+.craft-axis-unselected {
+  color: #fff;
+  background-color: rgb(0 0 0 / 0.55);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.45);
+}
+
+.craft-axis-unselected:hover {
+  background-color: rgb(0 0 0 / 0.75);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.8);
 }
 </style>

@@ -63,6 +63,11 @@ export const useGraphStore = defineStore("graph", () => {
   // shown at double its configured size.
   const craftLayout = shallowRef({ left: 0, top: 0, size: 0 });
   const craftEnlarged = ref(false);
+  // While enlarged, the craft can show the movement of just one axis: "roll", "pitch" or "yaw"
+  // (null: all of them).
+  const craftAxis = ref(null);
+  // Which axes the current craft model can isolate - set by grapher.js.
+  const craftAxes = shallowRef([]);
   const markerTime = ref(0);
   const seekBarMode = ref("avgThrottle");
 
@@ -138,6 +143,11 @@ export const useGraphStore = defineStore("graph", () => {
     craftEnlarged.value = !craftEnlarged.value;
     prefs.set("craftEnlarged", craftEnlarged.value);
     updateCanvasSize.value?.();
+  }
+
+  function setCraftAxis(axis) {
+    craftAxis.value = axis || null;
+    invalidateGraph.value?.();
   }
 
   prefs.get("craftEnlarged", (value) => {
@@ -265,6 +275,9 @@ export const useGraphStore = defineStore("graph", () => {
     craftLayout,
     craftEnlarged,
     toggleCraftEnlarged,
+    craftAxis,
+    craftAxes,
+    setCraftAxis,
     zoomGraphConfig,
     expandGraphConfig,
     reorderGraphs,

@@ -1102,7 +1102,11 @@ export function FlightLogGrapher(
         }
 
         if (options.craftType === "3D" && craft3D) {
-          craft3D.render(centerFrame, flightLog.getMainFieldIndexes());
+          craft3D.render(
+            centerFrame,
+            flightLog.getMainFieldIndexes(),
+            graphStore.craftEnlarged ? graphStore.craftAxis : null,
+          );
         } else if (craft2D) {
           craft2D.render(centerFrame, flightLog.getMainFieldIndexes());
         }
@@ -1238,6 +1242,17 @@ export function FlightLogGrapher(
     if (options.craftType === "2D") {
       craft2D = new Craft2D(flightLog, craftCanvas, idents.motorColors);
     }
+
+    // Axes the craft model can show on their own (see graphStore.craftAxis) - the 2D craft has no
+    // attitude, and the multirotor 3D craft doesn't show yaw.
+    if (craft3D instanceof Craft3DHeli) {
+      graphStore.craftAxes = ["roll", "pitch", "yaw"];
+    } else if (craft3D) {
+      graphStore.craftAxes = ["roll", "pitch"];
+    } else {
+      graphStore.craftAxes = [];
+    }
+    if (!graphStore.craftAxes.includes(graphStore.craftAxis)) graphStore.craftAxis = null;
   };
 
   this.destroy = function () {

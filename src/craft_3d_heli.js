@@ -197,12 +197,16 @@ export function Craft3DHeli(flightLog, canvas, facing) {
   };
 
   // Matches the Craft3D (multirotor) call signature so grapher.js doesn't need to special-case
-  // this renderer at the call site.
-  this.render = function (frame) {
+  // this renderer at the call site. axis: "roll", "pitch" or "yaw" to show only that axis's
+  // movement (the others held level/facing forward), or null for all of them.
+  this.render = function (frame, frameFieldIndexes, axis = null) {
+    const angle = (fieldIndex, name) =>
+      axis && axis !== name ? 0 : (-frame[fieldIndex] / 1800) * Math.PI;
+
     rotateTo(
-      (-frame[attitudeFrameIndex.x] / 1800) * Math.PI,
-      (-frame[attitudeFrameIndex.y] / 1800) * Math.PI,
-      (-frame[attitudeFrameIndex.z] / 1800) * Math.PI,
+      angle(attitudeFrameIndex.x, "pitch"),
+      angle(attitudeFrameIndex.y, "yaw"),
+      angle(attitudeFrameIndex.z, "roll"),
       typeof collectiveFieldIndex === "number" ? frame[collectiveFieldIndex] : undefined,
       typeof cyclicRollFieldIndex === "number" ? frame[cyclicRollFieldIndex] : undefined,
       typeof cyclicPitchFieldIndex === "number" ? frame[cyclicPitchFieldIndex] : undefined,

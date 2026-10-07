@@ -279,7 +279,8 @@ export function Craft3D(flightLog, canvas, propColors) {
   // Rotate the craft mesh and props to bring the board's direction arrow to the right direction
   craft.rotation.z = yawOffset;
 
-  this.render = function (frame, frameFieldIndexes) {
+  // axis: "roll" or "pitch" to show only that axis's movement, or null for both (yaw isn't shown).
+  this.render = function (frame, frameFieldIndexes, axis = null) {
     for (let i = 0; i < numMotors; i++) {
       if (props[i]) propShells[i].remove(props[i]);
 
@@ -310,8 +311,8 @@ export function Craft3D(flightLog, canvas, propColors) {
 
     // Display the craft's attitude
     craftParent.rotation.x =
-      -frame[frameFieldIndexes["heading[1]"]] /*- Math.PI / 2*/; // pitch
-    craftParent.rotation.y = frame[frameFieldIndexes["heading[0]"]]; // roll
+      axis && axis !== "pitch" ? 0 : -frame[frameFieldIndexes["heading[1]"]] /*- Math.PI / 2*/; // pitch
+    craftParent.rotation.y = axis && axis !== "roll" ? 0 : frame[frameFieldIndexes["heading[0]"]]; // roll
 
     //craftParent.rotation.z = -frame[frameFieldIndexes['heading[2]']]; // yaw
 
