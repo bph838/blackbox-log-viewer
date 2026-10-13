@@ -174,7 +174,15 @@
                 v-for="entry in sidebarEntries"
                 :key="entry.id"
                 class="group px-2 py-1.5 border-b border-default cursor-pointer text-xs relative"
-                :class="selectedEntryId === entry.id ? 'bg-primary/15' : 'hover:bg-elevated'"
+                :class="
+                  entryCraftMismatch(entry)
+                    ? selectedEntryId === entry.id
+                      ? 'bg-error/35'
+                      : 'bg-error/20 hover:bg-error/30'
+                    : selectedEntryId === entry.id
+                      ? 'bg-primary/15'
+                      : 'hover:bg-elevated'
+                "
                 @click="selectEntry(entry.id)"
               >
                 <div class="font-medium flex items-center gap-1 pr-5 flex-wrap">
