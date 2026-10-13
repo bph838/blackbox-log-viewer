@@ -19,6 +19,13 @@ const CRAFT_FACING_OFFSETS = {
   backward: Math.PI,
 };
 
+// The neutral pose for each axis the model can show on its own.
+const ISOLATED_FACING_OFFSETS = {
+  roll: CRAFT_FACING_OFFSETS.forward,
+  pitch: CRAFT_FACING_OFFSETS.right,
+  yaw: CRAFT_FACING_OFFSETS.forward,
+};
+
 // Collective color: blue for negative (descending) pitch, green for positive (climb) pitch.
 // Opacity carries the magnitude, so the disc is fully transparent at zero collective and
 // becomes more visible the further the stick is pushed away from center in either direction.
@@ -198,8 +205,9 @@ export function Craft3DHeli(flightLog, canvas, facing) {
 
   // Matches the Craft3D (multirotor) call signature so grapher.js doesn't need to special-case
   // this renderer at the call site. isolated: { axis, degrees } to show just one axis's turn since
-  // it was picked (see craft_axis_motion.js) on a craft that starts level with its tail towards the
-  // viewer whatever the facing setting, or null to show the logged attitude.
+  // it was picked (see craft_axis_motion.js) on a craft that starts level - side on for pitch, so the
+  // nose visibly rises and falls, otherwise with its tail towards the viewer - whatever the facing
+  // setting, or null to show the logged attitude.
   this.render = function (frame, frameFieldIndexes, isolated = null) {
     let x, y, z;
     if (isolated) {
@@ -221,7 +229,7 @@ export function Craft3DHeli(flightLog, canvas, facing) {
       typeof collectiveFieldIndex === "number" ? frame[collectiveFieldIndex] : undefined,
       typeof cyclicRollFieldIndex === "number" ? frame[cyclicRollFieldIndex] : undefined,
       typeof cyclicPitchFieldIndex === "number" ? frame[cyclicPitchFieldIndex] : undefined,
-      isolated ? CRAFT_FACING_OFFSETS.forward : facingOffset,
+      isolated ? ISOLATED_FACING_OFFSETS[isolated.axis] : facingOffset,
     );
   };
 
