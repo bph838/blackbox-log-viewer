@@ -1,9 +1,9 @@
 <template>
   <div>
     <!-- Logo bar with amber accent bottom border -->
-    <div class="toolbar-logo" @mouseenter="traceKey++">
+    <div class="toolbar-logo" @mouseenter="replayTrace">
       <!-- Same stylised gyro traces as the welcome page hero, squashed into the bar.
-           Re-keyed on hover so the draw-in animation replays. -->
+           Re-keyed on the first hover so the draw-in animation replays once per page load. -->
       <div class="toolbar-trace" aria-hidden="true">
         <svg :key="traceKey" viewBox="0 0 1200 200" preserveAspectRatio="none">
           <path
@@ -156,6 +156,10 @@ defineEmits([
 const logStore = useLogStore();
 const appStore = useAppStore();
 const traceKey = ref(0);
+
+function replayTrace() {
+  if (traceKey.value === 0) traceKey.value++;
+}
 </script>
 
 <style scoped>
