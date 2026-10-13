@@ -195,6 +195,13 @@
                     <UBadge color="warning" variant="subtle" size="xs">Approximated Datetime</UBadge>
                   </UTooltip>
                   <UTooltip
+                    v-if="sameConfigAsPrevious.has(entry.id)"
+                    :text="`Same config as the previous entry (${formatTimestamp(sameConfigAsPrevious.get(entry.id).timestamp)}) - no settings were changed between these flights`"
+                    :delay-duration="0"
+                  >
+                    <UBadge color="info" variant="subtle" size="xs">Same Config</UBadge>
+                  </UTooltip>
+                  <UTooltip
                     v-if="isBehindLatest(entry)"
                     text="The current log is not the latest entry in this tuning log"
                     :delay-duration="0"
@@ -942,6 +949,8 @@ watch(open, (isOpen) => {
 function entryCost(entry) {
   return (entry.ai && entry.ai.costUsd) || 0;
 }
+
+const sameConfigAsPrevious = computed(() => TuningLog.findSameConfigAsPrevious(tuningLogStore.entries));
 
 function entryHasAnalysis(entry) {
   return !!(entry.ai && entry.ai.conversation && entry.ai.conversation.length);

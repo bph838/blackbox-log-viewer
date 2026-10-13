@@ -8,6 +8,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import AI_MODELS from "./data/ai_models.json";
 import { sliceToPromptText, sliceToSummaryText } from "./flight_slice.js";
+import { findSameConfigAsPrevious } from "./tuning_log.js";
 
 const MODELS_BY_ID = {};
 for (const m of AI_MODELS.models) {
@@ -172,14 +173,22 @@ function lastAssistantText(entry) {
  * log's history as context. Pass excludingEntryId to leave out the entry currently being asked
  * about (it's supplied separately as the new message, not as history).
  *
+ * To save tokens, an entry flown on the same config as the entry before it is left out - it adds
+ * nothing the AI hasn't already seen - unless it has its own AI conversation, which the AI needs
+ * to follow what it has already advised, or notes the user has written about that flight.
+ *
  * maxImages limits how many step response graphs the history carries, to save tokens: only the
  * most recent maxImages history entries keep their image, older ones are sent as text only
  * (config, notes, earlier analysis). null/undefined or a negative value sends every image.
  */
 export function buildHistoryMessages(log, excludingEntryId, maxImages) {
   const messages = [];
-  const entries = ((log && log.entries) || []).filter(
-    (entry) => !(excludingEntryId && entry.id === excludingEntryId),
+  const allEntries = (log && log.entries) || [];
+  const sameConfigAsPrevious = findSameConfigAsPrevious(allEntries);
+  const entries = allEntries.filter(
+    (entry) =>
+      !(excludingEntryId && entry.id === excludingEntryId) &&
+      !(sameConfigAsPrevious.has(entry.id) && !entry.ai?.conversation?.length && !entry.notes?.trim()),
   );
 
   const sendAllImages = maxImages === null || maxImages === undefined || maxImages < 0;

@@ -3,6 +3,7 @@ import {
   makeId,
   create,
   buildConfigSummary,
+  configsMatch,
   resolveLogDateTimes,
   addEntry,
   buildFilename,
@@ -56,6 +57,25 @@ describe("buildConfigSummary", () => {
   it("returns an empty string for an empty/missing config", () => {
     expect(buildConfigSummary({})).toBe("");
     expect(buildConfigSummary(undefined)).toBe("");
+  });
+});
+
+describe("configsMatch", () => {
+  it("ignores per-flight header values", () => {
+    const a = buildConfigSummary({ rollPID: [1, 2, 3], "Log start datetime": "2026-01-01", vbatref: 400 });
+    const b = buildConfigSummary({ rollPID: [1, 2, 3], "Log start datetime": "2026-01-02", vbatref: 410 });
+    expect(configsMatch(a, b)).toBe(true);
+  });
+
+  it("detects a changed setting", () => {
+    expect(configsMatch(buildConfigSummary({ rollPID: [1, 2, 3] }), buildConfigSummary({ rollPID: [1, 2, 4] }))).toBe(
+      false,
+    );
+  });
+
+  it("never matches an empty/missing config", () => {
+    expect(configsMatch("", "")).toBe(false);
+    expect(configsMatch(undefined, "a: 1")).toBe(false);
   });
 });
 

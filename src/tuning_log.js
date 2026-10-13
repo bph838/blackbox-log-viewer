@@ -90,6 +90,42 @@ export function buildConfigSummary(sysConfig) {
   return lines.join("\n");
 }
 
+// Header values that differ from one flight to the next without any setting having changed -
+// left out when deciding whether two entries were flown on the same config.
+const PER_FLIGHT_CONFIG_KEYS = new Set(["Log start datetime", "vbatref"]);
+
+/**
+ * True when two config summaries (see buildConfigSummary) hold the same settings, ignoring
+ * per-flight header values like the log start time. An empty/missing summary never matches.
+ */
+export function configsMatch(a, b) {
+  if (!a || !b) return false;
+
+  const settings = (summary) =>
+    summary
+      .split("\n")
+      .filter((line) => !PER_FLIGHT_CONFIG_KEYS.has(line.slice(0, line.indexOf(": "))))
+      .join("\n");
+
+  return settings(a) === settings(b);
+}
+
+/**
+ * Entry id -> the chronologically previous entry, for each entry whose config is unchanged from
+ * that previous entry (i.e. nothing was re-tuned between the two flights).
+ */
+export function findSameConfigAsPrevious(entries) {
+  const result = new Map();
+  const chronological = [...(entries || [])].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+  for (let i = 1; i < chronological.length; i++) {
+    if (configsMatch(chronological[i].config, chronological[i - 1].config)) {
+      result.set(chronological[i].id, chronological[i - 1]);
+    }
+  }
+  return result;
+}
+
 /**
  * Read and validate a flight log's own "Log start datetime" header in isolation, with no
  * fallback - use this when a made-up substitute (see resolveLogDateTimes() below) would be

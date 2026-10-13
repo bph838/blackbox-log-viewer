@@ -48,6 +48,23 @@ describe("buildHistoryMessages", () => {
     expect(messages.map(imageCount)).toEqual([0, 1, 1]);
   });
 
+  it("leaves out entries with the same config as the previous one, unless they have an AI conversation or notes", () => {
+    const log = makeLog(5);
+    log.entries[1].config = "p: 0";
+    log.entries[2].config = "p: 0";
+    log.entries[2].ai = { conversation: [{ role: "user", content: "q" }, { role: "assistant", content: "answer" }] };
+    log.entries[3].config = "p: 0";
+    log.entries[3].notes = "windy";
+    const messages = buildHistoryMessages(log, null, 0);
+    expect(messages.map((m) => (m.role === "user" ? m.content[0].text.match(/p: \d/)[0] : m.content))).toEqual([
+      "p: 0",
+      "p: 0",
+      "answer",
+      "p: 0",
+      "p: 4",
+    ]);
+  });
+
   it("keeps each entry's last AI answer as an assistant message", () => {
     const log = makeLog(2);
     log.entries[0].ai = { conversation: [{ role: "user", content: "q" }, { role: "assistant", content: "answer" }] };
