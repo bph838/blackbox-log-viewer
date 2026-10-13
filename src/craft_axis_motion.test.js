@@ -5,13 +5,13 @@ import { FlightLogParser } from "./flightlog_parser.js";
 const TIME = FlightLogParser.prototype.FLIGHT_LOG_FIELD_INDEX_TIME;
 const FIELDS = { "gyroADC[0]": 2, "gyroADC[1]": 3, "gyroADC[2]": 4 };
 
-// A log sampled every 1 ms for `seconds`, with roll rate rate(t) deg/s (t in seconds).
+// A log sampled every 1 ms for `seconds`, with yaw rate rate(t) deg/s (t in seconds).
 function makeLog(seconds, rate) {
   const frames = [];
   for (let us = 0; us <= seconds * 1e6; us += 1000) {
     const frame = [0, 0, 0, 0, 0];
     frame[TIME] = us;
-    frame[FIELDS["gyroADC[0]"]] = rate(us / 1e6);
+    frame[FIELDS["gyroADC[2]"]] = rate(us / 1e6);
     frames.push(frame);
   }
   // Split in two chunks sharing a boundary frame, like the real log's chunks.
@@ -31,24 +31,21 @@ describe("createAxisMotion", () => {
     expect(hasAxisMotion({ getMainFieldIndexByName: () => undefined })).toBe(false);
   });
 
-  it("shows a fast wobble at its full size", () => {
-    // 10 Hz roll wobble of +-5 degrees: angle = 5 sin(2 pi 10 t).
-    const f = 10;
-    const log = makeLog(10, (t) => 5 * 2 * Math.PI * f * Math.cos(2 * Math.PI * f * t));
-    const motion = createAxisMotion(log);
-    expect(motion.at(5.025e6, "roll", 1)).toBeCloseTo(5, 1); // a peak
-    expect(motion.at(5.075e6, "roll", 1)).toBeCloseTo(-5, 1); // a trough
+  it("is zero at the reference time", () => {
+    const motion = createAxisMotion(makeLog(10, () => 90));
+    expect(motion.at(4e6, "yaw", 4e6)).toBeCloseTo(0, 6);
   });
 
-  it("leaves out a slow change like rolling inverted and holding it", () => {
-    // Rolls 180 degrees over the first second, then holds.
-    const log = makeLog(10, (t) => (t < 1 ? 180 : 0));
-    const motion = createAxisMotion(log);
-    expect(Math.abs(motion.at(6e6, "roll", 1))).toBeLessThan(1e-6);
+  it("measures the turn since the reference time", () => {
+    // 90 deg/s for 2 s, then holds: a 180 degree pirouette.
+    const motion = createAxisMotion(makeLog(10, (t) => (t >= 1 && t < 3 ? 90 : 0)));
+    expect(motion.at(2e6, "yaw", 0.5e6)).toBeCloseTo(90, 0);
+    expect(motion.at(6e6, "yaw", 0.5e6)).toBeCloseTo(180, 0);
+    expect(motion.at(0.5e6, "yaw", 6e6)).toBeCloseTo(-180, 0);
   });
 
   it("is zero on axes that don't move", () => {
     const motion = createAxisMotion(makeLog(2, (t) => 100 * Math.sin(t)));
-    expect(motion.at(1e6, "pitch", 1)).toBe(0);
+    expect(motion.at(1e6, "pitch", 0)).toBe(0);
   });
 });

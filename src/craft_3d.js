@@ -279,8 +279,8 @@ export function Craft3D(flightLog, canvas, propColors) {
   // Rotate the craft mesh and props to bring the board's direction arrow to the right direction
   craft.rotation.z = yawOffset;
 
-  // isolated: { axis: "roll" | "pitch", degrees } to show just that axis's movement (see
-  // craft_axis_motion.js) on an otherwise level craft, or null to show its attitude (yaw isn't
+  // isolated: { axis: "roll" | "pitch", degrees } to show just that axis's turn since it was picked
+  // (see craft_axis_motion.js) on a craft that starts level, or null to show its attitude (yaw isn't
   // shown either way).
   this.render = function (frame, frameFieldIndexes, isolated = null) {
     for (let i = 0; i < numMotors; i++) {

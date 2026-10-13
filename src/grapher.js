@@ -1111,7 +1111,8 @@ export function FlightLogGrapher(
           let isolated = null;
           if (axis) {
             axisMotion = axisMotion || createAxisMotion(flightLog);
-            isolated = { axis, degrees: axisMotion.at(windowCenterTime, axis, graphStore.craftAxisWindow) };
+            if (graphStore.craftAxisReference === null) graphStore.craftAxisReference = windowCenterTime;
+            isolated = { axis, degrees: axisMotion.at(windowCenterTime, axis, graphStore.craftAxisReference) };
           }
           craft3D.render(centerFrame, flightLog.getMainFieldIndexes(), isolated);
         } else if (craft2D) {
@@ -1262,6 +1263,7 @@ export function FlightLogGrapher(
       graphStore.craftAxes = [];
     }
     if (!graphStore.craftAxes.includes(graphStore.craftAxis)) graphStore.craftAxis = null;
+    graphStore.craftAxisReference = null; // A new log: re-zero at whatever is shown first.
   };
 
   this.destroy = function () {

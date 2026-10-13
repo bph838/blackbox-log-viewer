@@ -1,8 +1,7 @@
 // The movement of a craft on one axis (roll, pitch or yaw), for the craft model's isolated-axis
-// view: the gyro rate on that axis integrated into an angle, minus that angle's average over a
-// window centred on the moment shown. Short wobbles and oscillations come through as they
-// happened; slow changes - flips, holding an inverted hover, drift from integrating the gyro - are
-// taken out, so the model can show them on an otherwise level, forward-facing craft.
+// view: the gyro rate on that axis integrated into an angle, relative to the angle at a reference
+// moment (when the axis was picked). The model starts from a neutral pose at that moment and turns
+// only on that axis as the log plays.
 
 import { FlightLogParser } from "./flightlog_parser.js";
 
@@ -45,20 +44,17 @@ function interpolate(times, values, t) {
 }
 
 /**
- * Integrates one axis's gyro rate (deg/s) over the whole log. Returns { times, angle, area }:
- * angle (degrees) since the start of the log at each time, and area - the running integral of
- * angle over time (degree-seconds) - so the average angle over any window is a subtraction.
+ * Integrates one axis's gyro rate (deg/s) over the whole log. Returns { times, angle }: the angle
+ * (degrees) turned since the start of the log at each time.
  */
 function integrateAxis(flightLog, fieldIndex) {
   const timeIndex = FlightLogParser.prototype.FLIGHT_LOG_FIELD_INDEX_TIME;
   const times = [];
   const angle = [];
-  const area = [];
 
   let lastTime = null;
   let lastRate = 0;
   let currentAngle = 0;
-  let currentArea = 0;
 
   for (const chunk of flightLog.getChunksInTimeRange(flightLog.getMinTime(), flightLog.getMaxTime())) {
     for (const frame of chunk.frames || []) {
@@ -70,33 +66,28 @@ function integrateAxis(flightLog, fieldIndex) {
         lastRate = rate;
         times.push(time);
         angle.push(0);
-        area.push(0);
         continue;
       }
       if (time <= lastTime) continue; // Chunks can repeat their boundary frame.
 
-      const dt = (time - lastTime) / 1e6;
-      const previousAngle = currentAngle;
-      currentAngle += ((lastRate + rate) / 2) * dt;
-      currentArea += ((previousAngle + currentAngle) / 2) * dt;
+      currentAngle += ((lastRate + rate) / 2) * ((time - lastTime) / 1e6);
       lastTime = time;
       lastRate = rate;
 
       if (time - times[times.length - 1] >= SAMPLE_INTERVAL_US) {
         times.push(time);
         angle.push(currentAngle);
-        area.push(currentArea);
       }
     }
   }
 
-  return { times: Float64Array.from(times), angle: Float64Array.from(angle), area: Float64Array.from(area) };
+  return { times: Float64Array.from(times), angle: Float64Array.from(angle) };
 }
 
 /**
- * Builds each axis's table the first time it's asked for. at(time, axis, windowSeconds) is that
- * axis's movement in degrees at `time` (microseconds, log time): its angle relative to the average
- * over windowSeconds centred on `time` (clipped to the log at either end).
+ * Builds each axis's table the first time it's asked for. at(time, axis, referenceTime) is how far
+ * (degrees) the craft has turned on that axis between referenceTime and `time` (microseconds, log
+ * time) - negative when `time` is before the reference, or the turn was the other way.
  */
 export function createAxisMotion(flightLog) {
   const tables = {};
@@ -110,21 +101,10 @@ export function createAxisMotion(flightLog) {
   }
 
   return {
-    at(time, axis, windowSeconds) {
+    at(time, axis, referenceTime) {
       const t = table(axis);
       if (!t || t.times.length < 2) return 0;
-
-      const first = t.times[0];
-      const last = t.times[t.times.length - 1];
-      const half = (windowSeconds * 1e6) / 2;
-      const start = Math.max(first, time - half);
-      const end = Math.min(last, time + half);
-      const now = interpolate(t.times, t.angle, time);
-      if (end <= start) return 0;
-
-      const average =
-        (interpolate(t.times, t.area, end) - interpolate(t.times, t.area, start)) / ((end - start) / 1e6);
-      return now - average;
+      return interpolate(t.times, t.angle, time) - interpolate(t.times, t.angle, referenceTime);
     },
   };
 }

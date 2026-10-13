@@ -156,11 +156,11 @@ export function Craft3DHeli(flightLog, canvas, facing) {
     render();
   });
 
-  const rotateTo = (x, y, z, collectiveRaw, cyclicRollRaw, cyclicPitchRaw) => {
+  const rotateTo = (x, y, z, collectiveRaw, cyclicRollRaw, cyclicPitchRaw, yawOffset = facingOffset) => {
     if (!model) return;
 
     model.rotation.x = x;
-    modelWrapper.rotation.y = y + facingOffset;
+    modelWrapper.rotation.y = y + yawOffset;
     model.rotation.z = z;
     
     if (collectiveDisc && typeof collectiveRaw === "number") {
@@ -197,9 +197,9 @@ export function Craft3DHeli(flightLog, canvas, facing) {
   };
 
   // Matches the Craft3D (multirotor) call signature so grapher.js doesn't need to special-case
-  // this renderer at the call site. isolated: { axis, degrees } to show just one axis's movement
-  // (see craft_axis_motion.js) on an otherwise level, forward-facing craft, or null to show the
-  // logged attitude.
+  // this renderer at the call site. isolated: { axis, degrees } to show just one axis's turn since
+  // it was picked (see craft_axis_motion.js) on a craft that starts level with its tail towards the
+  // viewer whatever the facing setting, or null to show the logged attitude.
   this.render = function (frame, frameFieldIndexes, isolated = null) {
     let x, y, z;
     if (isolated) {
@@ -221,6 +221,7 @@ export function Craft3DHeli(flightLog, canvas, facing) {
       typeof collectiveFieldIndex === "number" ? frame[collectiveFieldIndex] : undefined,
       typeof cyclicRollFieldIndex === "number" ? frame[cyclicRollFieldIndex] : undefined,
       typeof cyclicPitchFieldIndex === "number" ? frame[cyclicPitchFieldIndex] : undefined,
+      isolated ? CRAFT_FACING_OFFSETS.forward : facingOffset,
     );
   };
 

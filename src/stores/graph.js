@@ -68,9 +68,10 @@ export const useGraphStore = defineStore("graph", () => {
   const craftAxis = ref(null);
   // Which axes the current craft model can isolate - set by grapher.js.
   const craftAxes = shallowRef([]);
-  // The isolated axis shows its movement relative to its average over this many seconds (centred
-  // on the moment shown) - see craft_axis_motion.js.
-  const craftAxisWindow = ref(1);
+  // Log time (microseconds) the isolated axis is measured from: the moment it was picked, where the
+  // craft is shown in its neutral pose - see craft_axis_motion.js. null until grapher.js next
+  // draws, which sets it to the time shown then.
+  const craftAxisReference = ref(null);
   const markerTime = ref(0);
   const seekBarMode = ref("avgThrottle");
 
@@ -149,19 +150,11 @@ export const useGraphStore = defineStore("graph", () => {
   }
 
   function setCraftAxis(axis) {
+    // Picking an axis (again) re-zeros it at the moment shown.
     craftAxis.value = axis || null;
+    craftAxisReference.value = null;
     invalidateGraph.value?.();
   }
-
-  function setCraftAxisWindow(seconds) {
-    craftAxisWindow.value = seconds;
-    prefs.set("craftAxisWindow", seconds);
-    invalidateGraph.value?.();
-  }
-
-  prefs.get("craftAxisWindow", (value) => {
-    if (typeof value === "number" && value > 0) craftAxisWindow.value = value;
-  });
 
   prefs.get("craftEnlarged", (value) => {
     craftEnlarged.value = !!value;
@@ -290,9 +283,8 @@ export const useGraphStore = defineStore("graph", () => {
     toggleCraftEnlarged,
     craftAxis,
     craftAxes,
-    craftAxisWindow,
+    craftAxisReference,
     setCraftAxis,
-    setCraftAxisWindow,
     zoomGraphConfig,
     expandGraphConfig,
     reorderGraphs,
