@@ -19,8 +19,34 @@
       <p class="hero-subtitle">Blackbox Explorer</p>
       <p class="hero-tagline">Analyze flight logs recorded by Rotorflights's Blackbox feature.</p>      
       <p class="tag-version">{{ appStore.statusViewerVersion }}</p>
-      <p v-if="loadingFileText" class="loading-file-indicator">{{ loadingFileText }}</p>
-      <LogFileInput size="lg" label="Open log file / video" @files-selected="$emit('files-selected', $event)" />
+      <!-- Drop zone (from rotorflight-blackbox's welcome page) - drops are handled window-wide in App.vue -->
+      <div class="rf-dropzone" :class="{ 'is-dragging': isDragging }">
+        <svg
+          class="rf-dropzone-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        <p class="rf-dropzone-title">Drop a log or video anywhere</p>
+        <p class="rf-dropzone-or">or</p>
+        <LogFileInput
+          label="Open log file / video"
+          button-class="rf-btn-primary"
+          @files-selected="$emit('files-selected', $event)"
+        />
+        <p v-if="loadingFileText" class="loading-file-indicator">{{ loadingFileText }}</p>
+        <ul class="rf-formats">
+          <li v-for="format in FORMATS" :key="format">{{ format }}</li>
+        </ul>
+      </div>
     </div>
     </div>
 
@@ -90,7 +116,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useLogStore } from "../stores/log.js";
 import { useAppStore } from "../stores/app.js";
 import LogFileInput from "./LogFileInput.vue";
@@ -105,6 +131,46 @@ const appStore = useAppStore();
 const logoSrc = computed(() =>
   appStore.darkThemeEnabled ? "/images/rf_logo_white.svg" : "/images/rf_logo_black.svg",
 );
+
+const FORMATS = [".BBL", ".BFL", ".TXT", ".MP4", ".MOV", ".AVI", "Workspace .JSON"];
+
+// Highlight the drop zone while files are dragged over the window. dragenter/dragleave fire for
+// every child element crossed, so count them rather than toggling on each event.
+const isDragging = ref(false);
+let dragDepth = 0;
+
+function hasFiles(e) {
+  return [...(e.dataTransfer?.types ?? [])].includes("Files");
+}
+
+function onDragEnter(e) {
+  if (!hasFiles(e)) return;
+  dragDepth++;
+  isDragging.value = true;
+}
+
+function onDragLeave(e) {
+  if (!hasFiles(e)) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) isDragging.value = false;
+}
+
+function onDragEnd() {
+  dragDepth = 0;
+  isDragging.value = false;
+}
+
+onMounted(() => {
+  document.addEventListener("dragenter", onDragEnter);
+  document.addEventListener("dragleave", onDragLeave);
+  document.addEventListener("drop", onDragEnd);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("dragenter", onDragEnter);
+  document.removeEventListener("dragleave", onDragLeave);
+  document.removeEventListener("drop", onDragEnd);
+});
 
 const loadingFileText = computed(() => {
   const names = appStore.loadingFileNames;
@@ -256,7 +322,110 @@ const loadingFileText = computed(() => {
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--color-primary-500);
-  margin: -0.5rem 0 0.75rem;
+  margin: 0.85rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+/* Drop zone */
+.rf-dropzone {
+  width: min(560px, 100%);
+  margin-top: 0.75rem;
+  padding: 36px 32px 28px;
+  border: 2px dashed rgba(0, 0, 0, 0.18);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(8px);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+:root.dark .rf-dropzone {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(20, 22, 26, 0.65);
+}
+
+.rf-dropzone.is-dragging,
+:root.dark .rf-dropzone.is-dragging {
+  border-color: #80c5eb;
+  background: rgba(77, 168, 218, 0.12);
+  transform: scale(1.02);
+}
+
+.rf-dropzone-icon {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 12px;
+  color: var(--rf-accent);
+}
+
+:root.dark .rf-dropzone-icon {
+  color: #80c5eb;
+}
+
+.rf-dropzone-title {
+  margin: 0;
+  font-size: 1.25em;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.rf-dropzone-or {
+  margin: 6px 0 14px;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+}
+
+.rf-dropzone :deep(.rf-btn-primary) {
+  padding: 14px 34px;
+  border: none;
+  border-radius: 8px;
+  background: var(--rf-accent);
+  color: #181818;
+  font-size: 0.95em;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(77, 168, 218, 0.3);
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.rf-dropzone :deep(.rf-btn-primary:hover),
+.rf-dropzone :deep(.rf-btn-primary:focus-visible) {
+  background: #80c5eb;
+  transform: translateY(-2px);
+  box-shadow: 0 14px 36px rgba(77, 168, 218, 0.4);
+}
+
+.rf-formats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rf-formats li {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 0.75em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+:root.dark .rf-formats li {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 /* Info grid */

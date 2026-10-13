@@ -1,5 +1,9 @@
 <template>
+  <button v-if="buttonClass" type="button" :class="buttonClass" @click="$refs.fileInput.click()">
+    {{ label }}
+  </button>
   <UButton
+    v-else
     :size="size"
     color="primary"
     :label="label"
@@ -27,6 +31,11 @@ defineProps({
   label: {
     type: String,
     default: "Open log file/video",
+  },
+  // When set, renders a plain <button> with this class instead of the Nuxt UI button
+  buttonClass: {
+    type: String,
+    default: "",
   },
 });
 
