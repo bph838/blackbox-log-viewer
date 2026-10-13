@@ -50,60 +50,46 @@
     </div>
     </div>
 
-    <!-- Info grid -->
+    <!-- Info cards (styled after rotorflight-blackbox's welcome page cards) -->
     <div class="info-grid">
       <div class="info-card">
-        <div class="info-card-header">
-          <UIcon name="i-lucide-book-open" class="size-4 text-primary-500" />
-          <h3>Getting Started</h3>
-        </div>
+        <span class="info-card-icon" aria-hidden="true"><UIcon name="i-lucide-book-open" /></span>
+        <h3>Getting Started</h3>
         <p>
           Blackbox is built in to
-          <a href="https://github.com/rotorflight/rotorflight/releases" target="_blank"
-            rel="noopener noreferrer">Rotorflight</a>
+          <a href="https://github.com/rotorflight/rotorflight/releases" target="_blank" rel="noopener noreferrer"
+            >Rotorflight</a
+          >
           and supported on most flight controllers.
         </p>
         <div class="info-links">
-          <a href="https://rotorflight.org/docs/examples" target="_blank" rel="noopener noreferrer">
-            <UIcon name="i-lucide-file-text" class="size-3.5" /> Getting started
-          </a>
-          <a href="https://www.rcgroups.com/forums/showthread.php?4000345-Rotorflight-Flight-Control-%28FBL%29-Software-Official-discussion"
-            target="_blank" rel="noopener noreferrer">
-            <UIcon name="i-lucide-file-text" class="size-3.5" /> RC Groups
-          </a>
-          <a href="https://discord.gg/6QUySXdEvd" target="_blank" rel="noopener noreferrer">
-            <UIcon name="i-lucide-monitor" class="size-3.5" /> Discord
-          </a>
-
+          <a href="https://rotorflight.org/docs/examples" target="_blank" rel="noopener noreferrer">Getting started &rarr;</a>
+          <a
+            href="https://www.rcgroups.com/forums/showthread.php?4000345-Rotorflight-Flight-Control-%28FBL%29-Software-Official-discussion"
+            target="_blank"
+            rel="noopener noreferrer"
+            >RC Groups &rarr;</a
+          >
+          <a href="https://discord.gg/6QUySXdEvd" target="_blank" rel="noopener noreferrer">Discord &rarr;</a>
         </div>
       </div>
 
       <div class="info-card">
-        <div class="info-card-header">
-          <UIcon name="i-lucide-sliders-horizontal" class="size-4 text-primary-500" />
-          <h3>Tuning Resources</h3>
-        </div>
+        <span class="info-card-icon" aria-hidden="true"><UIcon name="i-lucide-trending-up" /></span>
+        <h3>Tuning Resources</h3>
         <p>Use Blackbox insights to tune PIDs and filter settings.</p>
         <div class="info-links">
-          <a href="https://rotorflight.org/docs/Tuning/First-Flight-Filter-Tuning" target="_blank"
-            rel="noopener noreferrer">
-            <UIcon name="i-lucide-file-text" class="size-3.5" /> Filter Tuning
-          </a>
-
+          <a href="https://rotorflight.org/docs/Tuning/First-Flight-Filter-Tuning" target="_blank" rel="noopener noreferrer"
+            >Filter tuning &rarr;</a
+          >
         </div>
       </div>
 
-
       <div class="info-card">
-        <div class="info-card-header">
-          <UIcon name="i-lucide-info" class="size-4 text-primary-500" />
-          <h3>Links</h3>
-        </div>
+        <span class="info-card-icon" aria-hidden="true"><UIcon name="i-lucide-globe" /></span>
+        <h3>Links</h3>
         <div class="info-links">
-          <a href="https://www.rotorflight.org" target="_blank" rel="noopener noreferrer">
-            <UIcon name="i-lucide-globe" class="size-3.5" /> Rotorflight
-          </a>          
-          
+          <a href="https://www.rotorflight.org" target="_blank" rel="noopener noreferrer">Rotorflight &rarr;</a>
         </div>
       </div>
     </div>
@@ -428,18 +414,21 @@ const loadingFileText = computed(() => {
   background: rgba(255, 255, 255, 0.06);
 }
 
-/* Info grid */
+/* Info cards */
 .info-grid {
+  position: relative;
+  z-index: 1;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
   width: 100%;
-  max-width: 56rem;
+  max-width: 1100px;
+  margin-top: 1rem;
 }
 
 @media (max-width: 900px) {
   .info-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -449,75 +438,94 @@ const loadingFileText = computed(() => {
   }
 }
 
-/* Info cards */
 .info-card {
-  border: 1px solid var(--border-color, #ddd);
-  border-radius: 0.5rem;
-  padding: 0.75rem;
-  background: var(--surface-0);
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  transition: border-color 0.2s;
+  padding: 24px;
+  border: 1px solid hsl(220, 12%, 85%);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease;
 }
 
-.info-card:hover {
-  border-color: var(--color-primary-500);
+:root.dark .info-card {
+  border-color: hsl(220, 10%, 22%);
+  background: rgba(31, 33, 37, 0.8);
 }
 
-.info-card-header {
-  display: flex;
+.info-card:hover,
+:root.dark .info-card:hover {
+  border-color: var(--rf-accent);
+  transform: translateY(-4px);
+}
+
+.info-card-icon {
+  display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  background: rgba(77, 168, 218, 0.15);
+  color: var(--rf-accent);
+  font-size: 22px;
 }
 
-.info-card-header h3 {
-  font-size: 0.8rem;
-  font-weight: 600;
-  margin: 0;
+:root.dark .info-card-icon {
+  color: #80c5eb;
+}
+
+.info-card h3 {
+  margin: 0 0 8px;
+  font-size: 1.2em;
+  font-weight: 800;
   color: var(--text-primary);
 }
 
 .info-card p {
-  margin: 0;
-  line-height: 1.4;
+  margin: 0 0 14px;
+  font-size: 0.95em;
+  line-height: 1.6;
+  color: var(--text-secondary);
 }
 
-/* Link list */
+.info-card p a {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Links sit at the bottom of the card, like the "Logging guide ->" link on the upstream cards */
 .info-links {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  /*margin-top: auto;*/
-  padding-top: 0.25rem;
-  border-top: 1px solid var(--border-color, #eee);
+  gap: 4px;
+  margin-top: auto;
 }
 
 .info-links a {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.7rem;
-  color: var(--color-primary-700, #063363);
+  align-self: flex-start;
+  font-size: 0.85em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   text-decoration: none;
-  padding: 0.2rem 0.35rem;
-  border-radius: 0.25rem;
-  transition: background-color 0.15s, color 0.15s;
+  color: var(--rf-accent);
+  transition: color 0.15s ease;
 }
 
 .info-links a:hover {
-  background-color: var(--color-primary-50, #eaf4fb);
-  color: var(--color-primary-800, #052a4f);
+  color: #2f8ed0;
 }
 
 :root.dark .info-links a {
-  color: var(--color-primary-400, #2f8ed0);
+  color: #80c5eb;
 }
 
 :root.dark .info-links a:hover {
-  background-color: rgba(8, 80, 172, 0.1);
-  color: var(--color-primary-300, #63b0e3);
+  color: #b3dcf3;
 }
 </style>
