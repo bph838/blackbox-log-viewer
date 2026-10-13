@@ -1,7 +1,21 @@
 <template>
   <div>
     <!-- Logo bar with amber accent bottom border -->
-    <div class="toolbar-logo">
+    <div class="toolbar-logo" @mouseenter="traceKey++">
+      <!-- Same stylised gyro traces as the welcome page hero, squashed into the bar.
+           Re-keyed on hover so the draw-in animation replays. -->
+      <div class="toolbar-trace" aria-hidden="true">
+        <svg :key="traceKey" viewBox="0 0 1200 200" preserveAspectRatio="none">
+          <path
+            class="toolbar-trace-a"
+            d="M0 110 C 60 60, 110 160, 170 105 S 280 40, 340 100 S 450 170, 520 95 S 640 30, 700 110 S 820 180, 880 90 S 1000 40, 1060 115 S 1160 150, 1200 100"
+          />
+          <path
+            class="toolbar-trace-b"
+            d="M0 120 C 80 150, 130 70, 200 115 S 320 160, 380 105 S 480 60, 560 120 S 660 150, 740 95 S 860 70, 920 125 S 1040 150, 1100 100 S 1170 90, 1200 110"
+          />
+        </svg>
+      </div>
       <div class="flex items-center gap-2">
         <img src="/images/rf_logo_white.svg" alt="Rotorflight" class="toolbar-logo-img" />
         <span class="toolbar-logo-subtitle">Blackbox Explorer</span>
@@ -119,6 +133,7 @@
 </template>
 
 <script setup>
+import { ref } from "vue";
 import { useLogStore } from "../stores/log.js";
 import { useAppStore } from "../stores/app.js";
 import LogFileInput from "./LogFileInput.vue";
@@ -140,6 +155,7 @@ defineEmits([
 
 const logStore = useLogStore();
 const appStore = useAppStore();
+const traceKey = ref(0);
 </script>
 
 <style scoped>
@@ -150,6 +166,73 @@ const appStore = useAppStore();
   padding: 0.35rem 0.75rem;
   background: hsl(0, 0%, 12%);
   border-bottom: 2px solid var(--color-primary-500, #0850ac);
+  position: relative;
+  overflow: hidden;
+}
+
+.toolbar-logo > :not(.toolbar-trace) {
+  position: relative;
+  z-index: 1;
+}
+
+.toolbar-trace {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  /* Keep the traces mostly clear of the logo + "Blackbox Explorer" subtitle, fading in after them */
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0,
+    rgba(0, 0, 0, 0.5) 260px,
+    #000 480px,
+    #000 80%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0,
+    rgba(0, 0, 0, 0.5) 260px,
+    #000 480px,
+    #000 80%,
+    transparent 100%
+  );
+}
+
+.toolbar-trace svg {
+  width: 100%;
+  height: 100%;
+}
+
+.toolbar-trace path {
+  fill: none;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 3000;
+  stroke-dashoffset: 3000;
+  animation: toolbar-trace-draw 2.4s ease-out forwards;
+}
+
+.toolbar-trace-a {
+  stroke: #4da8da;
+}
+
+.toolbar-trace path.toolbar-trace-b {
+  stroke: rgba(255, 255, 255, 0.25);
+  animation-delay: 0.3s;
+}
+
+@keyframes toolbar-trace-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbar-trace path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
 }
 
 .toolbar-logo-img {
