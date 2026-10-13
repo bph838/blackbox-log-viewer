@@ -1,6 +1,19 @@
 <template>
   <div v-if="!logStore.hasLog && !logStore.hasVideo" class="welcome-page">
-    <!-- Hero -->
+    <!-- Hero, with a stylised pair of gyro traces drawn behind it (from rotorflight-blackbox's welcome page) -->
+    <div class="hero-wrap">
+    <div class="rf-trace" aria-hidden="true">
+      <svg viewBox="0 0 1200 200" preserveAspectRatio="none">
+        <path
+          class="rf-trace-a"
+          d="M0 110 C 60 60, 110 160, 170 105 S 280 40, 340 100 S 450 170, 520 95 S 640 30, 700 110 S 820 180, 880 90 S 1000 40, 1060 115 S 1160 150, 1200 100"
+        />
+        <path
+          class="rf-trace-b"
+          d="M0 120 C 80 150, 130 70, 200 115 S 320 160, 380 105 S 480 60, 560 120 S 660 150, 740 95 S 860 70, 920 125 S 1040 150, 1100 100 S 1170 90, 1200 110"
+        />
+      </svg>
+    </div>
     <div class="hero">
       <img :src="logoSrc" alt="Rotorflight" class="hero-logo" />
       <p class="hero-subtitle">Blackbox Explorer</p>
@@ -8,6 +21,7 @@
       <p class="tag-version">{{ appStore.statusViewerVersion }}</p>
       <p v-if="loadingFileText" class="loading-file-indicator">{{ loadingFileText }}</p>
       <LogFileInput size="lg" label="Open log file / video" @files-selected="$emit('files-selected', $event)" />
+    </div>
     </div>
 
     <!-- Info grid -->
@@ -101,16 +115,93 @@ const loadingFileText = computed(() => {
 
 <style scoped>
 .welcome-page {
+  --rf-accent: #4da8da;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 60vh;
+  min-height: 100vh;
+  overflow: hidden;
   gap: 2rem;
   padding: 2.5rem 1.5rem 1.5rem;
+  background:
+    radial-gradient(circle at 85% -10%, rgba(77, 168, 218, 0.18) 0%, transparent 45%),
+    radial-gradient(circle at 0% 110%, rgba(0, 0, 0, 0.04) 0%, transparent 40%),
+    linear-gradient(160deg, hsl(220, 14%, 98%) 0%, hsl(220, 12%, 92%) 100%);
+}
+
+/* Same background as rotorflight-blackbox's welcome page */
+:root.dark .welcome-page {
+  background:
+    radial-gradient(circle at 85% -10%, rgba(77, 168, 218, 0.22) 0%, transparent 45%),
+    radial-gradient(circle at 0% 110%, rgba(255, 255, 255, 0.06) 0%, transparent 40%),
+    linear-gradient(160deg, hsl(220, 9%, 13%) 0%, hsl(220, 10%, 9%) 100%);
 }
 
 /* Hero section */
+.hero-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.rf-trace {
+  position: absolute;
+  left: -1.5rem;
+  right: -1.5rem;
+  top: 50%;
+  height: 240px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  opacity: 0.5;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 20%, #000 80%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 20%, #000 80%, transparent 100%);
+}
+
+.rf-trace svg {
+  width: 100%;
+  height: 100%;
+}
+
+.rf-trace path {
+  fill: none;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 3000;
+  stroke-dashoffset: 3000;
+  animation: rf-trace-draw 2.4s ease-out forwards;
+}
+
+.rf-trace-a {
+  stroke: var(--rf-accent);
+}
+
+.rf-trace path.rf-trace-b {
+  stroke: rgba(0, 0, 0, 0.25);
+  animation-delay: 0.3s;
+}
+
+:root.dark .rf-trace path.rf-trace-b {
+  stroke: rgba(255, 255, 255, 0.25);
+}
+
+@keyframes rf-trace-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-trace path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
 .hero {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
