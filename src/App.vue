@@ -12,6 +12,7 @@
           @open-keys="onOpenKeys"
           @open-craft-config="onOpenCraftConfig"
           @open-tuning-log="onOpenTuningLog"
+          @open-flight-analysis="onOpenFlightAnalysis"
           @export-csv="onExportCsv"
           @export-gpx="onExportGpx"
           @export-video="onExportVideo"
@@ -133,6 +134,7 @@
         @save-config="onSaveVideoConfig"
       />
       <TuningLogDialog v-model:open="appStore.tuningLogDialogOpen" />
+      <FlightAnalysisDialog v-model:open="appStore.flightAnalysisDialogOpen" />
     </div>
   </UApp>
 </template>
@@ -166,6 +168,7 @@ import GraphConfigDialog from "./components/GraphConfigDialog.vue";
 import HeaderDialog from "./components/HeaderDialog.vue";
 import VideoExportDialog from "./components/VideoExportDialog.vue";
 import TuningLogDialog from "./components/TuningLogDialog.vue";
+import FlightAnalysisDialog from "./components/FlightAnalysisDialog.vue";
 import CraftSizeToggle from "./components/CraftSizeToggle.vue";
 import SpectrumAnalyser from "./components/SpectrumAnalyser.vue";
 import StepResponseAnalyser from "./components/StepResponseAnalyser.vue";
@@ -252,6 +255,11 @@ function onOpenCraftConfig() {
 function onOpenTuningLog() {
   trackEvent("open_tuning_log");
   appStore.tuningLogDialogOpen = true;
+}
+
+function onOpenFlightAnalysis() {
+  trackEvent("open_flight_analysis");
+  appStore.flightAnalysisDialogOpen = true;
 }
 
 function onExportCsv() {

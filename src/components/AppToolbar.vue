@@ -69,6 +69,16 @@
         <UButton
           variant="ghost"
           color="neutral"
+          label="Flight Analysis"
+          icon="i-lucide-activity"
+          size="xs"
+          :disabled="!logStore.hasLog"
+          title="Flight Analysis: headspeed, power, battery, vibration and PID tracking checks"
+          @click="$emit('open-flight-analysis')"
+        />
+        <UButton
+          variant="ghost"
+          color="neutral"
           label="Craft Config"
           icon="i-lucide-file-cog"
           size="xs"
@@ -125,6 +135,7 @@ defineEmits([
   "open-keys",
   "open-craft-config",
   "open-tuning-log",
+  "open-flight-analysis",
 ]);
 
 const logStore = useLogStore();

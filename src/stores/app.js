@@ -39,6 +39,7 @@ export const useAppStore = defineStore("app", () => {
   const craftNameMismatchDialogOpen = ref(false);
   const craftNameMismatchMessage = ref("");
   const tuningLogDialogOpen = ref(false);
+  const flightAnalysisDialogOpen = ref(false);
 
   // Callbacks registered by main.js (closure-dependent operations)
   const loadFiles = shallowRef(null);
@@ -89,6 +90,7 @@ export const useAppStore = defineStore("app", () => {
     craftNameMismatchDialogOpen,
     craftNameMismatchMessage,
     tuningLogDialogOpen,
+    flightAnalysisDialogOpen,
     loadFiles,
     newGraphConfig,
     exportCsv,
