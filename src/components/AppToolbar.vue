@@ -93,7 +93,7 @@
         <UButton
           variant="ghost"
           color="neutral"
-          label="Imagine"
+          label="Gyro Filters"
           icon="i-lucide-sparkles"
           size="xs"
           :disabled="!logStore.hasLog"
