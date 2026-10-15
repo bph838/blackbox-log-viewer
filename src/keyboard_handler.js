@@ -228,6 +228,12 @@ export function createKeydownHandler(ctx) {
       }
     },
     KeyT: handleKeyTable,
+    KeyB(e, shifted) {
+      if (!shifted) {
+        appStore.headspeedInfoDialogOpen = true;
+        e.preventDefault();
+      }
+    },
     KeyW(e) {
       if (e.shiftKey) {
         workspaceStore.showDefaultMenu = true;

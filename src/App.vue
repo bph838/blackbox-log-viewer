@@ -135,6 +135,7 @@
       />
       <TuningLogDialog v-model:open="appStore.tuningLogDialogOpen" />
       <FlightAnalysisDialog v-model:open="appStore.flightAnalysisDialogOpen" />
+      <HeadspeedInfoDialog v-model:open="appStore.headspeedInfoDialogOpen" />
     </div>
   </UApp>
 </template>
@@ -169,6 +170,7 @@ import HeaderDialog from "./components/HeaderDialog.vue";
 import VideoExportDialog from "./components/VideoExportDialog.vue";
 import TuningLogDialog from "./components/TuningLogDialog.vue";
 import FlightAnalysisDialog from "./components/FlightAnalysisDialog.vue";
+import HeadspeedInfoDialog from "./components/HeadspeedInfoDialog.vue";
 import CraftSizeToggle from "./components/CraftSizeToggle.vue";
 import SpectrumAnalyser from "./components/SpectrumAnalyser.vue";
 import StepResponseAnalyser from "./components/StepResponseAnalyser.vue";
