@@ -549,7 +549,7 @@
               </div>
 
               <UTooltip v-if="entryUsage" :text="entryUsage.tooltip" :delay-duration="0">
-                <p class="flex items-center gap-1.5 text-xs text-dimmed w-fit">
+                <p class="flex items-center gap-1.5 text-xs text-dimmed w-fit mb-4">
                   <UIcon name="i-lucide-gauge" class="size-3.5 shrink-0" />
                   {{ entryUsage.label }}
                 </p>
