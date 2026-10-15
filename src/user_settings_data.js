@@ -2,6 +2,15 @@
 // the Anthropic SDK into the main bundle before the Tuning Log dialog is ever opened.
 import AI_MODELS from "./data/ai_models.json";
 
+// Models offered to the user. Entries with modelAvailabe: false stay in ai_models.json so older
+// Tuning Log results can still be priced/labelled, but can't be picked for new requests.
+export const availableAiModels = AI_MODELS.models.filter((m) => m.modelAvailabe !== false);
+
+// Falls back to the default model when a saved setting names a model that's no longer available
+export function resolveAiModel(modelId) {
+  return availableAiModels.some((m) => m.id === modelId) ? modelId : AI_MODELS.defaultModel;
+}
+
 // Mixer definitions — shared between settings dialog and renderers
 export const mixerList = [
   { name: "Tricopter", model: "tricopter", image: "tri", defaultMotorOrder: [0, 1, 2], defaultYawOffset: -Math.PI / 2 },

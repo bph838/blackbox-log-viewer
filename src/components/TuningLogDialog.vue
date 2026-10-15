@@ -630,7 +630,7 @@ import { setCurrentBlackboxTime, setGraphZoom } from "../playback_controls.js";
 import { GRAPH_MIN_ZOOM, GRAPH_MAX_ZOOM } from "../stores/graph.js";
 import { usePlaybackStore } from "../stores/playback.js";
 import { useWorkspaceStore } from "../stores/workspace.js";
-import AI_MODELS from "../data/ai_models.json";
+import { availableAiModels, resolveAiModel } from "../user_settings_data.js";
 
 const open = defineModel("open", { type: Boolean, default: false });
 
@@ -641,7 +641,7 @@ const settingsStore = useSettingsStore();
 const playbackStore = usePlaybackStore();
 const workspaceStore = useWorkspaceStore();
 
-const modelOptions = AI_MODELS.models.map((m) => ({
+const modelOptions = availableAiModels.map((m) => ({
   label: m.displayName + (m.description ? ` (${m.description})` : ""),
   value: m.id,
 }));
@@ -1093,7 +1093,7 @@ const pendingEntryIds = ref(new Set());
 const streamingTextByEntryId = ref({});
 
 const modelModel = computed({
-  get: () => settingsStore.userSettings.aiModel || AI_MODELS.defaultModel,
+  get: () => resolveAiModel(settingsStore.userSettings.aiModel),
   set: (val) => settingsStore.saveSetting("aiModel", val),
 });
 
@@ -1435,7 +1435,7 @@ function onAskAi() {
 
   const callOptions = {
     apiKey: settings.aiApiKey,
-    model: settings.aiModel,
+    model: modelModel.value,
     effort: settings.aiEffort,
     skillIds: useSkillsModel.value ? settings.aiSkillIds : [],
     historyMessages,
@@ -1447,7 +1447,7 @@ function onAskAi() {
 
   function onResult(text, entryMessages, costUsd) {
     clearPending(entry.id);
-    tuningLogStore.setEntryAiResult(entry.id, { model: settings.aiModel, conversation: entryMessages, costUsd });
+    tuningLogStore.setEntryAiResult(entry.id, { model: modelModel.value, conversation: entryMessages, costUsd });
     if (slice) tuningLogStore.markEntrySliceSent(entry.id);
   }
 

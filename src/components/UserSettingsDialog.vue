@@ -433,7 +433,7 @@ import SettingRow from "./SettingRow.vue";
 import PercentInput from "./PercentInput.vue";
 import { useSettingsStore } from "../stores/settings.js";
 import { FLIGHT_LOG_GOVSTATES, FLIGHT_LOG_AIRBORNE_STATES } from "../flightlog_fielddefs.js";
-import AI_MODELS from "../data/ai_models.json";
+import { availableAiModels, resolveAiModel } from "../user_settings_data.js";
 import { createGitHubClient } from "../github_client.js";
 import { FLIGHT_SLICE_SAMPLE_RATES, DEFAULT_FLIGHT_SLICE_SAMPLE_RATE } from "../flight_slice.js";
 
@@ -445,7 +445,9 @@ const emit = defineEmits(["save"]);
 
 // Deep-clone store settings into local state for editing
 function cloneSettings() {
-  return JSON.parse(JSON.stringify(toRaw(settingsStore.userSettings))); // NOSONAR
+  const settings = JSON.parse(JSON.stringify(toRaw(settingsStore.userSettings))); // NOSONAR
+  settings.aiModel = resolveAiModel(settings.aiModel);
+  return settings;
 }
 
 const local = ref(cloneSettings());
@@ -539,7 +541,7 @@ const altitudeOptions = [
   { label: "feet", value: 2 },
 ];
 
-const aiModelOptions = AI_MODELS.models.map((m) => ({
+const aiModelOptions = availableAiModels.map((m) => ({
   label: m.displayName + (m.description ? ` (${m.description})` : ""),
   value: m.id,
 }));

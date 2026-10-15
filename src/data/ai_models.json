@@ -1,6 +1,15 @@
 {
-  "defaultModel": "claude-haiku-4-5",
+  "defaultModel": "claude-haiku-5-5",
   "models": [
+    {
+      "id": "claude-fable-5-1",
+      "displayName": "Claude Fable 5.1",
+      "description": "most capable, most expensive",
+      "supportsAdaptiveThinking": true,
+      "supportsEffort": true,
+      "pricePerMillionInputTokens": 10.0,
+      "pricePerMillionOutputTokens": 50.0
+    },
     {
       "id": "claude-opus-5-5",
       "displayName": "Claude Opus 5.5",
@@ -20,13 +29,23 @@
       "pricePerMillionOutputTokens": 10.0
     },
     {
+      "id": "claude-haiku-5-5",
+      "displayName": "Claude Haiku 5.5",
+      "description": "fastest, cheapest",
+      "supportsAdaptiveThinking": true,
+      "supportsEffort": true,
+      "pricePerMillionInputTokens": 0.1,
+      "pricePerMillionOutputTokens": 0.5
+    },
+    {
       "id": "claude-haiku-4-5",
       "displayName": "Claude Haiku 4.5",
-      "description": "fastest, cheapest",
+      "description": "previous generation",
       "supportsAdaptiveThinking": false,
       "supportsEffort": false,
       "pricePerMillionInputTokens": 1.0,
-      "pricePerMillionOutputTokens": 5.0
+      "pricePerMillionOutputTokens": 5.0,
+      "modelAvailabe": false
     }
   ]
 }
