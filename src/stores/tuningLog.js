@@ -437,9 +437,16 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     }
   }
 
-  function createLog(name, craftName) {
-    adoptLog(TuningLog.create(name, craftName), OPS.CREATE_LOG);
+  function createLog(name, craftName, description) {
+    adoptLog(TuningLog.create(name, craftName, description), OPS.CREATE_LOG);
     return currentLog.value;
+  }
+
+  function updateDescription(description) {
+    if (!currentLog.value || (currentLog.value.description || "") === description) return;
+
+    currentLog.value.description = description;
+    change(OPS.UPDATE_DESCRIPTION);
   }
 
   /**
@@ -716,6 +723,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     deleteLog,
     addEntry,
     deleteEntry,
+    updateDescription,
     updateEntryNotes,
     updateEntryImage,
     updateEntrySlice,

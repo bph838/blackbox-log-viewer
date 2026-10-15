@@ -95,6 +95,14 @@ describe("buildPromptText", () => {
     expect(buildPromptText({ configSummary: "", hasSlice: true })).toContain("CSV data for a block of the flight");
     expect(buildPromptText({ configSummary: "" })).not.toContain("CSV data");
   });
+
+  it("includes the heli description only when one is given", () => {
+    expect(buildPromptText({ configSummary: "", heliDescription: " Goblin 700, 12S " })).toContain(
+      "describes the helicopter as follows",
+    );
+    expect(buildPromptText({ configSummary: "", heliDescription: "Goblin 700, 12S" })).toContain("Goblin 700, 12S");
+    expect(buildPromptText({ configSummary: "", heliDescription: "  " })).not.toContain("describes the helicopter");
+  });
 });
 
 describe("extractInstructions", () => {

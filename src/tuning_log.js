@@ -49,7 +49,11 @@ export function makeId(timestampIso, logIndex, logCount) {
   return hashHex(key);
 }
 
-export function create(name, craftName) {
+/**
+ * description: free text about the heli itself (size, make/model, motor, blades...), sent to the
+ * AI as context with every analysis.
+ */
+export function create(name, craftName, description) {
   const createdDate = new Date().toISOString();
 
   return {
@@ -57,6 +61,7 @@ export function create(name, craftName) {
     logId: hashHex(`${name || ""}|${createdDate}`),
     name: name || craftName || "Tuning Log",
     craftName: craftName || "",
+    description: description || "",
     createdDate,
     entries: [],
     // Tombstones ({ id, deletedAt }) for deleted entries, so a sync can't bring them back from

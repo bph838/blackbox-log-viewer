@@ -77,17 +77,28 @@ export function extractInstructions(promptText) {
 }
 
 /**
- * options: { configSummary, instructions, expertMode, hasSlice }
+ * options: { configSummary, instructions, expertMode, hasSlice, heliDescription }
  * hasSlice: an isolated-flight CSV block (see flight_slice.js) is attached to the same message.
+ * heliDescription: the user's own description of the heli (size, make/model, etc.) from the
+ * tuning log, if they gave one.
  */
 export function buildPromptText(options) {
   const instructions = (options.instructions || "").trim() || NO_INSTRUCTIONS_PLACEHOLDER;
+  const heliDescription = (options.heliDescription || "").trim();
 
   let text =
     "You are helping tune the PID controller of an RC helicopter flight controller running Rotorflight " +
     "(forked from Betaflight). Attached is a step response graph generated from a blackbox log, showing " +
     "setpoint-vs-gyro tracking (Roll in red, Pitch in cyan, Yaw in yellow) for the 0-500ms period after a " +
-    "stick input, with 1.0 on the y-axis representing perfect tracking.\n\n" +
+    "stick input, with 1.0 on the y-axis representing perfect tracking.\n\n";
+
+  if (heliDescription) {
+    text +=
+      "The user describes the helicopter as follows - take its size, build and components into account " +
+      `when judging the response and recommending values:\n${heliDescription}\n\n`;
+  }
+
+  text +=
     `Current flight controller configuration extracted from the log:\n${options.configSummary}\n\n` +
     `${INSTRUCTIONS_START}${instructions}${INSTRUCTIONS_END}` +
     "Analyse the attached step response graph and suggest specific, actionable PID changes " +
@@ -325,7 +336,7 @@ const NO_CANCEL = () => {};
  * the rest of the tuning log's history prepended as context.
  *
  * options: { apiKey, model, effort, skillIds, historyMessages, entry: {image,
- * config}, instructions, expertMode, images, slice, onChunk }
+ * config}, instructions, expertMode, heliDescription, images, slice, onChunk }
  * slice, if given, is an isolated-flight slice (see flight_slice.js) sent as a CSV text block.
  * images, if given, is an array of extra data-URL images (e.g. pasted screenshots) to attach
  * alongside the entry's own step response image.
@@ -373,6 +384,7 @@ export function analyze(options, onResult, onError) {
       instructions: options.instructions,
       expertMode: options.expertMode,
       hasSlice: !!options.slice,
+      heliDescription: options.heliDescription,
     }),
   });
 

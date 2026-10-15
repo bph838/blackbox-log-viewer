@@ -34,6 +34,36 @@
           <TuningLogSyncStatus />
         </div>
         <div class="flex items-center gap-1">
+          <UPopover
+            v-if="tuningLogStore.hasLog && !creatingNew"
+            v-model:open="descriptionOpen"
+            :ui="{ content: 'z-[300]' }"
+          >
+            <UButton
+              variant="soft"
+              color="neutral"
+              size="xs"
+              icon="i-lucide-info"
+              label="Heli description"
+              :title="tuningLogStore.currentLog.description || 'Describe this heli for the AI'"
+            />
+            <template #content>
+              <div class="p-3 w-[26rem] flex flex-col gap-2">
+                <p class="text-xs font-medium flex items-center gap-1">
+                  Heli description
+                  <HelpIcon :text="HELI_DESCRIPTION_HELP" />
+                </p>
+                <UTextarea
+                  v-model="descriptionDraft"
+                  :rows="5"
+                  :placeholder="HELI_DESCRIPTION_PLACEHOLDER"
+                  size="sm"
+                  class="w-full"
+                  @blur="saveDescription"
+                />
+              </div>
+            </template>
+          </UPopover>
           <UButton variant="soft" color="neutral" size="xs" label="New…" @click="onNewClick" />
           <UButton variant="soft" color="neutral" size="xs" label="Import…" @click="onImportClick" />
           <UButton
@@ -120,13 +150,64 @@
         </div>
 
         <!-- Create-new form -->
-        <div v-else-if="creatingNew" class="flex flex-col gap-2 max-w-sm mx-auto my-8">
-          <label class="text-sm font-medium">Tuning log name</label>
-          <UInput v-model="newLogName" placeholder="e.g. craft name" size="sm" @keyup.enter="onCreateConfirm" />
-          <p v-if="createError" class="text-xs text-error">{{ createError }}</p>
-          <div class="flex justify-end gap-2 mt-2">
-            <UButton variant="outline" color="neutral" label="Cancel" @click="creatingNew = false" />
-            <UButton color="primary" label="Create…" @click="onCreateConfirm" />
+        <div
+          v-else-if="creatingNew"
+          class="w-full max-w-lg mx-auto my-6 rounded-lg border border-default bg-elevated/40 shadow-sm"
+        >
+          <div class="flex items-start gap-3 px-5 pt-5 pb-4 border-b border-default">
+            <div class="flex items-center justify-center size-9 rounded-full bg-primary/10 shrink-0">
+              <UIcon name="i-lucide-notebook-pen" class="size-5 text-primary" />
+            </div>
+            <div class="min-w-0">
+              <h3 class="font-semibold text-base">New tuning log</h3>
+              <p class="text-xs text-dimmed">
+                Tracks your tuning of
+                <strong v-if="newLogCraft" class="font-medium text-default">{{ newLogCraft }}</strong>
+                <template v-else>this heli</template>
+                over time - one entry per flight log, with AI advice that builds on earlier flights.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-4 px-5 py-4">
+            <div class="flex flex-col gap-1.5">
+              <label for="new-tuning-log-name" class="text-sm font-medium">Name</label>
+              <UInput
+                id="new-tuning-log-name"
+                v-model="newLogName"
+                placeholder="e.g. craft name"
+                class="w-full"
+                autofocus
+                @keyup.enter="onCreateConfirm"
+              />
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label for="new-tuning-log-description" class="text-sm font-medium">
+                Heli description <span class="font-normal text-dimmed">(optional)</span>
+              </label>
+              <UTextarea
+                id="new-tuning-log-description"
+                v-model="newLogDescription"
+                :rows="4"
+                autoresize
+                :maxrows="10"
+                :placeholder="HELI_DESCRIPTION_PLACEHOLDER"
+                class="w-full"
+              />
+              <p class="flex items-start gap-1.5 text-xs text-dimmed">
+                <UIcon name="i-lucide-sparkles" class="size-3.5 shrink-0 mt-px text-primary" />
+                Size, make and model, motor, ESC, blades, headspeed, flying style - sent to the AI with
+                every analysis so its advice fits your heli. You can change it later.
+              </p>
+            </div>
+
+            <p v-if="createError" class="text-xs text-error">{{ createError }}</p>
+          </div>
+
+          <div class="flex justify-end gap-2 px-5 py-3 border-t border-default">
+            <UButton variant="ghost" color="neutral" label="Cancel" @click="creatingNew = false" />
+            <UButton color="primary" icon="i-lucide-plus" label="Create tuning log" @click="onCreateConfirm" />
           </div>
         </div>
 
@@ -395,7 +476,7 @@
               <h4 class="text-xs font-semibold flex items-center gap-1">
                 PID tuning advice
                 <HelpIcon
-                  text="Sends the step response image and configuration for this entry, plus whatever you type below - and, if attached, the isolated block of the flight (Ctrl+I / Ctrl+O) with the current workspace's fields. As context, it also sends the images, configs, notes and past AI answers from every other entry already saved in this tuning log."
+                  text="Sends the step response image and configuration for this entry, the heli description, plus whatever you type below - and, if attached, the isolated block of the flight (Ctrl+I / Ctrl+O) with the current workspace's fields. As context, it also sends the images, configs, notes and past AI answers from every other entry already saved in this tuning log."
                 />
               </h4>
 
@@ -643,8 +724,13 @@ const APPROXIMATED_DATETIME_TOOLTIP =
 
 // ---- Create / Import ----
 
+const HELI_DESCRIPTION_HELP =
+  "Describe the heli - size, make and model, motor, ESC, blades, headspeed, flying style. This is sent to the AI with every analysis in this tuning log, so its advice can take the heli into account.";
+const HELI_DESCRIPTION_PLACEHOLDER = "e.g. Goblin 700 Competition, 12S, Scorpion motor, 690mm blades, 2100 rpm, 3D";
+
 const creatingNew = ref(false);
 const newLogName = ref("");
+const newLogDescription = ref("");
 // Craft name the new log is for - the flight log's, unless started from the log switcher.
 const newLogCraft = ref("");
 const createError = ref("");
@@ -659,6 +745,7 @@ function onNewForCraft(craftName) {
   switcherOpen.value = false;
   newLogName.value = craftName || "";
   newLogCraft.value = craftName || "";
+  newLogDescription.value = "";
   createError.value = "";
   creatingNew.value = true;
 }
@@ -670,10 +757,28 @@ function onCreateConfirm() {
     return;
   }
 
-  tuningLogStore.createLog(name, newLogCraft.value || sysConfig.value?.["Craft name"] || "");
+  tuningLogStore.createLog(
+    name,
+    newLogCraft.value || sysConfig.value?.["Craft name"] || "",
+    newLogDescription.value.trim(),
+  );
   creatingNew.value = false;
   selectedEntryId.value = null;
   syncSelectionToCurrentFlightLog();
+}
+
+// ---- Heli description (editing an existing log's) ----
+
+const descriptionOpen = ref(false);
+const descriptionDraft = ref("");
+
+watch(descriptionOpen, (isOpen) => {
+  if (isOpen) descriptionDraft.value = tuningLogStore.currentLog?.description || "";
+  else saveDescription();
+});
+
+function saveDescription() {
+  if (tuningLogStore.hasLog) tuningLogStore.updateDescription(descriptionDraft.value.trim());
 }
 
 function onImportClick() {
@@ -1065,6 +1170,7 @@ async function onCopyPrompt() {
     configSummary: currentEntry.value.config,
     instructions: aiPromptText.value,
     expertMode: expertModeModel.value,
+    heliDescription: tuningLogStore.currentLog?.description,
   });
 
   try {
@@ -1472,6 +1578,7 @@ function onAskAi() {
   } else {
     callOptions.entry = entry;
     callOptions.instructions = promptText;
+    callOptions.heliDescription = tuningLogStore.currentLog?.description;
     cancelRequest = TuningAI.analyze(callOptions, onResultAndForget, onError);
   }
 

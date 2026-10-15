@@ -16,6 +16,7 @@ export const OPS = {
   ADD_ENTRY: "addEntry",
   DELETE_ENTRY: "deleteEntry",
   UPDATE_NOTES: "updateNotes",
+  UPDATE_DESCRIPTION: "updateDescription",
   UPDATE_IMAGE: "updateImage",
   UPDATE_SLICE: "updateSlice",
   SET_AI: "setAi",
@@ -60,7 +61,12 @@ export function recordChange(sync, change) {
     return sync;
   }
 
-  if (change.op === OPS.UPDATE_NOTES || change.op === OPS.UPDATE_IMAGE || change.op === OPS.SET_AI) {
+  if (
+    change.op === OPS.UPDATE_NOTES ||
+    change.op === OPS.UPDATE_IMAGE ||
+    change.op === OPS.SET_AI ||
+    change.op === OPS.UPDATE_DESCRIPTION
+  ) {
     const existing = pending.find((c) => c.op === change.op && c.entryId === change.entryId);
     if (existing) {
       existing.at = at;
@@ -303,7 +309,7 @@ export function mergeLogs(base, local, remote) {
   merged.deletedEntries = deletedEntries;
 
   // Log-level fields: whichever side changed wins; if both did, this computer's edit wins.
-  for (const field of ["name", "craftName"]) {
+  for (const field of ["name", "craftName", "description"]) {
     const result = threeWay(base && base[field], local[field], remote[field]);
     merged[field] = result.conflict ? local[field] : result.value;
   }
