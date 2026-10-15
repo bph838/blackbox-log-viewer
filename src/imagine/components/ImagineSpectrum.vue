@@ -61,7 +61,16 @@
     </div>
 
     <div ref="container" class="relative min-h-0 flex-1 bg-black">
-      <canvas ref="canvas" class="absolute inset-0" @mousemove="onMouseMove" @mouseleave="clearMouse" />
+      <canvas ref="canvas" class="absolute inset-0" @mousemove="onMouseMove" @mouseleave="onMouseLeave" />
+      <div
+        v-if="hover"
+        class="pointer-events-none absolute top-2 rounded bg-neutral-900/85 px-2 py-1 font-mono text-xs leading-tight text-white"
+        :style="{ left: `${hover.left}px` }"
+      >
+        <div class="text-sm font-semibold">{{ hover.hz.toFixed(1) }} Hz</div>
+        <div class="text-neutral-300">{{ Math.round(hover.hz * 60) }} rpm</div>
+        <div v-if="hover.harmonic" class="text-neutral-300">{{ hover.harmonic.toFixed(2) }} × main rotor</div>
+      </div>
       <div
         v-if="store.settingsDirty && store.imagined"
         class="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded bg-warning/90 px-3 py-1 text-xs font-semibold text-black"
@@ -175,7 +184,40 @@ function updateMarkers() {
   draw();
 }
 
+// Frequency under the mouse, shown in the top left of the chart. The plot's x axis runs from 0 Hz
+// at its left margin to (log rate / 2) / zoom at the right edge.
+const hover = ref(null);
+
+function updateHover(e) {
+  if (!hasData || !store.rates || !canvas.value) {
+    hover.value = null;
+    return;
+  }
+  const rect = canvas.value.getBoundingClientRect();
+  const marginLeft = GraphSpectrumPlot._getActualMarginLeft();
+  const width = canvas.value.width - marginLeft;
+  const x = e.clientX - rect.left - marginLeft;
+  if (width <= 0 || x < 0) {
+    hover.value = null;
+    return;
+  }
+  const maxHz = (0.5 * store.rates.logRateHz) / (zoomX.value / 100);
+  const hz = (x / width) * maxHz;
+  const head = store.rotorSpeeds?.head;
+  hover.value = {
+    hz,
+    harmonic: head ? hz / (head / 60) : null,
+    left: marginLeft + 8,
+  };
+}
+
+function onMouseLeave() {
+  hover.value = null;
+  clearMouse();
+}
+
 function onMouseMove(e) {
+  updateHover(e);
   const ratios = store.rotor;
   const ctrlActive = e.ctrlKey && ratios?.mainGearRatio && ratios?.tailPerHead;
   if (e.shiftKey || ctrlActive) {
