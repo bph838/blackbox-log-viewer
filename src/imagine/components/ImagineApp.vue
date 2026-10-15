@@ -9,7 +9,6 @@
       <ImagineToolbar @open-file="openFile" />
 
       <div v-if="store.hasLog" class="flex min-h-0 flex-1">
-        <ImagineSettingsPanel />
         <main class="flex min-w-0 flex-1 flex-col">
           <UAlert
             v-if="store.firmware && store.firmware.status !== 'match'"
@@ -39,6 +38,7 @@
           </div>
           <ImagineResults />
         </main>
+        <ImagineSettingsPanel />
       </div>
 
       <div v-else class="flex flex-1 items-center justify-center p-6">

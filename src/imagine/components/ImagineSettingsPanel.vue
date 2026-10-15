@@ -1,5 +1,5 @@
 <template>
-  <aside class="flex h-full min-h-0 w-[27rem] shrink-0 flex-col border-r border-default">
+  <aside class="flex h-full min-h-0 w-[27rem] shrink-0 flex-col border-l border-default">
     <div class="flex items-center gap-2 border-b border-default px-3 py-1.5 text-xs">
       <span class="flex-1 text-muted">Laid out like the Configurator's Gyro tab</span>
       <USwitch v-model="expertMode" size="xs" aria-label="Expert mode" />
