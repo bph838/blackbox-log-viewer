@@ -17,6 +17,9 @@ for (const m of AI_MODELS.models) {
 
 export const DEFAULT_MODEL = AI_MODELS.defaultModel;
 
+// Models that accept the server-side refusal fallback ("default" routing)
+const REFUSAL_FALLBACK_MODELS = new Set(["claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"]);
+
 function createClient(apiKey) {
   return new Anthropic({
     apiKey,
@@ -272,14 +275,21 @@ export function buildHistoryMessages(log, excludingEntryId, maxImages) {
 }
 
 /**
- * options may include an `onChunk(textSnapshot)` callback - if given, it's called every time more
- * response text arrives, with the full text accumulated so far (not just the latest delta), so
- * callers can render progressively instead of waiting for the whole response.
+ * Streams one request to Claude and hands back the complete final message - every content block
+ * (text, thinking, tool_use, ...) exactly as the API returned it. Shared by the Tuning Log (via
+ * sendMessages, which keeps only the text) and Imagine's AI Filters panel (which needs tool_use
+ * blocks for structured suggestions, and must send thinking blocks back unchanged on the next
+ * turn).
  *
- * Returns a cancel() function that aborts the request - after which neither onResult nor onError
+ * options: { apiKey, model, effort, skillIds, onChunk(textSnapshot), onStatus(status) }
+ * extras: { system, tools } - optional system prompt (string or text blocks) and client tools
+ * handlers: { onFinal(response, costUsd, usage), onError(message) }
+ *
+ * Returns a cancel() function that aborts the request - after which neither onFinal nor onError
  * is called (the caller already knows it cancelled).
  */
-function sendMessages(options, messages, onResult, onError) {
+export function streamClaude(options, extras, messages, handlers) {
+  const { onFinal, onError } = handlers;
   let client;
   try {
     client = createClient(options.apiKey);
@@ -303,6 +313,13 @@ function sendMessages(options, messages, onResult, onError) {
     cache_control: { type: "ephemeral" },
   };
 
+  if (extras && extras.system) {
+    requestParams.system = extras.system;
+  }
+  if (extras && extras.tools && extras.tools.length) {
+    requestParams.tools = [...extras.tools];
+  }
+
   // Adaptive thinking isn't supported on every model (e.g. Haiku 4.5) - only request it where it's valid
   const modelInfo = MODELS_BY_ID[model];
   if (!modelInfo || modelInfo.supportsAdaptiveThinking) {
@@ -320,7 +337,7 @@ function sendMessages(options, messages, onResult, onError) {
   // aren't picked up automatically just because they exist on the account.
   const skillIds = (options.skillIds || []).filter(Boolean);
   if (skillIds.length > 0) {
-    requestParams.tools = [{ type: "code_execution_20260521", name: "code_execution" }];
+    requestParams.tools = [...(requestParams.tools || []), { type: "code_execution_20260521", name: "code_execution" }];
     requestParams.container = {
       skills: skillIds.map((skillId) => ({ type: "custom", skill_id: skillId, version: "latest" })),
     };
@@ -329,12 +346,26 @@ function sendMessages(options, messages, onResult, onError) {
     // mechanism, so any file the code-execution container writes is unreachable and effectively
     // lost. Skills must still answer entirely in chat text rather than treating a written file as
     // their deliverable.
-    requestParams.system =
+    const skillsNote =
       "This is a chat-only interface with no file download or transfer capability - any file " +
       "written to the code execution container is permanently inaccessible to the user. Never " +
       "treat a saved/exported file as your deliverable. Always give your complete answer directly " +
       "as chat text/markdown in your response, even if that means writing out a long answer " +
       "instead of a file.";
+    if (!requestParams.system) {
+      requestParams.system = skillsNote;
+    } else {
+      const base =
+        typeof requestParams.system === "string" ? [{ type: "text", text: requestParams.system }] : requestParams.system;
+      requestParams.system = [...base, { type: "text", text: skillsNote }];
+    }
+  }
+
+  // Server-side refusal fallback: if this model's safeguards decline the request, the API re-runs
+  // it on a suitable fallback model inside the same call instead of returning a refusal.
+  if (REFUSAL_FALLBACK_MODELS.has(model)) {
+    requestParams.betas = [...(requestParams.betas || []), "server-side-fallback-2026-07-01"];
+    requestParams.fallbacks = "default";
   }
 
   // The SDK can't report how much of the request has been uploaded, so progress is reported as
@@ -370,22 +401,7 @@ function sendMessages(options, messages, onResult, onError) {
 
   stream.on("finalMessage", (response) => {
     if (cancelled) return;
-    let text = "";
-    for (const block of response.content) {
-      if (block.type === "text") {
-        text += block.text;
-      }
-    }
-
-    if (response.stop_reason === "max_tokens") {
-      text = `${text ? `${text}\n\n` : ""}_(This response was cut off - it ran out of its token budget, often because most of it was spent on internal reasoning before any answer was written. Try again, or ask a more focused follow-up question.)_`;
-    }
-
-    text = text || "(No text response received)";
-
-    const updatedMessages = messages.concat([{ role: "assistant", content: text }]);
-    const costUsd = estimateCostUsd(model, response.usage);
-    onResult(text, updatedMessages, costUsd, summariseUsage(response));
+    onFinal(response, estimateCostUsd(model, response.usage), summariseUsage(response));
   });
 
   stream.on("error", (error) => {
@@ -400,6 +416,41 @@ function sendMessages(options, messages, onResult, onError) {
     cancelled = true;
     stream.abort();
   };
+}
+
+/** All text blocks of a response joined, with a note appended if it was cut off. */
+export function responseText(response) {
+  let text = "";
+  for (const block of (response && response.content) || []) {
+    if (block.type === "text") {
+      text += block.text;
+    }
+  }
+
+  if (response && response.stop_reason === "max_tokens") {
+    text = `${text ? `${text}\n\n` : ""}_(This response was cut off - it ran out of its token budget, often because most of it was spent on internal reasoning before any answer was written. Try again, or ask a more focused follow-up question.)_`;
+  }
+  return text;
+}
+
+/**
+ * The Tuning Log's request: streams via streamClaude() and keeps only the reply's text in the
+ * conversation. options may include an `onChunk(textSnapshot)` callback - if given, it's called
+ * every time more response text arrives, with the full text accumulated so far (not just the
+ * latest delta), so callers can render progressively instead of waiting for the whole response.
+ *
+ * Returns a cancel() function that aborts the request - after which neither onResult nor onError
+ * is called (the caller already knows it cancelled).
+ */
+function sendMessages(options, messages, onResult, onError) {
+  return streamClaude(options, null, messages, {
+    onFinal(response, costUsd, usage) {
+      const text = responseText(response) || "(No text response received)";
+      const updatedMessages = messages.concat([{ role: "assistant", content: text }]);
+      onResult(text, updatedMessages, costUsd, usage);
+    },
+    onError,
+  });
 }
 
 const NO_CANCEL = () => {};

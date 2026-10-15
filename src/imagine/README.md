@@ -69,3 +69,13 @@ The reproduce check runs a real log with its own settings and compares the resul
 ```sh
 IMAGINE_SAMPLE_LOG=path/to/log.bbl [IMAGINE_TAIL_RATIO=5.75] npx vitest run src/imagine/validation.test.js --reporter=verbose
 ```
+
+## AI Filters
+
+A chat panel, opened with the toolbar's AI Filters button, where Claude looks at a summary of the log and suggests filter settings. The code is in `ai/`.
+
+- **Claude calls.** These go through `streamClaude` in `src/tuning_ai.js`, shared with the Tuning Log. It uses the same API key, model and effort settings, and streams with adaptive thinking. Server-side refusal fallback is on for the models that support it. The key stays in this browser and only goes to api.anthropic.com.
+- **What is sent.** `filter_summary.js` builds about 5 KB, roughly 1,400 tokens: loop rates, rotor speeds and harmonics, the current settings as CLI lines, and for each axis the noise peaks with their likely source, the noise floor and the flown filters' deepest cuts. An applied config's Imagine result adds roughly 600–700 tokens. The panel's "Show data sent with this message" view shows exactly what will go.
+- **Suggestions.** Claude suggests through the `propose_filter_config` tool in `filter_tool.js`. The tool uses a strict schema, Rotorflight CLI names and CLI units. Every value is checked against the firmware's CLI limits plus cross-checks; a failed check goes straight back to Claude to correct. Nothing changes until the user presses Apply.
+- **Conversations.** `conversation.js` keeps the history append-only, because thinking and tool_use blocks have to go back unchanged. App context is wrapped in `<log_summary>`, `<imagine_result>` or `<current_settings>` tags. Conversations, with their saved configs, are stored per craft in the `rfImagineAiFilters` IndexedDB database.
+- **System prompt.** It's in `system_prompt.js`, and its parameter table is generated from the parameter list in `filter_tool.js`.

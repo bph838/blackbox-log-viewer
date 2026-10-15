@@ -9,10 +9,20 @@
 
 import { craftKey, pendingCount, stripImages } from "./tuning_log_sync.js";
 
-const DB_NAME = "rfTuningLogs";
-const DB_VERSION = 1;
 const LOGS = "logs";
 const IMAGES = "images";
+
+// Database layout: { name, version, stores: [{ name, keyPath }] } (keyPath null = out-of-line keys).
+// The IndexedDB/memory backends below take one of these, so other features (e.g. Imagine's AI
+// Filters conversations) can keep their own database with the same code.
+export const TUNING_LOG_SCHEMA = Object.freeze({
+  name: "rfTuningLogs",
+  version: 1,
+  stores: [
+    { name: LOGS, keyPath: "logId" },
+    { name: IMAGES, keyPath: null },
+  ],
+});
 
 function imageKey(logId, entryId) {
   return `${logId}/${entryId}`;
@@ -25,20 +35,19 @@ function requestToPromise(request) {
   });
 }
 
-function createIndexedDbBackend(indexedDB) {
+export function createIndexedDbBackend(indexedDB, schema = TUNING_LOG_SCHEMA) {
   let dbPromise = null;
 
   function open() {
     if (!dbPromise) {
       dbPromise = new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        const request = indexedDB.open(schema.name, schema.version);
         request.onupgradeneeded = () => {
           const db = request.result;
-          if (!db.objectStoreNames.contains(LOGS)) {
-            db.createObjectStore(LOGS, { keyPath: "logId" });
-          }
-          if (!db.objectStoreNames.contains(IMAGES)) {
-            db.createObjectStore(IMAGES);
+          for (const store of schema.stores) {
+            if (!db.objectStoreNames.contains(store.name)) {
+              db.createObjectStore(store.name, store.keyPath ? { keyPath: store.keyPath } : undefined);
+            }
           }
         };
         request.onsuccess = () => resolve(request.result);
@@ -69,15 +78,20 @@ function createIndexedDbBackend(indexedDB) {
   };
 }
 
-export function createMemoryBackend() {
-  const stores = { [LOGS]: new Map(), [IMAGES]: new Map() };
+export function createMemoryBackend(schema = TUNING_LOG_SCHEMA) {
+  const stores = {};
+  const keyPaths = {};
+  for (const store of schema.stores) {
+    stores[store.name] = new Map();
+    keyPaths[store.name] = store.keyPath;
+  }
   const copy = (value) => (value === undefined ? undefined : structuredClone(value));
 
   return {
     get: async (storeName, key) => copy(stores[storeName].get(key)),
     getAll: async (storeName) => [...stores[storeName].values()].map(copy),
     put: async (storeName, value, key) => {
-      stores[storeName].set(key === undefined ? value.logId : key, copy(value));
+      stores[storeName].set(key === undefined ? value[keyPaths[storeName]] : key, copy(value));
     },
     delete: async (storeName, key) => {
       stores[storeName].delete(key);

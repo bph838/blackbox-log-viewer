@@ -1,6 +1,7 @@
 <template>
   <aside class="flex h-full min-h-0 w-[27rem] shrink-0 flex-col border-l border-default">
     <div class="flex items-center gap-2 border-b border-default px-3 py-1.5 text-xs">
+      <UButton icon="i-lucide-panel-right-close" size="xs" variant="ghost" color="neutral" title="Collapse the Filters panel" @click="$emit('collapse')" />
       <span class="flex-1 text-muted">Laid out like the Configurator's Gyro tab</span>
       <USwitch v-model="expertMode" size="xs" aria-label="Expert mode" />
       <span title="Show Lowpass Filter 2, Notch Filters, Dynamic Cutoff and the RPM Minimum Frequency, as Expert Mode does in the Configurator">
@@ -225,6 +226,7 @@ import ImagineSection from "./ImagineSection.vue";
 import ImagineSubSection from "./ImagineSubSection.vue";
 import ImagineTypeSelect from "./ImagineTypeSelect.vue";
 
+defineEmits(["collapse"]);
 const store = useImagineStore();
 const craftConfigStore = useCraftConfigStore();
 const s = store.settings;

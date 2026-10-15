@@ -349,6 +349,7 @@ export const useImagineStore = defineStore("imagine", () => {
     loadBytes,
     openSubLog,
     resetSettings,
+    applySettings: setSettings,
     imagine,
     invalidateResults,
     setTimeRange,

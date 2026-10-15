@@ -49,6 +49,15 @@
 
     <div class="ml-auto flex items-center gap-2">
       <span v-if="store.statusMessage && store.status === 'ready'" class="text-xs text-dimmed">{{ store.statusMessage }}</span>
+      <UButton
+        label="AI Filters"
+        icon="i-lucide-sparkles"
+        size="xs"
+        :variant="ai.open ? 'solid' : 'outline'"
+        :color="ai.open ? 'primary' : 'neutral'"
+        title="Chat with Claude about your gyro filters (opens a panel on the left)"
+        @click="ai.setOpen(!ai.open)"
+      />
       <UButton label="Open log" icon="i-lucide-folder-open" size="xs" variant="outline" color="neutral" @click="fileInput.click()" />
       <input ref="fileInput" type="file" accept=".bbl,.bfl,.txt,.cfl,.bin,.log" class="hidden" @change="onFile" />
     </div>
@@ -58,8 +67,10 @@
 <script setup>
 import { computed, ref } from "vue";
 import { useImagineStore } from "../imagine_store.js";
+import { useAiFiltersStore } from "../ai/ai_filters_store.js";
 
 const store = useImagineStore();
+const ai = useAiFiltersStore();
 const fileInput = ref(null);
 const emit = defineEmits(["open-file"]);
 

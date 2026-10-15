@@ -9,6 +9,7 @@
       <ImagineToolbar @open-file="openFile" />
 
       <div v-if="store.hasLog" class="flex min-h-0 flex-1">
+        <ImagineAiPanel v-if="ai.open" />
         <main class="flex min-w-0 flex-1 flex-col">
           <UAlert
             v-if="store.firmware && store.firmware.status !== 'match'"
@@ -38,7 +39,27 @@
           </div>
           <ImagineResults />
         </main>
-        <ImagineSettingsPanel />
+        <ImagineSettingsPanel v-if="!filtersCollapsed" @collapse="setFiltersCollapsed(true)" />
+        <aside v-else class="flex h-full w-9 shrink-0 flex-col items-center gap-2 border-l border-default py-2">
+          <UButton icon="i-lucide-panel-right-open" size="xs" variant="ghost" color="neutral" title="Show the Filters panel" @click="setFiltersCollapsed(false)" />
+          <button
+            type="button"
+            class="cursor-pointer text-xs font-semibold text-muted [writing-mode:vertical-rl] hover:text-default"
+            title="Show the Filters panel"
+            @click="setFiltersCollapsed(false)"
+          >
+            Filters
+          </button>
+          <UButton
+            class="mt-auto"
+            icon="i-lucide-sparkles"
+            size="xs"
+            :loading="store.running"
+            :disabled="!store.hasLog || store.status !== 'ready'"
+            title="Imagine"
+            @click="store.imagine()"
+          />
+        </aside>
       </div>
 
       <div v-else class="flex flex-1 items-center justify-center p-6">
@@ -78,10 +99,32 @@ import { useImagineStore } from "../imagine_store.js";
 import { requestLogFromOpener } from "../handoff.js";
 import ImagineToolbar from "./ImagineToolbar.vue";
 import ImagineSettingsPanel from "./ImagineSettingsPanel.vue";
+import ImagineAiPanel from "./ImagineAiPanel.vue";
+import { useAiFiltersStore } from "../ai/ai_filters_store.js";
 import ImagineSpectrum from "./ImagineSpectrum.vue";
 import ImagineResults from "./ImagineResults.vue";
 
 const store = useImagineStore();
+const ai = useAiFiltersStore();
+
+// The Filters panel can collapse to a narrow strip to give the chart more room (remembered).
+const FILTERS_KEY = "imagine.filtersCollapsed";
+function readCollapsed() {
+  try {
+    return globalThis.localStorage?.getItem(FILTERS_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+const filtersCollapsed = ref(readCollapsed());
+function setFiltersCollapsed(v) {
+  filtersCollapsed.value = v;
+  try {
+    globalThis.localStorage?.setItem(FILTERS_KEY, v ? "1" : "0");
+  } catch {
+    // not remembered
+  }
+}
 const dragging = ref(false);
 const picker = ref(null);
 
