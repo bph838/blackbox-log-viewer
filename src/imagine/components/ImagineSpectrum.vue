@@ -62,6 +62,7 @@
 
     <div ref="container" class="relative min-h-0 flex-1 bg-black">
       <canvas ref="canvas" class="absolute inset-0" @mousemove="onMouseMove" @mouseleave="onMouseLeave" />
+      <canvas ref="overlay" class="pointer-events-none absolute inset-0" />
       <div
         v-if="hover"
         class="pointer-events-none absolute top-2 rounded bg-neutral-900/85 px-2 py-1 font-mono text-xs leading-tight text-white"
@@ -93,10 +94,12 @@ import { useSettingsStore } from "../../stores/settings.js";
 import { GraphSpectrumPlot, SPECTRUM_OVERDRAW_TYPE, SPECTRUM_TYPE } from "../../graph_spectrum_plot.js";
 import { AXIS_NAMES, useImagineStore } from "../imagine_store.js";
 import { buildSpectrumView, CURVE_STYLE, markerSysConfig } from "../spectrum_view.js";
+import { dynNotchStats, notchLowerCutoff } from "../dyn_notch_overlay.js";
 
 const store = useImagineStore();
 const container = ref(null);
 const canvas = ref(null);
+const overlay = ref(null);
 const show = reactive({ bars: true, unfiltered: false, imagined: true, logged: false });
 const zoomX = ref(100);
 const zoomY = ref(100);
@@ -138,6 +141,120 @@ let mouseActive = false;
 
 function draw() {
   if (hasData) GraphSpectrumPlot.draw();
+  drawDynNotchOverlay();
+}
+
+// ---- Dynamic notch overlay ----
+// Shaded band: the range the dynamic notches may move in (current settings).
+// Triangles: each notch at its median tracked position over the analysed range, drawn like the
+// static notches (cutoff, centre, mirrored cutoff) with its own Q (Q + 0.2 per extra notch).
+// Strip along the bottom: how much time the notches spent at each frequency.
+const DYN_COLOR = "217, 70, 239";
+
+const dynStats = computed(() => {
+  const result = store.imagined;
+  if (!result?.dynNotchCenters || !result.dynNotchCount || !store.rates) return null;
+  return dynNotchStats(
+    result.dynNotchCenters,
+    result.dynNotchCount,
+    store.axis,
+    store.range.start,
+    store.range.end,
+    store.rates.pidRateHz / 2,
+  );
+});
+
+function drawDynNotchOverlay() {
+  const c = overlay.value;
+  if (!c || !canvas.value) return;
+  if (c.width !== canvas.value.width || c.height !== canvas.value.height) {
+    c.width = canvas.value.width;
+    c.height = canvas.value.height;
+  }
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0, 0, c.width, c.height);
+  if (!hasData || !store.showDynNotchOverlay || !store.rates) return;
+
+  const dn = store.settings.dynNotch;
+  const stats = dynStats.value;
+  if (!dn?.enabled && !stats) return;
+
+  const marginLeft = GraphSpectrumPlot._getActualMarginLeft();
+  const W = c.width - marginLeft;
+  const H = c.height - 10; // plot MARGIN
+  const maxHz = (0.5 * store.rates.logRateHz) / (zoomX.value / 100);
+  const xOf = (f) => marginLeft + (f / maxHz) * W;
+  ctx.save();
+  ctx.font = "11px monospace";
+  ctx.textBaseline = "middle";
+  // text on a dark box so it stays readable over the bars and the Analyser's own labels
+  const label = (text, x, y, alpha = 1) => {
+    const w = ctx.measureText(text).width + 6;
+    const left = Math.min(Math.max(x, marginLeft + 2), c.width - w - 2);
+    ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+    ctx.fillRect(left, y - 7, w, 14);
+    ctx.fillStyle = `rgba(${DYN_COLOR}, ${alpha})`;
+    ctx.fillText(text, left + 3, y);
+  };
+
+  // range band for the current settings
+  if (dn?.enabled) {
+    const min = Math.max(dn.minHz, 10);
+    const max = Math.min(Math.max(min, dn.maxHz), store.rates.pidRateHz / 2);
+    const x0 = xOf(min);
+    const x1 = xOf(max);
+    ctx.fillStyle = `rgba(${DYN_COLOR}, 0.08)`;
+    ctx.fillRect(x0, 0, x1 - x0, H);
+    ctx.strokeStyle = `rgba(${DYN_COLOR}, 0.6)`;
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x0, 0);
+    ctx.lineTo(x0, H);
+    ctx.moveTo(x1, 0);
+    ctx.lineTo(x1, H);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const note = stats ? "" : " · press Imagine to see the notches";
+    label(`Dynamic notch range ${min}–${max} Hz${note}`, x0 + 4, 12);
+  }
+
+  // tracked notches from the last Imagine run
+  if (stats && store.imaginedSettings) {
+    const q0 = store.imaginedSettings.dynNotch.q / 10;
+    const dirty = store.settingsDirty;
+    // one label line per notch, in frequency order, so neighbouring notches don't collide
+    const order = stats.medians.map((f, p) => ({ f, p })).sort((a, b) => a.f - b.f);
+    order.forEach(({ f, p }, row) => {
+      const q = q0 + p * 0.2;
+      const cutoff = notchLowerCutoff(f, q);
+      // below the Analyser's own marker labels, which stack from the top in 15 px rows
+      const apexY = 105 + row * 15;
+      ctx.strokeStyle = `rgba(${DYN_COLOR}, ${dirty ? 0.45 : 0.9})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(xOf(cutoff), H);
+      ctx.lineTo(xOf(f), apexY);
+      ctx.lineTo(xOf(2 * f - cutoff), H);
+      ctx.stroke();
+      label(`DN${p + 1} ${f.toFixed(0)} Hz Q${q.toFixed(1)}`, xOf(f) + 4, apexY, dirty ? 0.6 : 1);
+    });
+
+    // time spent at each frequency
+    if (stats.maxBin > 0) {
+      const binW = Math.max(1, (stats.binHz / maxHz) * W);
+      for (let b = 0; b < stats.histogram.length; b++) {
+        const v = stats.histogram[b];
+        if (!v) continue;
+        ctx.fillStyle = `rgba(${DYN_COLOR}, ${0.15 + 0.85 * (v / stats.maxBin)})`;
+        ctx.fillRect(xOf(b * stats.binHz), H - 7, binW, 7);
+      }
+    }
+    if (dirty) {
+      label("Dynamic notches from the last Imagine run", marginLeft + 4, H - 16, 0.8);
+    }
+  }
+  ctx.restore();
 }
 
 function resize() {
@@ -246,6 +363,7 @@ watch(
   rebuild,
 );
 watch(() => store.settings, updateMarkers, { deep: true });
+watch(() => [store.showDynNotchOverlay, dynStats.value], () => drawDynNotchOverlay());
 watch(
   () => show.bars,
   (visible) => {

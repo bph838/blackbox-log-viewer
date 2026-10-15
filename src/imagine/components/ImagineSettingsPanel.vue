@@ -81,6 +81,17 @@
 
       <!-- Dynamic Filter -->
       <ImagineSection title="Dynamic Filter" :help="HELP.dynamic">
+        <template #header>
+          <UButton
+            :icon="store.showDynNotchOverlay ? 'i-lucide-eye' : 'i-lucide-eye-off'"
+            size="xs"
+            variant="ghost"
+            :color="store.showDynNotchOverlay ? 'primary' : 'neutral'"
+            :title="store.showDynNotchOverlay ? 'Hide the dynamic notch on the chart' : 'Show the dynamic notch on the chart: its range, and after Imagine where each notch sat'"
+            :aria-label="store.showDynNotchOverlay ? 'Hide dynamic notch on chart' : 'Show dynamic notch on chart'"
+            @click="store.setShowDynNotchOverlay(!store.showDynNotchOverlay)"
+          />
+        </template>
         <ImagineField id="dyn-enable" label="Enable" cli="feature DYN_NOTCH" :changed="s.dynNotch.enabled !== log.dynNotch.enabled">
           <USwitch id="dyn-enable" v-model="s.dynNotch.enabled" />
         </ImagineField>

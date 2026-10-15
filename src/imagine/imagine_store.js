@@ -43,6 +43,24 @@ export const useImagineStore = defineStore("imagine", () => {
   const craft = shallowRef(null); // {fileName, settings} snapshot
   const axis = ref(0);
 
+  // Show the dynamic notch (range, tracked positions) on the chart. Remembered per browser.
+  const DYN_OVERLAY_KEY = "imagine.showDynNotch";
+  let initialDynOverlay = true;
+  try {
+    initialDynOverlay = globalThis.localStorage?.getItem(DYN_OVERLAY_KEY) !== "0";
+  } catch {
+    // storage unavailable: default on
+  }
+  const showDynNotchOverlay = ref(initialDynOverlay);
+  function setShowDynNotchOverlay(on) {
+    showDynNotchOverlay.value = on;
+    try {
+      globalThis.localStorage?.setItem(DYN_OVERLAY_KEY, on ? "1" : "0");
+    } catch {
+      // not remembered
+    }
+  }
+
   const running = ref(false);
   const imagined = shallowRef(null); // simulation result for the imagined settings
   const imaginedSettings = shallowRef(null); // settings the imagined result was made with
@@ -328,6 +346,8 @@ export const useImagineStore = defineStore("imagine", () => {
     rotor,
     rotorSpeeds,
     axis,
+    showDynNotchOverlay,
+    setShowDynNotchOverlay,
     running,
     imagined,
     imaginedSettings,
