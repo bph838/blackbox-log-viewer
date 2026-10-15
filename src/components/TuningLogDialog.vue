@@ -109,8 +109,8 @@
             <span>
               This flight log is for <strong>{{ flightCraft }}</strong>, but the open tuning log “{{
                 tuningLogStore.currentLog.name
-              }}” is for <strong>{{ tuningLogStore.currentLog.craftName }}</strong>. Open a tuning log for
-              {{ flightCraft }}, or start a new one?
+              }}” is for <strong>{{ tuningLogStore.currentLog.craftName }}</strong>, so it hasn't been added
+              to it. Open a tuning log for {{ flightCraft }}, or start a new one:
             </span>
           </p>
           <TuningLogPicker
@@ -124,7 +124,7 @@
                 size="xs"
                 variant="ghost"
                 color="neutral"
-                :label="`Keep using “${tuningLogStore.currentLog.name}”`"
+                :label="`Add it to “${tuningLogStore.currentLog.name}” anyway`"
                 @click="dismissCraftMismatch"
               />
             </template>
@@ -215,7 +215,9 @@
              config), and if the box grew/shrank per entry, the centered modal would re-center
              around a different height each time - shifting the step response image on screen and
              making it hard to compare between entries. -->
-        <div v-else class="flex gap-3 h-[65vh]">
+        <!-- Hidden while the flight log is for another heli - the banner above is the only choice
+             to make, and the other heli's entries would just be in the way. -->
+        <div v-else-if="!showCraftMismatch" class="flex gap-3 h-[65vh]">
           <div class="w-56 shrink-0 flex flex-col border rounded-md border-default overflow-hidden">
             <div class="flex items-center justify-between px-2 py-1.5 border-b border-default text-xs font-medium">
               <span>Entries</span>
@@ -843,6 +845,8 @@ const showCraftMismatch = computed(() => {
 
 function dismissCraftMismatch() {
   dismissedMismatch.value = mismatchKey();
+  // Only now that the user has said so does the flight go into the other heli's log
+  syncSelectionToCurrentFlightLog();
 }
 
 // A selected entry belongs to the tuning log it was picked in. Opening another log - especially
@@ -857,6 +861,9 @@ watch(
   currentLogId,
   () => {
     selectedEntryId.value = currentFlightLogEntry.value?.id ?? null;
+    // Switching to the right heli's log from the mismatch banner: add the flight to it now, since
+    // that banner's "opened" event never arrives (see above). Create/import add it themselves.
+    if (open.value && !creatingNew.value) nextTick(syncSelectionToCurrentFlightLog);
   },
   { flush: "sync" },
 );
@@ -943,6 +950,9 @@ function captureFromContext() {
  */
 function ensureCurrentFlightLogCaptured() {
   if (!tuningLogStore.hasLog || currentFlightLogEntry.value) return false;
+  // A flight for a different heli isn't added unless the user picks "Add it anyway" (see
+  // dismissCraftMismatch) - they'll usually want to switch to that heli's log instead.
+  if (showCraftMismatch.value) return false;
 
   const capture = captureFromContext();
   if (!capture) return false;
