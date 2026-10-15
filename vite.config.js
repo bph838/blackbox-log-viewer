@@ -75,6 +75,7 @@ export default defineConfig({
         },
         colors: {
           primary: "primary",
+          secondary: "purple",
           neutral: "neutral",
           success: "lime",
           warning: "orange",

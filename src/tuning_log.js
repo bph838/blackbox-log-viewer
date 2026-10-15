@@ -239,7 +239,7 @@ export function addEntry(log, options) {
   };
 
   // Persisted on the entry itself (rather than re-derived from the timestamp later) so the
-  // "Approximated Datetime" badge still shows correctly for a past entry after its originating flight
+  // "No RTC" badge still shows correctly for a past entry after its originating flight
   // log file is no longer open - see resolveLogDateTimes() above.
   if (options.calculatedDateTime) {
     entry.calculatedDateTime = true;

@@ -188,11 +188,24 @@
                 <div class="font-medium flex items-center gap-1 pr-5 flex-wrap">
                   {{ entry.id === currentFlightLogEntryId ? "Current" : formatTimestamp(entry.timestamp) }}
                   <UTooltip
-                    v-if="entry.id !== currentFlightLogEntryId && entry.calculatedDateTime"
-                    :text="APPROXIMATED_DATETIME_TOOLTIP"
+                    v-if="isBehindLatest(entry)"
+                    text="The current log is not the latest entry in this tuning log"
                     :delay-duration="0"
                   >
-                    <UBadge color="warning" variant="subtle" size="xs">Approximated Datetime</UBadge>
+                    <UIcon name="i-lucide-triangle-alert" class="size-3 text-error" />
+                  </UTooltip>
+                  <UTooltip v-if="entry.notes?.trim()" text="Notes have been added to this entry" :delay-duration="0">
+                    <UIcon name="i-lucide-notebook-pen" class="size-3 text-warning" />
+                  </UTooltip>
+                </div>
+                <!-- Badges get their own row; empty:hidden collapses it when an entry has none -->
+                <div class="flex items-center gap-1 flex-wrap my-0.5 empty:hidden">
+                  <UTooltip
+                    v-if="entryHasAnalysis(entry)"
+                    text="AI tuning advice has already been generated for this entry"
+                    :delay-duration="0"
+                  >
+                    <UBadge color="secondary" variant="subtle" size="xs">AI</UBadge>
                   </UTooltip>
                   <UTooltip
                     v-if="sameConfigAsPrevious.has(entry.id)"
@@ -201,22 +214,8 @@
                   >
                     <UBadge color="info" variant="subtle" size="xs">Same Config</UBadge>
                   </UTooltip>
-                  <UTooltip
-                    v-if="isBehindLatest(entry)"
-                    text="The current log is not the latest entry in this tuning log"
-                    :delay-duration="0"
-                  >
-                    <UIcon name="i-lucide-triangle-alert" class="size-3 text-error" />
-                  </UTooltip>
-                  <UTooltip
-                    v-if="entryHasAnalysis(entry)"
-                    text="AI tuning advice has already been generated for this entry"
-                    :delay-duration="0"
-                  >
-                    <UIcon name="i-lucide-check-circle-2" class="size-3 text-primary" />
-                  </UTooltip>
-                  <UTooltip v-if="entry.notes?.trim()" text="Notes have been added to this entry" :delay-duration="0">
-                    <UIcon name="i-lucide-notebook-pen" class="size-3 text-warning" />
+                  <UTooltip v-if="entry.calculatedDateTime" :text="APPROXIMATED_DATETIME_TOOLTIP" :delay-duration="0">
+                    <UBadge color="warning" variant="subtle" size="xs">No RTC</UBadge>
                   </UTooltip>
                 </div>
                 <div
@@ -233,13 +232,6 @@
                 </div>
                 <div class="text-dimmed flex items-center gap-1 flex-wrap">
                   {{ entry.id === currentFlightLogEntryId ? formatTimestamp(entry.timestamp) : "Read-only" }}
-                  <UTooltip
-                    v-if="entry.id === currentFlightLogEntryId && entry.calculatedDateTime"
-                    :text="APPROXIMATED_DATETIME_TOOLTIP"
-                    :delay-duration="0"
-                  >
-                    <UBadge color="warning" variant="subtle" size="xs">Approximated Datetime</UBadge>
-                  </UTooltip>
                   <template v-if="entryCost(entry)"> · {{ formatCost(entryCost(entry)) }}</template>
                 </div>
                 <UPopover
@@ -300,7 +292,7 @@
                   <div class="flex items-center gap-2 flex-wrap">
                     <h4 class="font-medium text-sm">{{ mainTitle }}</h4>
                     <UTooltip v-if="mainTitleIsCalculated" :text="APPROXIMATED_DATETIME_TOOLTIP" :delay-duration="0">
-                      <UBadge color="warning" variant="subtle" size="xs">Approximated Datetime</UBadge>
+                      <UBadge color="warning" variant="subtle" size="xs">No RTC</UBadge>
                     </UTooltip>
                   </div>
                   <div class="flex items-center gap-1 flex-wrap">
