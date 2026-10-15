@@ -1,6 +1,9 @@
 import { formatTime } from "./tools.js";
 import { GRAPH_MIN_ZOOM } from "./stores/graph.js";
 import { setIsolateInTime, setIsolateOutTime } from "./isolation.js";
+import { GraphSpectrumPlot } from "./graph_spectrum_plot.js";
+import { HeadspeedStats } from "./headspeed_stats.js";
+import { useCraftConfigStore } from "./stores/craftConfig.js";
 
 /**
  * Create a keydown event handler for the document.
@@ -206,6 +209,42 @@ export function createKeydownHandler(ctx) {
     e.preventDefault();
   }
 
+  // Show the analyser with its SHIFT (harmonics) or CTRL (gearRatio) hover lines pinned to the
+  // average headspeed (IN/OUT range when set); pressing the same key again clears them.
+  function pinAverageHeadspeed(e, shifted, mode) {
+    if (shifted) {
+      return;
+    }
+    e.preventDefault();
+    if (graphStore.hasAnalyser && GraphSpectrumPlot.getPinnedFundamental()?.mode === mode) {
+      GraphSpectrumPlot.setPinnedFundamental(null);
+      invalidateGraph();
+      return;
+    }
+    const stats = HeadspeedStats.compute(logStore.flightLog, {
+      startTime: playbackStore.videoExportInTime ?? undefined,
+      endTime: playbackStore.videoExportOutTime ?? undefined,
+    });
+    if (!stats) {
+      // The dialog explains why there's nothing to show
+      appStore.headspeedInfoDialogOpen = true;
+      return;
+    }
+    if (mode === "gearRatio") {
+      const craftConfigStore = useCraftConfigStore();
+      GraphSpectrumPlot.setRotorGearRatios(
+        craftConfigStore.hasConfig
+          ? { main: craftConfigStore.mainRotorGearRatio, tail: craftConfigStore.tailRotorGearRatio }
+          : null,
+      );
+    }
+    GraphSpectrumPlot.setPinnedFundamental(stats.average / 60, "avg headspeed", mode);
+    if (!graphStore.hasAnalyser) {
+      graphStore.toggleAnalyser();
+    }
+    invalidateGraph();
+  }
+
   const letterKeyHandlers = {
     KeyI: handleKeyVideoIn,
     KeyO: handleKeyVideoOut,
@@ -228,6 +267,12 @@ export function createKeydownHandler(ctx) {
       }
     },
     KeyT: handleKeyTable,
+    KeyN(e, shifted) {
+      pinAverageHeadspeed(e, shifted, "harmonics");
+    },
+    KeyJ(e, shifted) {
+      pinAverageHeadspeed(e, shifted, "gearRatio");
+    },
     KeyB(e, shifted) {
       if (!shifted) {
         appStore.headspeedInfoDialogOpen = true;

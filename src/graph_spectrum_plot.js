@@ -47,6 +47,7 @@ export const GraphSpectrumPlot = {
   },
   _mouseMode: "harmonics", // "harmonics" (default) or "gearRatio" (CTRL-hover with a craft config loaded)
   _rotorGearRatios: null, // {main, tail} multipliers from the loaded craft config, while CTRL-hovering
+  _pinnedFundamental: null, // {frequency, label, mode} - lines drawn without a SHIFT/CTRL-hover (N/J keys: average headspeed)
   _overdrawType: null,
   _spectrumType: null,
   _sysConfig: null,
@@ -84,6 +85,7 @@ GraphSpectrumPlot.initialize = function (canvas, sysConfig) {
   this._logRateWarning = undefined;
   this._zoomX = 1;
   this._zoomY = 1;
+  this._pinnedFundamental = null;
 };
 
 GraphSpectrumPlot.setZoom = function (zoomX, zoomY) {
@@ -158,6 +160,25 @@ GraphSpectrumPlot.setMousePosition = function (x, y, mode) {
   this._mousePosition.x = x;
   this._mousePosition.y = y;
   this._mouseMode = mode || "harmonics";
+  // A real hover takes over from the pinned harmonics, so the two sets of lines never overlap.
+  if (x > 0 || y > 0) {
+    this._pinnedFundamental = null;
+  }
+};
+
+/**
+ * Pin the hover lines to a fixed fundamental frequency (Hz), drawn as if the user were hovering
+ * it - mode "harmonics" (SHIFT) or "gearRatio" (CTRL, main rotor = frequency, using the ratios
+ * from setRotorGearRatios). label is appended to the 1st harmonic / Main Rotor. Pass null to clear.
+ */
+GraphSpectrumPlot.setPinnedFundamental = function (frequency, label, mode = "harmonics") {
+  this._pinnedFundamental = frequency == null ? null : { frequency, label: label ?? null, mode };
+  this._mousePosition.x = 0;
+  this._mousePosition.y = 0;
+};
+
+GraphSpectrumPlot.getPinnedFundamental = function () {
+  return this._pinnedFundamental;
 };
 
 GraphSpectrumPlot.setRotorGearRatios = function (rotorGearRatios) {
@@ -1154,9 +1175,25 @@ GraphSpectrumPlot._drawNotCachedElements = function () {
       stroke,
       3,
     );
+  } else if (this._pinnedFundamental && this._fftData && this._hasFrequencyXAxis()) {
+    const maximalFrequency = (0.5 * this._fftData.blackBoxRate) / this._zoomX;
+    const { frequency, label, mode } = this._pinnedFundamental;
+    const drawLines = mode === "gearRatio" ? this._drawRotorRpmLines : this._drawHarmonicLines;
+    drawLines.call(this, canvasCtx, frequency, maximalFrequency, WIDTH, HEIGHT, 15 * offset + MARGIN, label);
   }
 
   canvasCtx.restore();
+};
+
+GraphSpectrumPlot._hasFrequencyXAxis = function () {
+  return (
+    this._spectrumType === SPECTRUM_TYPE.FREQUENCY ||
+    this._spectrumType === SPECTRUM_TYPE.FREQ_VS_THROTTLE ||
+    this._spectrumType === SPECTRUM_TYPE.FREQ_VS_RPM ||
+    this._spectrumType === SPECTRUM_TYPE.POWER_SPECTRAL_DENSITY ||
+    this._spectrumType === SPECTRUM_TYPE.PSD_VS_THROTTLE ||
+    this._spectrumType === SPECTRUM_TYPE.PSD_VS_RPM
+  );
 };
 
 GraphSpectrumPlot._drawAxisLabel = function (
@@ -1440,11 +1477,17 @@ GraphSpectrumPlot._drawRotorRpmLines = function (
   WIDTH,
   HEIGHT,
   OFFSET,
+  mainLabel,
 ) {
-  const ratios = this._rotorGearRatios;
+  // No craft config loaded (pinned by the J key) - just the main rotor line
+  const ratios = this._rotorGearRatios ?? {};
 
   const lines = [
-    { frequency: mainFrequency, label: "Main Rotor", stroke: "rgba(255,255,0,0.85)" },
+    {
+      frequency: mainFrequency,
+      label: mainLabel ? `Main Rotor - ${mainLabel}` : "Main Rotor",
+      stroke: "rgba(255,255,0,0.85)",
+    },
     {
       frequency: ratios.tail != null ? mainFrequency * ratios.tail : null,
       label: "Tail Rotor",
@@ -1483,7 +1526,8 @@ GraphSpectrumPlot._drawRotorRpmLines = function (
 /**
  * SHIFT-hover: draws the hovered frequency (1st harmonic) plus its 2nd through 8th harmonics,
  * each labelled with its harmonic number, Hz and RPM value and stacked vertically, so the user
- * can line them up against peaks in the spectrum.
+ * can line them up against peaks in the spectrum. Also used for the pinned fundamental (N key),
+ * where fundamentalLabel is appended to the 1st harmonic's label.
  */
 GraphSpectrumPlot._drawHarmonicLines = function (
   canvasCtx,
@@ -1492,6 +1536,7 @@ GraphSpectrumPlot._drawHarmonicLines = function (
   WIDTH,
   HEIGHT,
   OFFSET,
+  fundamentalLabel,
 ) {
   const stroke = "rgba(30,144,255,0.85)";
   const harmonicOrdinals = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
@@ -1502,7 +1547,10 @@ GraphSpectrumPlot._drawHarmonicLines = function (
       continue;
     }
 
-    const label = `${frequency.toFixed(1)}Hz - ${harmonicOrdinals[harmonic - 1]} harmonic (${Math.round(frequency * 60)}rpm)`;
+    let label = `${frequency.toFixed(1)}Hz - ${harmonicOrdinals[harmonic - 1]} harmonic (${Math.round(frequency * 60)}rpm)`;
+    if (harmonic === 1 && fundamentalLabel) {
+      label += ` - ${fundamentalLabel}`;
+    }
     this._drawVerticalMarkerLine(
       canvasCtx,
       frequency,
@@ -1733,14 +1781,7 @@ GraphSpectrumPlot._drawMousePosition = function (
 
   let mouseFrequency;
 
-  if (
-    this._spectrumType === SPECTRUM_TYPE.FREQUENCY ||
-    this._spectrumType === SPECTRUM_TYPE.FREQ_VS_THROTTLE ||
-    this._spectrumType === SPECTRUM_TYPE.FREQ_VS_RPM ||
-    this._spectrumType === SPECTRUM_TYPE.POWER_SPECTRAL_DENSITY ||
-    this._spectrumType === SPECTRUM_TYPE.PSD_VS_THROTTLE ||
-    this._spectrumType === SPECTRUM_TYPE.PSD_VS_RPM
-  ) {
+  if (this._hasFrequencyXAxis()) {
     // Calculate frequency at mouse
     const maximalFrequency = (0.5 * this._fftData.blackBoxRate) / this._zoomX;
 
