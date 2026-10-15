@@ -604,7 +604,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
   }
 
   /**
-   * result: { model, conversation, costUsd } - costUsd is added to any cost already recorded for
+   * result: { model, conversation, costUsd, usage } - costUsd and usage are added to what's already recorded for
    * this entry (a follow-up question adds to the running total, it doesn't replace it).
    */
   function setEntryAiResult(entryId, result) {
@@ -615,6 +615,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     entry.ai.model = result.model;
     entry.ai.conversation = result.conversation;
     entry.ai.costUsd = (entry.ai.costUsd || 0) + (result.costUsd || 0);
+    if (result.usage) entry.ai.usage = TuningLog.addUsage(entry.ai.usage, result.usage);
     change(OPS.SET_AI, entryId);
   }
 

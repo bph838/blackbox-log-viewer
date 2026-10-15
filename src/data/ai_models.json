@@ -8,7 +8,8 @@
       "supportsAdaptiveThinking": true,
       "supportsEffort": true,
       "pricePerMillionInputTokens": 10.0,
-      "pricePerMillionOutputTokens": 50.0
+      "pricePerMillionOutputTokens": 50.0,
+      "pricePerMillionCacheReadTokens": 0.25
     },
     {
       "id": "claude-opus-5-5",
@@ -17,7 +18,8 @@
       "supportsAdaptiveThinking": true,
       "supportsEffort": true,
       "pricePerMillionInputTokens": 4.0,
-      "pricePerMillionOutputTokens": 20.0
+      "pricePerMillionOutputTokens": 20.0,
+      "pricePerMillionCacheReadTokens": 0.20
     },
     {
       "id": "claude-sonnet-5-5",

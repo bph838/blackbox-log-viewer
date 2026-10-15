@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { buildHistoryMessages, buildPromptText, extractInstructions, notesAlreadySent } from "./tuning_ai.js";
+import {
+  buildHistoryMessages,
+  buildPromptText,
+  estimateCostUsd,
+  extractInstructions,
+  notesAlreadySent,
+  summariseUsage,
+} from "./tuning_ai.js";
 
 function makeLog(count) {
   const entries = [];
@@ -117,6 +124,30 @@ describe("buildPromptText", () => {
     );
     expect(buildPromptText({ configSummary: "", heliDescription: "Goblin 700, 12S" })).toContain("Goblin 700, 12S");
     expect(buildPromptText({ configSummary: "", heliDescription: "  " })).not.toContain("describes the helicopter");
+  });
+});
+
+describe("usage and cost", () => {
+  it("prices cache reads at the model's own rate, or a tenth of input", () => {
+    const usage = { cache_read_input_tokens: 1e6 };
+    expect(estimateCostUsd("claude-opus-5-5", usage)).toBeCloseTo(0.2);
+    expect(estimateCostUsd("claude-sonnet-5-5", usage)).toBeCloseTo(0.2);
+    expect(estimateCostUsd("claude-haiku-4-5", usage)).toBeCloseTo(0.1);
+  });
+
+  it("summarises a response's usage, counting code-execution steps", () => {
+    const response = {
+      usage: { input_tokens: 10, output_tokens: 20, cache_read_input_tokens: 30, cache_creation_input_tokens: 40 },
+      content: [{ type: "server_tool_use" }, { type: "bash_code_execution_tool_result" }, { type: "server_tool_use" }, { type: "text" }],
+    };
+    expect(summariseUsage(response)).toEqual({
+      requests: 1,
+      inputTokens: 10,
+      outputTokens: 20,
+      cacheReadTokens: 30,
+      cacheWriteTokens: 40,
+      codeSteps: 2,
+    });
   });
 });
 

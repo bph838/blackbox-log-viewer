@@ -8,6 +8,7 @@ import {
   addEntry,
   buildFilename,
   validationError,
+  addUsage,
 } from "./tuning_log.js";
 
 describe("makeId", () => {
@@ -234,5 +235,17 @@ describe("validationError", () => {
   it("rejects a malformed entries field", () => {
     expect(validationError({ formatVersion: 1, entries: "nope" })).not.toBeNull();
     expect(validationError({ formatVersion: 1, entries: [null] })).not.toBeNull();
+  });
+});
+
+describe("addUsage", () => {
+  it("adds a response's usage onto a running total", () => {
+    expect(addUsage(null, { requests: 1, outputTokens: 5 })).toEqual({ requests: 1, outputTokens: 5 });
+    expect(addUsage({ requests: 1, outputTokens: 5 }, { requests: 1, outputTokens: 7, codeSteps: 2 })).toEqual({
+      requests: 2,
+      outputTokens: 12,
+      codeSteps: 2,
+    });
+    expect(addUsage({ requests: 1 }, null)).toEqual({ requests: 1 });
   });
 });

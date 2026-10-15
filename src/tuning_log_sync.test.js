@@ -256,6 +256,21 @@ describe("mergeLogs", () => {
       expect(merged.costUsd).toBeCloseTo(1.75);
     });
 
+    it("adds up both sides' token usage, counting the shared part once", () => {
+      const ai = (conversation, requests, outputTokens) => ({
+        model: "m",
+        conversation,
+        costUsd: 1,
+        usage: { requests, outputTokens },
+      });
+      const usageBase = log([entry("e1", { ai: ai([q("1"), a("1")], 1, 100) })]);
+      const local = log([entry("e1", { ai: ai([q("1"), a("1"), q("L"), a("L")], 2, 150) })]);
+      const remote = log([entry("e1", { ai: ai([q("1"), a("1"), q("R"), a("R")], 2, 130) })]);
+
+      expect(mergeLogs(usageBase, local, remote).entries[0].ai.usage).toEqual({ requests: 3, outputTokens: 180 });
+      expect(mergeLogs(usageBase, local, clone(usageBase)).entries[0].ai.usage).toEqual({ requests: 2, outputTokens: 150 });
+    });
+
     it("keeps an analysis made only on one side", () => {
       const noAi = log([entry("e1")]);
       const withAi = log([entry("e1", { ai: { model: "m", conversation: [q("1"), a("1")], costUsd: 1 } })]);

@@ -42,19 +42,42 @@ function imageBlocksFromDataUrls(dataUrls) {
 
 /**
  * Estimated cost in USD for one API response, from its `usage` object. Cache writes are priced at
- * the 5-minute-TTL premium (1.25x input) since that's what this app requests.
+ * the 5-minute-TTL premium (1.25x input) since that's what this app requests. Cache reads are
+ * 0.1x input unless the model lists its own pricePerMillionCacheReadTokens (some are cheaper).
  */
 export function estimateCostUsd(model, usage) {
   const pricing = MODELS_BY_ID[model];
   if (!pricing || !usage) return 0;
 
+  const cacheReadPrice = pricing.pricePerMillionCacheReadTokens ?? pricing.pricePerMillionInputTokens * 0.1;
+
   let cost = 0;
   cost += ((usage.input_tokens || 0) / 1e6) * pricing.pricePerMillionInputTokens;
   cost += ((usage.output_tokens || 0) / 1e6) * pricing.pricePerMillionOutputTokens;
   cost += ((usage.cache_creation_input_tokens || 0) / 1e6) * pricing.pricePerMillionInputTokens * 1.25;
-  cost += ((usage.cache_read_input_tokens || 0) / 1e6) * pricing.pricePerMillionInputTokens * 0.1;
+  cost += ((usage.cache_read_input_tokens || 0) / 1e6) * cacheReadPrice;
 
   return cost;
+}
+
+/**
+ * What one API response used, in the shape kept on a tuning log entry (see tuning_log.js addUsage):
+ * { requests, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, codeSteps }.
+ * inputTokens is only the uncached part; codeSteps counts the code-execution calls Claude made
+ * running skills - each one re-reads the whole prompt, which is where most of a skills request's
+ * cost goes.
+ */
+export function summariseUsage(response) {
+  const usage = (response && response.usage) || {};
+  const codeSteps = ((response && response.content) || []).filter((block) => block.type === "server_tool_use").length;
+  return {
+    requests: 1,
+    inputTokens: usage.input_tokens || 0,
+    outputTokens: usage.output_tokens || 0,
+    cacheReadTokens: usage.cache_read_input_tokens || 0,
+    cacheWriteTokens: usage.cache_creation_input_tokens || 0,
+    codeSteps,
+  };
 }
 
 const NO_INSTRUCTIONS_PLACEHOLDER = "(No specific instructions given - provide general tuning suggestions.)";
@@ -274,6 +297,10 @@ function sendMessages(options, messages, onResult, onError) {
     // client-side HTTP timeout to get the full response back.
     max_tokens: 16000,
     messages,
+    // Caches the whole prompt (history graphs, config, conversation) for 5 minutes. Follow-up
+    // questions and retries then read it back at a tenth of the price or less - and so does every
+    // code-execution step within a request when skills are on, each of which re-reads the prompt.
+    cache_control: { type: "ephemeral" },
   };
 
   // Adaptive thinking isn't supported on every model (e.g. Haiku 4.5) - only request it where it's valid
@@ -358,7 +385,7 @@ function sendMessages(options, messages, onResult, onError) {
 
     const updatedMessages = messages.concat([{ role: "assistant", content: text }]);
     const costUsd = estimateCostUsd(model, response.usage);
-    onResult(text, updatedMessages, costUsd);
+    onResult(text, updatedMessages, costUsd, summariseUsage(response));
   });
 
   stream.on("error", (error) => {
@@ -394,7 +421,7 @@ const NO_CANCEL = () => {};
  * onChunk(textSnapshot), if given, is called repeatedly as the response streams in, with the full
  * response text accumulated so far - use it to render progressively instead of waiting for the
  * whole answer.
- * onResult(resultText, entryMessages, costUsd) - entryMessages is *this entry's own* conversation
+ * onResult(resultText, entryMessages, costUsd, usage) - usage is summariseUsage() for this call; entryMessages is *this entry's own* conversation
  * (not including historyMessages/repeats of it) - keep it and pass it back into ask() for
  * follow-ups, and persist it as entry.ai.conversation. costUsd is this call's estimated price -
  * add it to any running total you're keeping for the entry.
@@ -440,8 +467,8 @@ export function analyze(options, onResult, onError) {
   return sendMessages(
     options,
     historyMessages.concat([initialMessage]),
-    (text, updatedMessages, costUsd) => {
-      onResult(text, updatedMessages.slice(historyMessages.length), costUsd);
+    (text, updatedMessages, costUsd, usage) => {
+      onResult(text, updatedMessages.slice(historyMessages.length), costUsd, usage);
     },
     onError,
   );
@@ -462,7 +489,7 @@ export function analyze(options, onResult, onError) {
  * alongside the question.
  * onChunk(textSnapshot), if given, is called repeatedly as the response streams in, with the full
  * response text accumulated so far.
- * onResult(resultText, entryMessages, costUsd) - pass the updated entryMessages back in for the
+ * onResult(resultText, entryMessages, costUsd, usage) - usage is summariseUsage() for this call; pass the updated entryMessages back in for the
  * next follow-up; costUsd is this call's estimated price.
  *
  * Returns a cancel() function that aborts the request (see sendMessages).
@@ -504,8 +531,8 @@ export function ask(options, onResult, onError) {
   return sendMessages(
     options,
     historyMessages.concat(messages),
-    (text, updatedMessages, costUsd) => {
-      onResult(text, updatedMessages.slice(historyMessages.length), costUsd);
+    (text, updatedMessages, costUsd, usage) => {
+      onResult(text, updatedMessages.slice(historyMessages.length), costUsd, usage);
     },
     onError,
   );

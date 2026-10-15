@@ -548,6 +548,13 @@
                 />
               </div>
 
+              <UTooltip v-if="entryUsage" :text="entryUsage.tooltip" :delay-duration="0">
+                <p class="flex items-center gap-1.5 text-xs text-dimmed w-fit">
+                  <UIcon name="i-lucide-gauge" class="size-3.5 shrink-0" />
+                  {{ entryUsage.label }}
+                </p>
+              </UTooltip>
+
               <!-- Where an in-flight request has got to, so a long wait doesn't look like nothing's happening -->
               <div
                 v-if="isPending"
@@ -1341,6 +1348,37 @@ const aiStatusText = computed(() => {
   }
 });
 
+// ---- Token usage of this entry's AI requests (recorded from now on - older entries have none) ----
+
+function formatTokens(n) {
+  if (n < 1000) return String(n);
+  if (n < 1e6) return `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}k`;
+  return `${(n / 1e6).toFixed(1)}M`;
+}
+
+const entryUsage = computed(() => {
+  const usage = currentEntry.value?.ai?.usage;
+  if (!usage || !usage.requests) return null;
+
+  const promptTokens = usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
+  const cachedPercent = promptTokens ? Math.round((usage.cacheReadTokens / promptTokens) * 100) : 0;
+  const requests = `${usage.requests} request${usage.requests === 1 ? "" : "s"}`;
+  const steps = usage.codeSteps ? ` · ${usage.codeSteps} code step${usage.codeSteps === 1 ? "" : "s"}` : "";
+
+  return {
+    label:
+      `${requests} · ${formatTokens(promptTokens)} tokens in (${cachedPercent}% from cache) · ` +
+      `${formatTokens(usage.outputTokens)} out${steps}`,
+    tooltip:
+      `Prompt: ${formatTokens(usage.inputTokens)} uncached, ${formatTokens(usage.cacheWriteTokens)} written to the cache ` +
+      `(1.25× price), ${formatTokens(usage.cacheReadTokens)} read from the cache (a tenth of the price or less). ` +
+      `Output: ${formatTokens(usage.outputTokens)} tokens, including thinking.` +
+      (usage.codeSteps
+        ? ` Skills ran ${usage.codeSteps} code-execution step${usage.codeSteps === 1 ? "" : "s"} - each one re-reads the whole prompt.`
+        : ""),
+  };
+});
+
 const AI_STAGES = ["sending", "thinking", "writing"];
 const aiStageIndex = computed(() => {
   const entry = currentEntry.value;
@@ -1642,9 +1680,9 @@ function onAskAi() {
     },
   };
 
-  function onResult(text, entryMessages, costUsd) {
+  function onResult(text, entryMessages, costUsd, usage) {
     clearPending(entry.id);
-    tuningLogStore.setEntryAiResult(entry.id, { model: modelModel.value, conversation: entryMessages, costUsd });
+    tuningLogStore.setEntryAiResult(entry.id, { model: modelModel.value, conversation: entryMessages, costUsd, usage });
     if (slice) tuningLogStore.markEntrySliceSent(entry.id);
   }
 

@@ -259,6 +259,19 @@ export function addEntry(log, options) {
   return entry;
 }
 
+/**
+ * Adds one AI response's token usage (tuning_ai.js summariseUsage) onto an entry's running total
+ * (entry.ai.usage). Either may be missing.
+ */
+export function addUsage(total, usage) {
+  if (!usage) return total || null;
+  const result = { ...(total || {}) };
+  for (const [key, value] of Object.entries(usage)) {
+    result[key] = (result[key] || 0) + value;
+  }
+  return result;
+}
+
 export function buildFilename(log) {
   const now = new Date();
   const stamp = `${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}`;

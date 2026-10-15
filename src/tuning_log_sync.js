@@ -199,17 +199,30 @@ function mergeAi(base, local, remote) {
 
   let conversation;
   let costUsd;
+  let usage;
   if (prefix === localConversation.length || prefix === remoteConversation.length) {
     // One is just a continuation of the other.
     const longer = localConversation.length >= remoteConversation.length ? local : remote;
     conversation = longer.conversation || [];
     costUsd = Math.max(local.costUsd || 0, remote.costUsd || 0);
+    usage = longer.usage;
   } else {
     conversation = [...remoteConversation, ...localConversation.slice(prefix)];
     costUsd = (local.costUsd || 0) + (remote.costUsd || 0) - ((base && base.costUsd) || 0);
+    usage = combinedUsage(base && base.usage, local.usage, remote.usage);
   }
 
-  return clone({ model: local.model || remote.model, conversation, costUsd });
+  return clone({ model: local.model || remote.model, conversation, costUsd, ...(usage ? { usage } : {}) });
+}
+
+// Token usage from requests made on both sides since base, without counting base's twice
+function combinedUsage(base, local, remote) {
+  if (!local && !remote) return undefined;
+  const result = {};
+  for (const key of new Set([...Object.keys(local || {}), ...Object.keys(remote || {})])) {
+    result[key] = ((local && local[key]) || 0) + ((remote && remote[key]) || 0) - ((base && base[key]) || 0);
+  }
+  return result;
 }
 
 function mergeEntry(base, local, remote) {
