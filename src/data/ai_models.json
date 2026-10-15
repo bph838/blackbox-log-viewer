@@ -9,7 +9,8 @@
       "supportsEffort": true,
       "pricePerMillionInputTokens": 10.0,
       "pricePerMillionOutputTokens": 50.0,
-      "pricePerMillionCacheReadTokens": 0.25
+      "pricePerMillionCacheReadTokens": 0.25,
+      "modelAvailabe": false
     },
     {
       "id": "claude-opus-5-5",
@@ -19,7 +20,8 @@
       "supportsEffort": true,
       "pricePerMillionInputTokens": 4.0,
       "pricePerMillionOutputTokens": 20.0,
-      "pricePerMillionCacheReadTokens": 0.20
+      "pricePerMillionCacheReadTokens": 0.2,
+      "modelAvailabe": false
     },
     {
       "id": "claude-sonnet-5-5",
