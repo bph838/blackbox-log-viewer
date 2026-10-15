@@ -1116,7 +1116,7 @@ watch(
 );
 
 function onNotesBlur() {
-  if (currentEntry.value && isCurrentFlightLog.value) {
+  if (currentEntry.value && isCurrentFlightLog.value && (currentEntry.value.notes || "") !== notesDraft.value) {
     tuningLogStore.updateEntryNotes(currentEntry.value.id, notesDraft.value);
   }
 }
@@ -1180,6 +1180,7 @@ async function onCopyPrompt() {
     instructions: aiPromptText.value,
     expertMode: expertModeModel.value,
     heliDescription: tuningLogStore.currentLog?.description,
+    notes: notesDraft.value,
   });
 
   try {
@@ -1347,7 +1348,10 @@ function turnText(turn) {
   if (typeof turn.content === "string") return turn.content;
   if (!Array.isArray(turn.content)) return "";
   return turn.content
-    .filter((block) => block.type === "text" && !FlightSlice.isFlightSliceText(block.text))
+    .filter(
+      (block) =>
+        block.type === "text" && !FlightSlice.isFlightSliceText(block.text) && !TuningAI.isNotesUpdateText(block.text),
+    )
     .map((block) => block.text)
     .join("\n");
 }
@@ -1497,6 +1501,9 @@ function onAskAi() {
   // scrolled up to read earlier history.
   stickToBottom.value = true;
 
+  // Notes are normally saved when the box loses focus - make sure what's typed is what gets sent
+  onNotesBlur();
+
   const settings = settingsStore.userSettings;
   const promptText = aiPromptText.value;
   const images = pendingImages.value.map((img) => img.dataUrl);
@@ -1583,6 +1590,7 @@ function onAskAi() {
   if (hadConversation) {
     callOptions.messages = entry.ai.conversation;
     callOptions.question = promptText;
+    callOptions.notes = entry.notes;
     cancelRequest = TuningAI.ask(callOptions, onResultAndForget, onError);
   } else {
     callOptions.entry = entry;

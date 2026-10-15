@@ -76,8 +76,33 @@ export function extractInstructions(promptText) {
   return instructions === NO_INSTRUCTIONS_PLACEHOLDER ? "" : instructions;
 }
 
+const NOTES_START =
+  "The user's notes for this flight (e.g. what they changed since the last flight, and what they're trying to fix):\n";
+
+const NOTES_UPDATED_START = "The user has updated their notes for this flight:\n";
+
+/** True for the text block ask() sends updated notes in - shown in the UI as the Notes box, not as part of the question. */
+export function isNotesUpdateText(text) {
+  return typeof text === "string" && text.startsWith(NOTES_UPDATED_START);
+}
+
 /**
- * options: { configSummary, instructions, expertMode, hasSlice, heliDescription }
+ * True when the user's notes for an entry (trimmed) have already been sent somewhere in its
+ * conversation - so a follow-up only needs to send them again if they've been edited since.
+ */
+export function notesAlreadySent(conversation, notes) {
+  const trimmed = (notes || "").trim();
+  if (!trimmed) return true;
+  return (conversation || []).some((turn) => {
+    if (turn.role !== "user") return false;
+    const blocks = typeof turn.content === "string" ? [{ type: "text", text: turn.content }] : turn.content || [];
+    return blocks.some((block) => block.type === "text" && block.text.includes(trimmed));
+  });
+}
+
+/**
+ * options: { configSummary, instructions, expertMode, hasSlice, heliDescription, notes }
+ * notes: what the user wrote in this entry's Notes box.
  * hasSlice: an isolated-flight CSV block (see flight_slice.js) is attached to the same message.
  * heliDescription: the user's own description of the heli (size, make/model, etc.) from the
  * tuning log, if they gave one.
@@ -98,8 +123,14 @@ export function buildPromptText(options) {
       `when judging the response and recommending values:\n${heliDescription}\n\n`;
   }
 
+  text += `Current flight controller configuration extracted from the log:\n${options.configSummary}\n\n`;
+
+  const notes = (options.notes || "").trim();
+  if (notes) {
+    text += `${NOTES_START}${notes}\n\n`;
+  }
+
   text +=
-    `Current flight controller configuration extracted from the log:\n${options.configSummary}\n\n` +
     `${INSTRUCTIONS_START}${instructions}${INSTRUCTIONS_END}` +
     "Analyse the attached step response graph and suggest specific, actionable PID changes " +
     "to address the user's instructions, referencing the actual curve shapes you see (overshoot, " +
@@ -385,6 +416,7 @@ export function analyze(options, onResult, onError) {
       expertMode: options.expertMode,
       hasSlice: !!options.slice,
       heliDescription: options.heliDescription,
+      notes: options.entry.notes,
     }),
   });
 
@@ -404,7 +436,9 @@ export function analyze(options, onResult, onError) {
  * Continues an existing entry's conversation with a follow-up question.
  *
  * options: { apiKey, model, effort, skillIds, historyMessages, messages, question,
- * images, slice, onChunk }
+ * images, slice, notes, onChunk }
+ * notes, if given, is the entry's current Notes text - sent along if it isn't already in the
+ * conversation (written or edited since it started).
  * slice, if given, is an isolated-flight slice (see flight_slice.js) sent as a CSV text block.
  * `messages` is this entry's own conversation so far (as returned by a previous analyze()/ask() call).
  * effort, if given, is passed through as output_config.effort on models that support it.
@@ -427,6 +461,11 @@ export function ask(options, onResult, onError) {
   const question = (options.question || "").trim();
   const imageBlocks = imageBlocksFromDataUrls(options.images);
   const sliceBlocks = options.slice ? [{ type: "text", text: sliceToPromptText(options.slice) }] : [];
+  // Notes written or edited since the conversation started go along with the next message
+  const notes = (options.notes || "").trim();
+  const notesBlocks = notesAlreadySent(options.messages, notes)
+    ? []
+    : [{ type: "text", text: `${NOTES_UPDATED_START}${notes}` }];
   if (!question && !imageBlocks.length && !sliceBlocks.length) {
     onError("Please enter a question.");
     return NO_CANCEL;
@@ -435,10 +474,11 @@ export function ask(options, onResult, onError) {
   // Plain text when there's nothing attached, keeping the stored conversation shape unchanged for
   // the common case - an array of blocks only when there's something to attach.
   const content =
-    imageBlocks.length || sliceBlocks.length
+    imageBlocks.length || sliceBlocks.length || notesBlocks.length
       ? [
           ...imageBlocks,
           ...sliceBlocks,
+          ...notesBlocks,
           { type: "text", text: question || "(No question given - see the attached data.)" },
         ]
       : question;

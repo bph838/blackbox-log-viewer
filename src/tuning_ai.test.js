@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { buildHistoryMessages, buildPromptText, extractInstructions } from "./tuning_ai.js";
+import { buildHistoryMessages, buildPromptText, extractInstructions, notesAlreadySent } from "./tuning_ai.js";
 
 function makeLog(count) {
   const entries = [];
@@ -94,6 +94,21 @@ describe("buildPromptText", () => {
   it("mentions the attached isolated flight data only when there is some", () => {
     expect(buildPromptText({ configSummary: "", hasSlice: true })).toContain("CSV data for a block of the flight");
     expect(buildPromptText({ configSummary: "" })).not.toContain("CSV data");
+  });
+
+  it("includes the user's notes, without them being taken as instructions", () => {
+    const text = buildPromptText({ configSummary: "", notes: " raised roll D ", instructions: "help" });
+    expect(text).toContain("notes for this flight");
+    expect(text).toContain("raised roll D");
+    expect(extractInstructions(text)).toBe("help");
+    expect(buildPromptText({ configSummary: "" })).not.toContain("notes for this flight");
+  });
+
+  it("knows when notes are already in a conversation", () => {
+    const conversation = [{ role: "user", content: [{ type: "text", text: buildPromptText({ configSummary: "", notes: "a" }) }] }];
+    expect(notesAlreadySent(conversation, " a ")).toBe(true);
+    expect(notesAlreadySent(conversation, "a, then b")).toBe(false);
+    expect(notesAlreadySent(conversation, "")).toBe(true);
   });
 
   it("includes the heli description only when one is given", () => {
