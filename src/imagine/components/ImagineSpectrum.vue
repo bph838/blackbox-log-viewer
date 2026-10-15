@@ -95,6 +95,7 @@ import { GraphSpectrumPlot, SPECTRUM_OVERDRAW_TYPE, SPECTRUM_TYPE } from "../../
 import { AXIS_NAMES, useImagineStore } from "../imagine_store.js";
 import { buildSpectrumView, CURVE_STYLE, markerSysConfig } from "../spectrum_view.js";
 import { dynNotchStats, notchLowerCutoff } from "../dyn_notch_overlay.js";
+import { rpmNotchMarkers } from "../rpm_overlay.js";
 
 const store = useImagineStore();
 const container = ref(null);
@@ -141,16 +142,14 @@ let mouseActive = false;
 
 function draw() {
   if (hasData) GraphSpectrumPlot.draw();
-  drawDynNotchOverlay();
+  drawOverlays();
 }
 
-// ---- Dynamic notch overlay ----
-// Shaded band: the range the dynamic notches may move in (current settings).
-// Triangles: each notch at its median tracked position over the analysed range, drawn like the
-// static notches (cutoff, centre, mirrored cutoff) with its own Q (Q + 0.2 per extra notch).
-// Strip along the bottom: how much time the notches spent at each frequency.
+// ---- Overlays drawn over the plot: RPM notches and the dynamic notch ----
 const DYN_COLOR = "217, 70, 239";
+const RPM_COLOR = "34, 211, 238";
 
+// Dynamic notch: where each simulated notch sat (needs an Imagine run)
 const dynStats = computed(() => {
   const result = store.imagined;
   if (!result?.dynNotchCenters || !result.dynNotchCount || !store.rates) return null;
@@ -164,7 +163,20 @@ const dynStats = computed(() => {
   );
 });
 
-function drawDynNotchOverlay() {
+// RPM notches: from the current settings, so they move as they're edited (no Imagine needed)
+const rpmMarkers = computed(() => {
+  if (!store.rates || !store.settings?.rpm) return [];
+  return rpmNotchMarkers({
+    settings: store.settings,
+    axis: store.axis,
+    speeds: store.rotorSpeeds,
+    range: store.rotorSpeedRange,
+    rotor: store.rotor,
+    filterRateHz: store.rates.filterRateHz,
+  });
+});
+
+function drawOverlays() {
   const c = overlay.value;
   if (!c || !canvas.value) return;
   if (c.width !== canvas.value.width || c.height !== canvas.value.height) {
@@ -173,29 +185,97 @@ function drawDynNotchOverlay() {
   }
   const ctx = c.getContext("2d");
   ctx.clearRect(0, 0, c.width, c.height);
-  if (!hasData || !store.chartOverlays.dynNotch || !store.rates) return;
-
-  const dn = store.settings.dynNotch;
-  const stats = dynStats.value;
-  if (!dn?.enabled && !stats) return;
+  if (!hasData || !store.rates) return;
 
   const marginLeft = GraphSpectrumPlot._getActualMarginLeft();
   const W = c.width - marginLeft;
-  const H = c.height - 10; // plot MARGIN
-  const maxHz = (0.5 * store.rates.logRateHz) / (zoomX.value / 100);
-  const xOf = (f) => marginLeft + (f / maxHz) * W;
-  ctx.save();
-  ctx.font = "11px monospace";
-  ctx.textBaseline = "middle";
+  const g = {
+    ctx,
+    marginLeft,
+    W,
+    H: c.height - 10, // plot MARGIN
+    maxHz: (0.5 * store.rates.logRateHz) / (zoomX.value / 100),
+  };
+  g.xOf = (f) => marginLeft + (f / g.maxHz) * W;
   // text on a dark box so it stays readable over the bars and the Analyser's own labels
-  const label = (text, x, y, alpha = 1) => {
+  g.label = (text, x, y, color, alpha = 1) => {
     const w = ctx.measureText(text).width + 6;
     const left = Math.min(Math.max(x, marginLeft + 2), c.width - w - 2);
     ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
     ctx.fillRect(left, y - 7, w, 14);
-    ctx.fillStyle = `rgba(${DYN_COLOR}, ${alpha})`;
+    ctx.fillStyle = `rgba(${color}, ${alpha})`;
     ctx.fillText(text, left + 3, y);
   };
+
+  ctx.save();
+  ctx.font = "11px monospace";
+  ctx.textBaseline = "middle";
+  if (store.chartOverlays.rpm) drawRpmNotches(g);
+  if (store.chartOverlays.dynNotch) drawDynNotch(g);
+  ctx.restore();
+}
+
+// Each RPM notch as a triangle from its cutoff up to its centre, like the static notches. A notch
+// still fading in (just above the RPM Minimum Frequency) is drawn shorter and dashed. A bar under
+// each shows how far it moves with the headspeed spread of the flight (10th-90th percentile).
+function drawRpmNotches(g) {
+  const markers = rpmMarkers.value;
+  if (!markers.length) return;
+  const { ctx, H, xOf, label } = g;
+  const hl = store.rpmHighlight && store.rpmHighlight.axis === store.axis ? store.rpmHighlight : null;
+  const isHl = (m) => !!hl && ((hl.sources && hl.sources.includes(m.source)) || (hl.slots && hl.slots.includes(m.slot)));
+  const top = 55;
+
+  for (const m of markers) {
+    if (m.hz > g.maxHz * 1.02) continue;
+    const highlighted = isHl(m);
+    const alpha = highlighted ? 1 : hl ? 0.25 : 0.75;
+    const apexY = H - (H - top) * (0.3 + 0.7 * m.fader);
+    ctx.strokeStyle = `rgba(${RPM_COLOR}, ${alpha})`;
+    ctx.lineWidth = highlighted ? 2.5 : 1.5;
+    ctx.setLineDash(m.fader < 1 ? [5, 4] : []);
+    ctx.beginPath();
+    ctx.moveTo(xOf(m.cutoffHz), H);
+    ctx.lineTo(xOf(m.hz), apexY);
+    ctx.lineTo(xOf(2 * m.hz - m.cutoffHz), H);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (m.spread && xOf(m.spread[1]) - xOf(m.spread[0]) >= 1) {
+      ctx.fillStyle = `rgba(${RPM_COLOR}, ${highlighted ? 0.8 : hl ? 0.15 : 0.45})`;
+      ctx.fillRect(xOf(m.spread[0]), H - 14, Math.max(1, xOf(m.spread[1]) - xOf(m.spread[0])), 4);
+    }
+  }
+
+  // labels only for the hovered row, so a full bank stays readable
+  const labelled = markers.filter(isHl);
+  labelled.forEach((m, i) => {
+    const fade = m.fader < 1 ? ` · only ${Math.round(m.fader * 100)}% (fading in above ${store.settings.rpm.minHz} Hz)` : "";
+    const spread = m.spread ? ` · moves ${m.spread[0].toFixed(0)}–${m.spread[1].toFixed(0)} Hz` : "";
+    label(`${m.name} ${m.hz.toFixed(1)} Hz Q${m.q.toFixed(1)}${fade}${spread}`, xOf(m.hz) + 4, H - 44 - i * 15, RPM_COLOR);
+  });
+  if (!labelled.length) {
+    const axisName = ["roll", "pitch", "yaw"][store.axis];
+    label(
+      `RPM notches (${axisName}) at ${Math.round(store.rotorSpeeds.head)} rpm - hover a notch row to see it`,
+      g.marginLeft + 4,
+      H - 28,
+      RPM_COLOR,
+      0.9,
+    );
+  }
+}
+
+// Shaded band: the range the dynamic notches may move in (current settings).
+// Triangles: each notch at its median tracked position over the analysed range, drawn like the
+// static notches (cutoff, centre, mirrored cutoff) with its own Q (Q + 0.2 per extra notch).
+// Strip along the bottom: how much time the notches spent at each frequency.
+function drawDynNotch(g) {
+  const dn = store.settings.dynNotch;
+  const stats = dynStats.value;
+  if (!dn?.enabled && !stats) return;
+  const { ctx, H, xOf, W, maxHz, marginLeft } = g;
+  const label = (text, x, y, alpha = 1) => g.label(text, x, y, DYN_COLOR, alpha);
 
   // range band for the current settings
   if (dn?.enabled) {
@@ -254,7 +334,6 @@ function drawDynNotchOverlay() {
       label("Dynamic notches from the last Imagine run", marginLeft + 4, H - 16, 0.8);
     }
   }
-  ctx.restore();
 }
 
 function resize() {
@@ -363,7 +442,10 @@ watch(
   rebuild,
 );
 watch(() => store.settings, updateMarkers, { deep: true });
-watch(() => [store.chartOverlays.dynNotch, dynStats.value], () => drawDynNotchOverlay());
+watch(
+  () => [store.chartOverlays.dynNotch, store.chartOverlays.rpm, dynStats.value, store.rpmHighlight, rpmMarkers.value],
+  () => drawOverlays(),
+);
 watch(() => [store.chartOverlays.lowpass, store.chartOverlays.notch], updateMarkers);
 watch(
   () => show.bars,

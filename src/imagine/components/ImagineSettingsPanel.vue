@@ -133,6 +133,14 @@
 
       <!-- RPM Filter -->
       <ImagineSection title="RPM Filter" :help="HELP.rpm">
+        <template #header>
+          <ImagineChartToggle
+            :on="store.chartOverlays.rpm"
+            what="RPM notches"
+            detail="where each notch sits at the median headspeed for the chart's axis, with the range it moves over in the flight"
+            @toggle="store.setChartOverlay('rpm', $event)"
+          />
+        </template>
         <UAlert
           v-if="!store.data?.hasHeadspeed"
           color="warning"

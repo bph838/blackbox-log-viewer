@@ -45,7 +45,9 @@ export const useImagineStore = defineStore("imagine", () => {
 
   // Which filters are drawn on the chart (lowpass cutoffs, static notches, dynamic notch).
   // Everything is shown each time Imagine opens.
-  const chartOverlays = reactive({ lowpass: true, notch: true, dynNotch: true });
+  const chartOverlays = reactive({ lowpass: true, notch: true, dynNotch: true, rpm: true });
+  // The RPM notch row the mouse is over in the Filters panel: { axis, sources: [..] } or null
+  const rpmHighlight = ref(null);
   function setChartOverlay(name, on) {
     chartOverlays[name] = on;
   }
@@ -97,6 +99,30 @@ export const useImagineStore = defineStore("imagine", () => {
     const head = median(heads);
     let tail = d.tailspeed ? median(tails) : null;
     if (tail == null && rotor.value?.tailPerHead != null) tail = head * rotor.value.tailPerHead;
+    return { head, tail };
+  });
+
+  // Spread of rotor speeds while spinning (10th-90th percentile), to show how far RPM notches move
+  const rotorSpeedRange = computed(() => {
+    const d = data.value;
+    if (!d || !d.hasHeadspeed) return null;
+    const { start, end } = range.value;
+    const heads = [];
+    const tails = [];
+    for (let i = start; i < end; i += 2) {
+      if (d.headspeed[i] > 100) {
+        heads.push(d.headspeed[i]);
+        if (d.tailspeed) tails.push(d.tailspeed[i]);
+      }
+    }
+    if (heads.length < 10) return null;
+    const pct = (v, p) => {
+      const s = [...v].sort((a, b) => a - b);
+      return s[Math.floor((s.length - 1) * p)];
+    };
+    const head = [pct(heads, 0.1), pct(heads, 0.9)];
+    let tail = tails.length ? [pct(tails, 0.1), pct(tails, 0.9)] : null;
+    if (!tail && rotor.value?.tailPerHead != null) tail = head.map((h) => h * rotor.value.tailPerHead);
     return { head, tail };
   });
 
@@ -337,6 +363,8 @@ export const useImagineStore = defineStore("imagine", () => {
     axis,
     chartOverlays,
     setChartOverlay,
+    rpmHighlight,
+    rotorSpeedRange,
     running,
     imagined,
     imaginedSettings,

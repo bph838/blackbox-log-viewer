@@ -11,7 +11,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="row in rows" :key="row.slot">
+        <tr v-for="row in rows" :key="row.slot" class="hover:bg-elevated" @mouseenter="$emit('hover-slot', row.slot)" @mouseleave="$emit('hover-slot', null)">
           <td class="py-0.5 pr-1">
             <USelect
               :model-value="row.source"
@@ -68,6 +68,7 @@
 import { computed } from "vue";
 import { rpmBankFrequency, RPM_SOURCE_OPTIONS } from "../filters/rpm_filter.js";
 
+defineEmits(["hover-slot"]);
 const props = defineProps({
   rpm: { type: Object, required: true },
   axis: { type: Number, required: true },

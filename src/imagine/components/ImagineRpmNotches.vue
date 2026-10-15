@@ -30,7 +30,14 @@
 
         <template v-for="group in groups" :key="group.label">
           <ImagineSubSection v-if="group.rows.length" :label="group.label">
-            <div v-for="row in group.rows" :key="row.source" class="flex gap-2">
+            <div
+              v-for="row in group.rows"
+              :key="row.source"
+              class="-mx-1 flex gap-2 rounded px-1"
+              :class="{ 'bg-elevated': hoveredSource === row.source }"
+              @mouseenter="hover([row.source], row.source)"
+              @mouseleave="hover(null)"
+            >
               <div class="flex h-8 items-center">
                 <USwitch
                   :model-value="bank[row.source].enabled"
@@ -89,7 +96,7 @@
           description="These notches can't be shown in the Configurator's layout (it needs one Q per source, Q 1.5–10 and standard double/triple spacing), so they are listed slot by slot as in the CLI."
           class="mb-2"
         />
-        <ImagineRpmList :rpm="rpm" :axis="axis" :speeds="speeds" :rotor="rotor" :nyquist="nyquist" />
+        <ImagineRpmList :rpm="rpm" :axis="axis" :speeds="speeds" :rotor="rotor" :nyquist="nyquist" @hover-slot="hoverSlot" />
         <div class="mt-2 flex justify-end">
           <UButton
             label="Convert to Configurator layout"
@@ -107,7 +114,8 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, reactive, ref } from "vue";
+import { useImagineStore } from "../imagine_store.js";
 import {
   convertToLayout,
   DEFAULT_Q,
@@ -143,7 +151,26 @@ const typeItems = [
   { label: "TRIPLE", value: NOTCH_TYPE.TRIPLE },
 ];
 
-const axis = ref(0);
+// The tab follows the chart's axis, and picking a tab switches the chart too
+const imagine = useImagineStore();
+const axis = computed({
+  get: () => imagine.axis,
+  set: (v) => (imagine.axis = v),
+});
+const hoveredSource = ref(null);
+
+function hover(sources, source = null) {
+  hoveredSource.value = source;
+  imagine.rpmHighlight = sources ? { axis: axis.value, sources } : null;
+}
+
+function hoverSlot(slot) {
+  imagine.rpmHighlight = slot == null ? null : { axis: axis.value, slots: [slot] };
+}
+
+onBeforeUnmount(() => {
+  imagine.rpmHighlight = null;
+});
 const limitError = ref(null);
 // Q/type of rows while they are switched off, so switching back on restores them
 const memory = reactive([{}, {}, {}]);
