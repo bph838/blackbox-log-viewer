@@ -310,6 +310,12 @@ function sendMessages(options, messages, onResult, onError) {
       "instead of a file.";
   }
 
+  // The SDK can't report how much of the request has been uploaded, so progress is reported as
+  // stages instead: sending (with the request's size), then the model thinking, then writing.
+  const onStatus = typeof options.onStatus === "function" ? options.onStatus : () => {};
+  const requestBytes = new TextEncoder().encode(JSON.stringify(requestParams)).length;
+  onStatus({ phase: "sending", requestBytes });
+
   let stream;
   try {
     stream = client.beta.messages.stream(requestParams);
@@ -317,6 +323,15 @@ function sendMessages(options, messages, onResult, onError) {
     onError(e && e.message ? e.message : String(e));
     return NO_CANCEL;
   }
+
+  // The response starts once the whole request has arrived; until the first text, the model is
+  // thinking (or running skills' code)
+  stream.on("connect", () => {
+    if (!cancelled) onStatus({ phase: "thinking", requestBytes });
+  });
+  stream.on("text", () => {
+    if (!cancelled) onStatus({ phase: "writing", requestBytes });
+  });
 
   let cancelled = false;
 

@@ -548,6 +548,30 @@
                 />
               </div>
 
+              <!-- Where an in-flight request has got to, so a long wait doesn't look like nothing's happening -->
+              <div
+                v-if="isPending"
+                class="flex items-center gap-3 flex-wrap rounded-md border border-default bg-elevated px-3 py-2 text-xs"
+              >
+                <UIcon name="i-lucide-loader-circle" class="size-4 text-primary animate-spin shrink-0" />
+                <span class="font-medium tabular-nums">{{ aiStatusText }}</span>
+                <ol class="flex items-center gap-1.5 ml-auto text-dimmed">
+                  <template v-for="(label, i) in ['Send', 'Think', 'Write']" :key="label">
+                    <li v-if="i" class="h-px w-4 bg-(--ui-border-accented)" aria-hidden="true" />
+                    <li
+                      class="flex items-center gap-1"
+                      :class="{ 'text-primary font-medium': i === aiStageIndex, 'text-default': i < aiStageIndex }"
+                    >
+                      <UIcon
+                        :name="i < aiStageIndex ? 'i-lucide-circle-check' : i === aiStageIndex ? 'i-lucide-circle-dot' : 'i-lucide-circle'"
+                        class="size-3.5"
+                      />
+                      {{ label }}
+                    </li>
+                  </template>
+                </ol>
+              </div>
+
               <UAlert
                 v-if="showNoApiKeyBanner"
                 color="warning"
@@ -1275,6 +1299,55 @@ const streamingText = computed(() => {
   return entry ? streamingTextByEntryId.value[entry.id] : null;
 });
 
+// ---- AI request progress ----
+
+// { phase: "sending" | "thinking" | "writing", requestBytes, since } per entry with a request in
+// flight - see tuning_ai.js sendMessages()
+const aiStatusByEntryId = ref({});
+// Ticks once a second while any request is in flight, for the elapsed-time readout
+const now = ref(Date.now());
+let nowTimer = null;
+
+watch(
+  () => pendingEntryIds.value.size > 0,
+  (anyPending) => {
+    clearInterval(nowTimer);
+    nowTimer = anyPending ? setInterval(() => (now.value = Date.now()), 1000) : null;
+    now.value = Date.now();
+  },
+);
+onUnmounted(() => clearInterval(nowTimer));
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const aiStatusText = computed(() => {
+  const entry = currentEntry.value;
+  const status = entry && isPending.value ? aiStatusByEntryId.value[entry.id] : null;
+  if (!status) return isPending.value ? "Preparing request…" : "";
+
+  const seconds = Math.max(0, Math.round((now.value - status.since) / 1000));
+  const size = formatBytes(status.requestBytes);
+  switch (status.phase) {
+    case "sending":
+      return `Sending ${size} to Claude… ${seconds}s`;
+    case "thinking":
+      return `Sent ${size} · Claude is thinking… ${seconds}s`;
+    default:
+      return `Claude is writing its answer… ${seconds}s`;
+  }
+});
+
+const AI_STAGES = ["sending", "thinking", "writing"];
+const aiStageIndex = computed(() => {
+  const entry = currentEntry.value;
+  const status = entry && aiStatusByEntryId.value[entry.id];
+  return status ? AI_STAGES.indexOf(status.phase) : 0;
+});
+
 function renderMarkdown(text) {
   return DOMPurify.sanitize(marked.parse(String(text ?? "")));
 }
@@ -1545,6 +1618,10 @@ function onAskAi() {
     const nextQuestions = { ...pendingQuestionByEntryId.value };
     delete nextQuestions[entryId];
     pendingQuestionByEntryId.value = nextQuestions;
+
+    const nextStatus = { ...aiStatusByEntryId.value };
+    delete nextStatus[entryId];
+    aiStatusByEntryId.value = nextStatus;
   }
 
   const callOptions = {
@@ -1557,6 +1634,12 @@ function onAskAi() {
     images,
     slice,
     onChunk: (textSnapshot) => setStreamingText(entry.id, textSnapshot),
+    onStatus: (status) => {
+      const previous = aiStatusByEntryId.value[entry.id];
+      // Each stage's timer starts when it's reached; "writing" fires per chunk, so keep its start
+      const since = previous && previous.phase === status.phase ? previous.since : Date.now();
+      aiStatusByEntryId.value = { ...aiStatusByEntryId.value, [entry.id]: { ...status, since } };
+    },
   };
 
   function onResult(text, entryMessages, costUsd) {
