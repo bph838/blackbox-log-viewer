@@ -20,7 +20,11 @@
       <p class="hero-tagline">Analyze flight logs recorded by Rotorflights's Blackbox feature.</p>      
       <p class="tag-version">{{ appStore.statusViewerVersion }}</p>
       <!-- Drop zone (from rotorflight-blackbox's welcome page) - drops are handled window-wide in App.vue -->
-      <div class="rf-dropzone" :class="{ 'is-dragging': isDragging }">
+      <div
+        class="rf-dropzone"
+        :class="{ 'is-dragging': isDragging, 'is-loading': !!loadingFileText }"
+        :aria-busy="!!loadingFileText"
+      >
         <svg
           class="rf-dropzone-icon"
           viewBox="0 0 24 24"
@@ -310,6 +314,26 @@ const loadingFileText = computed(() => {
   color: var(--color-primary-500);
   margin: 0.85rem 0 0;
   overflow-wrap: anywhere;
+}
+
+/* While a file loads, the whole drop zone goes greyscale (and can't be clicked again) */
+.rf-dropzone > * {
+  transition: filter 0.2s ease, opacity 0.2s ease;
+}
+
+.rf-dropzone.is-loading {
+  cursor: progress;
+}
+
+.rf-dropzone.is-loading > * {
+  filter: grayscale(1);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* ...apart from the "is being loaded" message, which stays readable */
+.rf-dropzone.is-loading > .loading-file-indicator {
+  opacity: 1;
 }
 
 /* Drop zone */
