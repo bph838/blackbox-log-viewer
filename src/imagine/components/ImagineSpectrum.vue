@@ -173,7 +173,7 @@ function drawDynNotchOverlay() {
   }
   const ctx = c.getContext("2d");
   ctx.clearRect(0, 0, c.width, c.height);
-  if (!hasData || !store.showDynNotchOverlay || !store.rates) return;
+  if (!hasData || !store.chartOverlays.dynNotch || !store.rates) return;
 
   const dn = store.settings.dynNotch;
   const stats = dynStats.value;
@@ -297,7 +297,7 @@ function rebuild() {
 }
 
 function updateMarkers() {
-  GraphSpectrumPlot.setSysConfig(markerSysConfig(store.settings));
+  GraphSpectrumPlot.setSysConfig(markerSysConfig(store.settings, store.chartOverlays));
   draw();
 }
 
@@ -363,7 +363,8 @@ watch(
   rebuild,
 );
 watch(() => store.settings, updateMarkers, { deep: true });
-watch(() => [store.showDynNotchOverlay, dynStats.value], () => drawDynNotchOverlay());
+watch(() => [store.chartOverlays.dynNotch, dynStats.value], () => drawDynNotchOverlay());
+watch(() => [store.chartOverlays.lowpass, store.chartOverlays.notch], updateMarkers);
 watch(
   () => show.bars,
   (visible) => {
@@ -382,7 +383,7 @@ watch(zoomY, (v) => {
 });
 
 onMounted(() => {
-  GraphSpectrumPlot.initialize(canvas.value, markerSysConfig(store.settings));
+  GraphSpectrumPlot.initialize(canvas.value, markerSysConfig(store.settings, store.chartOverlays));
   GraphSpectrumPlot.setOverdraw(SPECTRUM_OVERDRAW_TYPE.GYRO_FILTERS);
   GraphSpectrumPlot.setFullScreen(true);
   GraphSpectrumPlot.setShowMainBars(show.bars);

@@ -11,6 +11,14 @@
     <div class="flex-1 space-y-3 overflow-y-auto p-3">
       <!-- Lowpass Filter -->
       <ImagineSection title="Lowpass Filter" :help="HELP.lowpass">
+        <template #header>
+          <ImagineChartToggle
+            :on="store.chartOverlays.lowpass"
+            what="lowpass cutoffs"
+            detail="a line at each cutoff frequency"
+            @toggle="store.setChartOverlay('lowpass', $event)"
+          />
+        </template>
         <ImagineSubSection :label="showLpf2 ? 'Lowpass Filter 1' : ''">
           <ImagineField id="lpf1-enable" label="Enable" :changed="(s.lpf1.type > 0) !== (log.lpf1.type > 0)">
             <USwitch id="lpf1-enable" :model-value="s.lpf1.type > 0" @update:model-value="toggleLpf1" />
@@ -58,6 +66,14 @@
 
       <!-- Notch Filter (expert) -->
       <ImagineSection v-if="showNotches" title="Notch Filter" :help="HELP.notch">
+        <template #header>
+          <ImagineChartToggle
+            :on="store.chartOverlays.notch"
+            what="notch filters"
+            detail="a triangle from each notch's cutoff up to its center"
+            @toggle="store.setChartOverlay('notch', $event)"
+          />
+        </template>
         <ImagineSubSection v-for="(n, i) in NOTCHES" :key="n.key" :label="`Notch Filter ${i + 1}`">
           <ImagineField :id="`${n.key}-enable`" label="Enable" :changed="notchOn(s, n.key) !== notchOn(log, n.key)">
             <USwitch :id="`${n.key}-enable`" :model-value="notchOn(s, n.key)" @update:model-value="toggleNotch(n.key, $event)" />
@@ -82,14 +98,11 @@
       <!-- Dynamic Filter -->
       <ImagineSection title="Dynamic Filter" :help="HELP.dynamic">
         <template #header>
-          <UButton
-            :icon="store.showDynNotchOverlay ? 'i-lucide-eye' : 'i-lucide-eye-off'"
-            size="xs"
-            variant="ghost"
-            :color="store.showDynNotchOverlay ? 'primary' : 'neutral'"
-            :title="store.showDynNotchOverlay ? 'Hide the dynamic notch on the chart' : 'Show the dynamic notch on the chart: its range, and after Imagine where each notch sat'"
-            :aria-label="store.showDynNotchOverlay ? 'Hide dynamic notch on chart' : 'Show dynamic notch on chart'"
-            @click="store.setShowDynNotchOverlay(!store.showDynNotchOverlay)"
+          <ImagineChartToggle
+            :on="store.chartOverlays.dynNotch"
+            what="dynamic notch"
+            detail="its range, and after Imagine where each notch sat"
+            @toggle="store.setChartOverlay('dynNotch', $event)"
           />
         </template>
         <ImagineField id="dyn-enable" label="Enable" cli="feature DYN_NOTCH" :changed="s.dynNotch.enabled !== log.dynNotch.enabled">
@@ -204,6 +217,7 @@ import { useImagineStore } from "../imagine_store.js";
 import { useCraftConfigStore } from "../../stores/craftConfig.js";
 import { settingsToCli } from "../header_settings.js";
 import { resolveRpmBanks } from "../filters/rpm_filter.js";
+import ImagineChartToggle from "./ImagineChartToggle.vue";
 import ImagineField from "./ImagineField.vue";
 import ImagineNumber from "./ImagineNumber.vue";
 import ImagineRpmNotches from "./ImagineRpmNotches.vue";

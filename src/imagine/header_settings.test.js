@@ -204,5 +204,10 @@ describe("spectrum view", () => {
     const m = markerSysConfig(s);
     expect(m.gyro_lowpass_hz).toBe(55);
     expect(m.gyro_notch_hz).toEqual([150, 0]);
+    // eye toggles hide lowpass lines and notch triangles independently
+    const hidden = markerSysConfig(s, { lowpass: false, notch: true });
+    expect(hidden.gyro_lowpass_hz).toBe(0);
+    expect(hidden.gyro_notch_hz).toEqual([150, 0]);
+    expect(markerSysConfig(s, { lowpass: true, notch: false }).gyro_notch_hz).toEqual([0, 0]);
   });
 });

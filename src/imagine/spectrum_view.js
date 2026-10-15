@@ -165,17 +165,22 @@ export function buildSpectrumView(p) {
   return p.mode === "db" ? buildDb(p) : buildLinear(p);
 }
 
-/** sysConfig-shaped object so the plot can draw the filter cutoff markers for these settings. */
-export function markerSysConfig(settings) {
-  const dyn = settings.lpf1.type && settings.lpf1.dynMinHz > 0;
+/**
+ * sysConfig-shaped object so the plot can draw the filter markers for these settings.
+ * show.lowpass / show.notch hide the lowpass cutoff lines / static notch triangles.
+ */
+export function markerSysConfig(settings, show = { lowpass: true, notch: true }) {
+  const lp = show.lowpass !== false;
+  const nt = show.notch !== false;
+  const dyn = lp && settings.lpf1.type && settings.lpf1.dynMinHz > 0;
   return {
     gyro_soft_type: settings.lpf1.type,
-    gyro_lowpass_hz: settings.lpf1.type ? settings.lpf1.staticHz : 0,
+    gyro_lowpass_hz: lp && settings.lpf1.type ? settings.lpf1.staticHz : 0,
     gyro_lowpass_dyn_hz: dyn ? [settings.lpf1.dynMinHz, settings.lpf1.dynMaxHz] : [0, 0],
     gyro_lowpass_dyn_expo: 0,
     gyro_soft2_type: settings.lpf2.type,
-    gyro_lowpass2_hz: settings.lpf2.type ? settings.lpf2.staticHz : 0,
-    gyro_notch_hz: [settings.notch1.hz, settings.notch2.hz],
-    gyro_notch_cutoff: [settings.notch1.cutoff, settings.notch2.cutoff],
+    gyro_lowpass2_hz: lp && settings.lpf2.type ? settings.lpf2.staticHz : 0,
+    gyro_notch_hz: nt ? [settings.notch1.hz, settings.notch2.hz] : [0, 0],
+    gyro_notch_cutoff: nt ? [settings.notch1.cutoff, settings.notch2.cutoff] : [0, 0],
   };
 }
