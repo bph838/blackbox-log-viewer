@@ -29,17 +29,25 @@ function hann(n) {
 
 /**
  * Single FFT amplitude spectrum over the whole range (like the Analyser "Frequency" view).
- * Returns amplitudes in deg/s (Hann window, coherent gain corrected).
+ *
+ * Default: Hann window, average removed, amplitudes in deg/s (coherent gain corrected).
+ * Analyser style ({window: <Analyser Hanning setting>, removeMean: false, raw: true}) returns the
+ * plain FFT magnitude, exactly as GraphSpectrumCalc does.
  */
-export function amplitudeSpectrum(samples, start, end, minLength = 2048) {
+export function amplitudeSpectrum(samples, start, end, minLength = 2048, options = {}) {
+  const { window = true, removeMean = true, raw = false, offset = 0 } = options;
   const count = Math.max(0, end - start);
   const n = nextPow2(Math.max(count, minLength));
   const input = new Float64Array(n);
-  const w = hann(count);
+  const w = window ? hann(count) : new Float64Array(count).fill(1);
   let wsum = 0;
-  let mean = 0;
-  for (let i = 0; i < count; i++) mean += samples[start + i];
-  mean = count ? mean / count : 0;
+  // value subtracted from every sample: the average, or minus the Analyser curve offset
+  let mean = -offset;
+  if (removeMean) {
+    mean = 0;
+    for (let i = 0; i < count; i++) mean += samples[start + i];
+    mean = count ? mean / count : 0;
+  }
   for (let i = 0; i < count; i++) {
     input[i] = (samples[start + i] - mean) * w[i];
     wsum += w[i];
@@ -48,7 +56,8 @@ export function amplitudeSpectrum(samples, start, end, minLength = 2048) {
   getFft(n).simple(output, input, "real");
   const half = n / 2;
   const mags = new Float64Array(half);
-  const scale = wsum > 0 ? 2 / wsum : 0;
+  let scale = wsum > 0 ? 2 / wsum : 0;
+  if (raw) scale = 1;
   for (let i = 0; i < half; i++) {
     mags[i] = Math.hypot(output[2 * i], output[2 * i + 1]) * scale;
   }

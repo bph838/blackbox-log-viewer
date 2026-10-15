@@ -27,6 +27,18 @@
       </div>
 
       <div class="flex items-center gap-3 text-xs">
+        <UCheckbox
+          v-model="analyserStyle"
+          label="Match Analyser"
+          :title="analyserStyleTitle"
+          :disabled="mode === 'db'"
+        />
+        <UCheckbox
+          v-model="show.bars"
+          label="Bars"
+          title="Show the unfiltered spectrum as bars behind the lines"
+          :disabled="mode === 'db'"
+        />
         <UCheckbox v-model="show.unfiltered" label="Unfiltered line" :disabled="mode === 'db'" />
         <UCheckbox v-model="show.imagined" :disabled="!store.imagined">
           <template #label><span :style="{ color: CURVE_STYLE.imagined.color }">Imagined</span></template>
@@ -67,7 +79,8 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { useSettingsStore } from "../../stores/settings.js";
 import { GraphSpectrumPlot, SPECTRUM_OVERDRAW_TYPE, SPECTRUM_TYPE } from "../../graph_spectrum_plot.js";
 import { AXIS_NAMES, useImagineStore } from "../imagine_store.js";
 import { buildSpectrumView, CURVE_STYLE, markerSysConfig } from "../spectrum_view.js";
@@ -75,7 +88,7 @@ import { buildSpectrumView, CURVE_STYLE, markerSysConfig } from "../spectrum_vie
 const store = useImagineStore();
 const container = ref(null);
 const canvas = ref(null);
-const show = reactive({ unfiltered: false, imagined: true, logged: true });
+const show = reactive({ bars: true, unfiltered: false, imagined: true, logged: false });
 const zoomX = ref(100);
 const zoomY = ref(100);
 const busy = ref(false);
@@ -84,6 +97,32 @@ const MODES = [
   { id: "db", label: "dB", title: "Power spectral density in dB: easier to read how much each filter removes" },
 ];
 const mode = ref("linear");
+
+// "Match Analyser": draw the Linear view the way the main Analyser does (its Hanning setting, no
+// average removal, absolute scale that clips big peaks). Remembered per browser.
+const settingsStore = useSettingsStore();
+const ANALYSER_STYLE_KEY = "imagine.matchAnalyser";
+function readAnalyserStylePref() {
+  try {
+    return globalThis.localStorage?.getItem(ANALYSER_STYLE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+const analyserStyle = ref(readAnalyserStylePref());
+watch(analyserStyle, (on) => {
+  try {
+    globalThis.localStorage?.setItem(ANALYSER_STYLE_KEY, on ? "1" : "0");
+  } catch {
+    // storage unavailable: the choice is just not remembered
+  }
+});
+const analyserStyleTitle = computed(
+  () =>
+    `Draw like the main Analyser: Hanning window ${settingsStore.userSettings.analyserHanning ? "on" : "off"} ` +
+    "(from User Settings), no average removal and an absolute scale where big peaks clip. " +
+    "Off: Hann window and the tallest peak scaled to fit.",
+);
 let hasData = false;
 let resizeObserver = null;
 let mouseActive = false;
@@ -115,6 +154,7 @@ function rebuild() {
         rateHz: store.rates.logRateHz,
         show,
         mode: mode.value,
+        analyserStyle: analyserStyle.value ? { hanning: !!settingsStore.userSettings.analyserHanning } : null,
       });
       GraphSpectrumPlot.curvesColors = view.colors.length ? view.colors : ["White"];
       GraphSpectrumPlot.setData(
@@ -160,10 +200,17 @@ function clearMouse() {
 }
 
 watch(
-  () => [store.data, store.imagined, store.axis, store.range.start, store.range.end, show.unfiltered, show.imagined, show.logged, mode.value],
+  () => [store.data, store.imagined, store.axis, store.range.start, store.range.end, show.unfiltered, show.imagined, show.logged, mode.value, analyserStyle.value],
   rebuild,
 );
 watch(() => store.settings, updateMarkers, { deep: true });
+watch(
+  () => show.bars,
+  (visible) => {
+    GraphSpectrumPlot.setShowMainBars(visible);
+    draw();
+  },
+);
 watch(zoomX, (v) => {
   GraphSpectrumPlot.setZoom(v / 100, 100 / zoomY.value);
   GraphSpectrumPlot.setMousePosition(0, 0);
@@ -178,6 +225,7 @@ onMounted(() => {
   GraphSpectrumPlot.initialize(canvas.value, markerSysConfig(store.settings));
   GraphSpectrumPlot.setOverdraw(SPECTRUM_OVERDRAW_TYPE.GYRO_FILTERS);
   GraphSpectrumPlot.setFullScreen(true);
+  GraphSpectrumPlot.setShowMainBars(show.bars);
   resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(container.value);
   resize();

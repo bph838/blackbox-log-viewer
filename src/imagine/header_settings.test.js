@@ -10,6 +10,7 @@ import {
 } from "./header_settings.js";
 import { buildSpectrumView, markerSysConfig } from "./spectrum_view.js";
 import { rpmBankFrequency } from "./filters/rpm_filter.js";
+import { GraphSpectrumCalc } from "../graph_spectrum_calc.js";
 
 // Header values as parsed from a Rotorflight 4.6.0 log (TRON 5.8 sample)
 const sysConfig = {
@@ -147,11 +148,13 @@ describe("spectrum view", () => {
     const view = buildSpectrumView({ data, imagined, axis: 0, range: { start: 0, end: n }, rateHz: rate, show: { unfiltered: true, imagined: true, logged: true }, mode: "linear" });
     expect(view.fftData.blackBoxRate).toBe(rate);
     expect(Math.max(...view.fftData.fftOutput)).toBeCloseTo(90, 0);
-    expect(view.curves.map((c) => c.name)).toEqual(["Unfiltered", "Imagined", "Logged filtered"]);
+    // imagined is drawn last, on top of the wider logged line
+    expect(view.curves.map((c) => c.name)).toEqual(["Unfiltered", "Logged filtered", "Imagined"]);
+    expect(view.curves[1].lineWidth).toBeGreaterThan(view.curves[2].lineWidth);
     const peak = (c) => Math.max(...c.points.map((p) => p.y));
     // 10 : 2 : 1 amplitude ratio survives the envelope
-    expect(peak(view.curves[1]) / peak(view.curves[0])).toBeCloseTo(0.2, 1);
-    expect(peak(view.curves[2]) / peak(view.curves[0])).toBeCloseTo(0.1, 1);
+    expect(peak(view.curves[2]) / peak(view.curves[0])).toBeCloseTo(0.2, 1);
+    expect(peak(view.curves[1]) / peak(view.curves[0])).toBeCloseTo(0.1, 1);
     expect(view.fftData.maxNoiseFrequency).toBeCloseTo(120, 0);
   });
 
@@ -160,6 +163,39 @@ describe("spectrum view", () => {
     const peak = (c) => Math.max(...c.points.map((p) => p.y));
     expect(view.curves[0].name).toBe("Unfiltered");
     expect(peak(view.curves[0]) - peak(view.curves[1])).toBeCloseTo(20 * Math.log10(5), 0);
+  });
+
+  test("Match Analyser reproduces the Analyser's own FFT of the curve-normalised samples", () => {
+    const x = Float64Array.from({ length: 3000 }, (_, i) => 40 + 30 * Math.sin(i * 0.9) + 5 * Math.cos(i * 0.21));
+    let min = Infinity;
+    let max = -Infinity;
+    for (const v of x) {
+      min = Math.min(min, v);
+      max = Math.max(max, v);
+    }
+    const curve = { lookupRaw: (v) => (v - (max + min) / 2) / ((max - min) / 2) };
+    for (const hanning of [false, true]) {
+      // GraphSpectrumCalc._getFlightSamplesFreq + optional _hanningWindow + _fft, magnitudes as _normalizeFft
+      const n = 4096;
+      const samples = new Float64Array(n);
+      x.forEach((v, i) => (samples[i] = curve.lookupRaw(v)));
+      if (hanning) GraphSpectrumCalc._hanningWindow(samples, x.length);
+      const out = GraphSpectrumCalc._fft(samples);
+      const expected = Array.from({ length: n / 2 }, (_, i) => Math.hypot(out[2 * i], out[2 * i + 1]));
+
+      const view = buildSpectrumView({
+        data: { raw: [x, x, x], logged: null },
+        imagined: null,
+        axis: 0,
+        range: { start: 0, end: x.length },
+        rateHz: 500,
+        show: { unfiltered: false, imagined: false, logged: false },
+        mode: "linear",
+        analyserStyle: { hanning },
+      });
+      expect(view.fftData.fftLength).toBe(n / 2);
+      for (let i = 0; i < n / 2; i++) expect(view.fftData.fftOutput[i]).toBeCloseTo(expected[i], 6);
+    }
   });
 
   test("filter markers follow the edited settings", () => {

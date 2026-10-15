@@ -293,10 +293,13 @@ GraphSpectrumPlot._drawFrequencyGraph = function (canvasCtx) {
   const stepX = WIDTH / (PLOTTED_BUFFER_LENGTH / stepData);
   const barWidth = Math.max(stepX, 1);
   let x = 0;
-  for (let i = 0; i < PLOTTED_BUFFER_LENGTH; i += stepData) {
-    const barHeight = this._fftData.fftOutput[i] * fftScale;
-    canvasCtx.fillRect(x, HEIGHT - barHeight, barWidth, barHeight);
-    x += stepX;
+  // The bars can be hidden so overlay lines are easier to read (Imagine)
+  if (this._showMainBars !== false) {
+    for (let i = 0; i < PLOTTED_BUFFER_LENGTH; i += stepData) {
+      const barHeight = this._fftData.fftOutput[i] * fftScale;
+      canvasCtx.fillRect(x, HEIGHT - barHeight, barWidth, barHeight);
+      x += stepX;
+    }
   }
 
   const scaleX = WIDTH / MAXIMAL_PLOTTED_FREQUENCY;
@@ -306,7 +309,7 @@ GraphSpectrumPlot._drawFrequencyGraph = function (canvasCtx) {
     const pointsCount = curvesPoints.length;
 
     canvasCtx.beginPath();
-    canvasCtx.lineWidth = 1;
+    canvasCtx.lineWidth = this._importedSpectrums.getCurve(spectrumNum).lineWidth ?? 1;
     canvasCtx.strokeStyle = this.getCurveColor(spectrumNum);
     canvasCtx.moveTo(0, HEIGHT);
     // Moving average width in points; a curve can ask for less smoothing (Imagine overlays)
@@ -427,7 +430,7 @@ GraphSpectrumPlot._drawPowerSpectralDensityGraph = function (canvasCtx) {
     const curvesPoints = this._importedPSD.getCurve(spectrumNum).points;
 
     canvasCtx.beginPath();
-    canvasCtx.lineWidth = 1;
+    canvasCtx.lineWidth = this._importedPSD.getCurve(spectrumNum).lineWidth ?? 1;
     canvasCtx.strokeStyle = this.getCurveColor(spectrumNum);
     let isFirstPoint = true;
     for (const point of curvesPoints) {
@@ -2014,8 +2017,8 @@ GraphSpectrumPlot.importCurvesFromCSV = function (files) {
 /**
  * Replace the overlay curves of the current spectrum type (Frequency or PSD) in one go. Used by
  * Imagine to draw the imagined and logged filtered gyro over the unfiltered spectrum.
- * curves: [{name, points: [{x, y}], smoothPoints?}] - smoothPoints sets the Frequency view's
- * moving average width (default 200 points).
+ * curves: [{name, points: [{x, y}], smoothPoints?, lineWidth?}] - smoothPoints sets the Frequency
+ * view's moving average width (default 200 points), lineWidth the stroke width (default 1).
  */
 GraphSpectrumPlot.setOverlayCurves = function (curves) {
   let ready = false;
@@ -2029,6 +2032,9 @@ GraphSpectrumPlot.setOverlayCurves = function (curves) {
     if (curve.smoothPoints != null) {
       overlay.getCurve(index).smoothPoints = curve.smoothPoints;
     }
+    if (curve.lineWidth != null) {
+      overlay.getCurve(index).lineWidth = curve.lineWidth;
+    }
   });
   ready = true;
   if (this._spectrumType === SPECTRUM_TYPE.POWER_SPECTRAL_DENSITY) {
@@ -2036,6 +2042,13 @@ GraphSpectrumPlot.setOverlayCurves = function (curves) {
   } else {
     this._importedSpectrums = overlay;
   }
+  this._invalidateCache();
+  this._invalidateDataCache();
+};
+
+/** Show or hide the main spectrum's bars in the Frequency view (overlay lines stay). */
+GraphSpectrumPlot.setShowMainBars = function (show) {
+  this._showMainBars = show;
   this._invalidateCache();
   this._invalidateDataCache();
 };

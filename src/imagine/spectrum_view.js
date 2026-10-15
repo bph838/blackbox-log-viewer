@@ -9,10 +9,12 @@ import { amplitudeSpectrum, welchPsd } from "./analysis.js";
 
 const AXIS_NAMES = ["Roll", "Pitch", "Yaw"];
 
+// Drawn in this order. The logged line is wider and drawn before the imagined one, so when the
+// imagined settings reproduce the log the orange line still shows on top of a blue edge.
 export const CURVE_STYLE = Object.freeze({
-  unfiltered: { name: "Unfiltered", color: "White" },
-  imagined: { name: "Imagined", color: "#ff9f40" },
-  logged: { name: "Logged filtered", color: "#4dabf7" },
+  unfiltered: { name: "Unfiltered", color: "White", lineWidth: 1 },
+  logged: { name: "Logged filtered", color: "#4dabf7", lineWidth: 3 },
+  imagined: { name: "Imagined", color: "#ff9f40", lineWidth: 1.5 },
 });
 
 const SCALE_FROM_HZ = 10; // ignore stick movement when choosing the vertical scale
@@ -38,14 +40,35 @@ function envelopePoints(magnitudes, binHz, scale) {
 function series(data, imagined, axis, show) {
   const list = [];
   if (show.unfiltered) list.push({ style: CURVE_STYLE.unfiltered, samples: data.raw[axis] });
-  if (show.imagined && imagined) list.push({ style: CURVE_STYLE.imagined, samples: imagined.filtered[axis] });
   if (show.logged && data.logged) list.push({ style: CURVE_STYLE.logged, samples: data.logged[axis] });
+  if (show.imagined && imagined) list.push({ style: CURVE_STYLE.imagined, samples: imagined.filtered[axis] });
   return list;
 }
 
-function buildLinear({ data, imagined, axis, range, rateHz, show }) {
+// The Analyser's default curve for a gyro field maps the field's whole-log min..max onto -1..1
+// (graph_config.js getCurveForMinMaxFields, grapher.js), and lookupRaw() divides by half that range.
+// A workspace can override the range, so this matches the Analyser's default only.
+function analyserInputRange(samples) {
+  let min = Infinity;
+  let max = -Infinity;
+  for (let i = 0; i < samples.length; i++) {
+    if (samples[i] < min) min = samples[i];
+    if (samples[i] > max) max = samples[i];
+  }
+  const half = (max - min) / 2;
+  return { half: half > 0 ? half : 1, offset: -(max + min) / 2 };
+}
+
+function buildLinear({ data, imagined, axis, range, rateHz, show, analyserStyle }) {
   const { start, end } = range;
-  const raw = amplitudeSpectrum(data.raw[axis], start, end);
+  // Imagine style: Hann window, average removed, tallest peak above 10 Hz at 90% height.
+  // Analyser style: the Analyser's own window setting, no average removal, absolute FFT magnitude
+  // of the curve-normalised samples, so large peaks clip just like in the main app.
+  const curve = analyserStyle ? analyserInputRange(data.raw[axis]) : null;
+  const spectrumOptions = analyserStyle
+    ? { window: !!analyserStyle.hanning, removeMean: false, raw: true, offset: curve.offset }
+    : {};
+  const raw = amplitudeSpectrum(data.raw[axis], start, end, 2048, spectrumOptions);
   const bins = raw.binCount;
   const binHz = rateHz / 2 / bins;
 
@@ -57,7 +80,8 @@ function buildLinear({ data, imagined, axis, range, rateHz, show }) {
     if (raw.magnitudes[i] > peak) peak = raw.magnitudes[i];
     if (i >= firstNoiseBin && raw.magnitudes[i] > raw.magnitudes[maxNoiseIdx]) maxNoiseIdx = i;
   }
-  const scale = peak > 0 ? TARGET_HEIGHT / peak : 1;
+  let scale = peak > 0 ? TARGET_HEIGHT / peak : 1;
+  if (analyserStyle) scale = 1 / curve.half;
 
   const scaled = new Float64Array(bins);
   for (let i = 0; i < bins; i++) scaled[i] = raw.magnitudes[i] * scale;
@@ -74,8 +98,13 @@ function buildLinear({ data, imagined, axis, range, rateHz, show }) {
   const curves = [];
   const colors = [];
   for (const s of series(data, imagined, axis, show)) {
-    const spec = s.samples === data.raw[axis] ? raw : amplitudeSpectrum(s.samples, start, end);
-    curves.push({ name: s.style.name, points: envelopePoints(spec.magnitudes, binHz, scale), smoothPoints: OVERLAY_SMOOTHING });
+    const spec = s.samples === data.raw[axis] ? raw : amplitudeSpectrum(s.samples, start, end, 2048, spectrumOptions);
+    curves.push({
+      name: s.style.name,
+      points: envelopePoints(spec.magnitudes, binHz, scale),
+      smoothPoints: OVERLAY_SMOOTHING,
+      lineWidth: s.style.lineWidth,
+    });
     colors.push(s.style.color);
   }
   return { fftData, curves, colors };
@@ -108,7 +137,7 @@ function buildDb({ data, imagined, axis, range, rateHz, show }) {
       if (db[i] < minimum) minimum = db[i];
       if (db[i] > maximum) maximum = db[i];
     }
-    curves.push({ name: s.style.name, points });
+    curves.push({ name: s.style.name, points, lineWidth: s.style.lineWidth });
     colors.push(s.style.color);
   }
 
@@ -128,7 +157,8 @@ function buildDb({ data, imagined, axis, range, rateHz, show }) {
 /**
  * @param {object} p
  *   data, imagined, axis, range {start, end}, rateHz,
- *   show {unfiltered, imagined, logged}, mode "linear" | "db"
+ *   show {unfiltered, imagined, logged}, mode "linear" | "db",
+ *   analyserStyle null, or {hanning} to draw the Linear view like the main Analyser
  * @returns {{fftData, curves, colors}}
  */
 export function buildSpectrumView(p) {
