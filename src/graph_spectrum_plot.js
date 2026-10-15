@@ -309,10 +309,12 @@ GraphSpectrumPlot._drawFrequencyGraph = function (canvasCtx) {
     canvasCtx.lineWidth = 1;
     canvasCtx.strokeStyle = this.getCurveColor(spectrumNum);
     canvasCtx.moveTo(0, HEIGHT);
-    const filterPointsCount = 200;
+    // Moving average width in points; a curve can ask for less smoothing (Imagine overlays)
+    const filterPointsCount =
+      this._importedSpectrums.getCurve(spectrumNum).smoothPoints ?? 200;
     for (let pointNum = 0; pointNum < pointsCount; pointNum++) {
       // Apply moving average filter at spectrum points to get visible line
-      let filterStartPoint = pointNum - filterPointsCount / 2;
+      let filterStartPoint = pointNum - Math.floor(filterPointsCount / 2);
       if (filterStartPoint < 0) {
         filterStartPoint = 0;
       }
@@ -2007,6 +2009,41 @@ GraphSpectrumPlot.importCurvesFromCSV = function (files) {
       );
       break;
   }
+};
+
+/**
+ * Replace the overlay curves of the current spectrum type (Frequency or PSD) in one go. Used by
+ * Imagine to draw the imagined and logged filtered gyro over the unfiltered spectrum.
+ * curves: [{name, points: [{x, y}], smoothPoints?}] - smoothPoints sets the Frequency view's
+ * moving average width (default 200 points).
+ */
+GraphSpectrumPlot.setOverlayCurves = function (curves) {
+  let ready = false;
+  const overlay = new ImportedCurves(() => {
+    if (ready) {
+      GraphSpectrumPlot.redraw();
+    }
+  });
+  curves.forEach((curve, index) => {
+    overlay.addCurve(curve.points, curve.name);
+    if (curve.smoothPoints != null) {
+      overlay.getCurve(index).smoothPoints = curve.smoothPoints;
+    }
+  });
+  ready = true;
+  if (this._spectrumType === SPECTRUM_TYPE.POWER_SPECTRAL_DENSITY) {
+    this._importedPSD = overlay;
+  } else {
+    this._importedSpectrums = overlay;
+  }
+  this._invalidateCache();
+  this._invalidateDataCache();
+};
+
+/** Replace the header config used to draw the filter cutoff markers. */
+GraphSpectrumPlot.setSysConfig = function (sysConfig) {
+  this._sysConfig = sysConfig;
+  this._invalidateCache();
 };
 
 GraphSpectrumPlot.removeImportedCurves = function () {

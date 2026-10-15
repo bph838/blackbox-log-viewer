@@ -13,6 +13,7 @@
           @open-craft-config="onOpenCraftConfig"
           @open-tuning-log="onOpenTuningLog"
           @open-flight-analysis="onOpenFlightAnalysis"
+          @open-imagine="onOpenImagine"
           @export-csv="onExportCsv"
           @export-gpx="onExportGpx"
           @export-video="onExportVideo"
@@ -151,6 +152,7 @@ import { useWorkspaceStore } from "./stores/workspace.js";
 import { useCraftConfigStore } from "./stores/craftConfig.js";
 import { recheckCraftConfigMatch } from "./log_lifecycle.js";
 import { trackEvent } from "./analytics.js";
+import { openImagine } from "./imagine/handoff.js";
 import AppToolbar from "./components/AppToolbar.vue";
 import WelcomePage from "./components/WelcomePage.vue";
 import ViewControls from "./components/ViewControls.vue";
@@ -262,6 +264,29 @@ function onOpenTuningLog() {
 function onOpenFlightAnalysis() {
   trackEvent("open_flight_analysis");
   appStore.flightAnalysisDialogOpen = true;
+}
+
+// Gyro – Imagine opens in its own tab and asks this window for the log (see imagine/handoff.js).
+function imaginePayload() {
+  if (!logStore.hasLog || !logStore.flightLogDataArray) return null;
+  return {
+    bytes: logStore.flightLogDataArray,
+    fileName: appStore.logFilename || "log",
+    logIndex: logStore.activeLogIndex,
+    timeRange: {
+      in: playbackStore.videoExportInTime ?? null,
+      out: playbackStore.videoExportOutTime ?? null,
+    },
+    // plain copy: reactive proxies can't be posted to another window
+    craft: craftConfigStore.hasConfig
+      ? JSON.parse(JSON.stringify({ fileName: craftConfigStore.fileName, settings: craftConfigStore.settings }))
+      : null,
+  };
+}
+
+function onOpenImagine() {
+  trackEvent("open_imagine");
+  openImagine(imaginePayload);
 }
 
 function onExportCsv() {

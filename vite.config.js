@@ -8,6 +8,13 @@ import pkg from "./package.json";
 export default defineConfig({
   build: {
     sourcemap: true,
+    rollupOptions: {
+      // Two pages: the main explorer and Gyro – Imagine (/imagine/), which shares its code.
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        imagine: fileURLToPath(new URL("./imagine/index.html", import.meta.url)),
+      },
+    },
   },
   plugins: [
     vue(),
@@ -91,6 +98,8 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
+        // Imagine is its own page: don't answer /imagine/ navigations with the main index.html.
+        navigateFallbackDenylist: [/^\/imagine/],
       },
       includeAssets: ["favicon.ico", "robots.txt", "apple-touch-icon.png"],
       manifest: {

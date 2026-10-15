@@ -93,6 +93,16 @@
         <UButton
           variant="ghost"
           color="neutral"
+          label="Imagine"
+          icon="i-lucide-sparkles"
+          size="xs"
+          :disabled="!logStore.hasLog"
+          title="Gyro – Imagine: preview what changing the gyro filter settings would do to this flight (opens a new tab)"
+          @click="$emit('open-imagine')"
+        />
+        <UButton
+          variant="ghost"
+          color="neutral"
           label="Craft Config"
           icon="i-lucide-file-cog"
           size="xs"
@@ -151,6 +161,7 @@ defineEmits([
   "open-craft-config",
   "open-tuning-log",
   "open-flight-analysis",
+  "open-imagine",
 ]);
 
 const logStore = useLogStore();

@@ -1,0 +1,6 @@
+/* Imagine page: full-window layout. */
+html,
+body,
+#imagine-app {
+  height: 100%;
+}
