@@ -276,9 +276,6 @@
                   >
                     <UIcon name="i-lucide-triangle-alert" class="size-3 text-error" />
                   </UTooltip>
-                  <UTooltip v-if="entry.notes?.trim()" text="Notes have been added to this entry" :delay-duration="0">
-                    <UIcon name="i-lucide-notebook-pen" class="size-3 text-warning" />
-                  </UTooltip>
                 </div>
                 <!-- Badges get their own row; empty:hidden collapses it when an entry has none -->
                 <div class="flex items-center gap-1 flex-wrap my-0.5 empty:hidden">
@@ -288,6 +285,9 @@
                     :delay-duration="0"
                   >
                     <UBadge color="secondary" variant="subtle" size="xs">AI</UBadge>
+                  </UTooltip>
+                  <UTooltip v-if="entry.notes?.trim()" text="Notes have been added to this entry" :delay-duration="0">
+                    <UBadge color="success" variant="subtle" size="xs">Notes</UBadge>
                   </UTooltip>
                   <UTooltip
                     v-if="sameConfigAsPrevious.has(entry.id)"
