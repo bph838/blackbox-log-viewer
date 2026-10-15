@@ -5,6 +5,7 @@ import semver from "semver";
 import { FIRMWARE_TYPE_ROTORFLIGHT, FLIGHT_LOG_FEATURES } from "../flightlog_fielddefs.js";
 import { parseGearRatio } from "../craft_config.js";
 import { RPM_FILTER_NOTCH_COUNT } from "./filters/rpm_filter.js";
+import { LPF_TYPE_NAMES } from "./filters/filters.js";
 
 // The firmware source the filter port was taken from.
 export const FIRMWARE_REFERENCE = Object.freeze({
@@ -91,14 +92,22 @@ export function cloneSettings(settings) {
   return JSON.parse(JSON.stringify(settings));
 }
 
+/**
+ * The lowpass types are lookup settings in the Rotorflight CLI: it takes the name
+ * (`set gyro_lpf1_type = FIRST_ORDER`) and rejects the number with "INVALID VALUE".
+ */
+export function lpfTypeCli(type) {
+  return LPF_TYPE_NAMES[type] ?? String(type);
+}
+
 /** CLI lines for the settings, so the user can paste their imagined setup into the CLI. */
 export function settingsToCli(s) {
   const lines = [
-    `set gyro_lpf1_type = ${s.lpf1.type}`,
+    `set gyro_lpf1_type = ${lpfTypeCli(s.lpf1.type)}`,
     `set gyro_lpf1_static_hz = ${s.lpf1.staticHz}`,
     `set gyro_lpf1_dyn_min_hz = ${s.lpf1.dynMinHz}`,
     `set gyro_lpf1_dyn_max_hz = ${s.lpf1.dynMaxHz}`,
-    `set gyro_lpf2_type = ${s.lpf2.type}`,
+    `set gyro_lpf2_type = ${lpfTypeCli(s.lpf2.type)}`,
     `set gyro_lpf2_static_hz = ${s.lpf2.staticHz}`,
     `set gyro_notch1_hz = ${s.notch1.hz}`,
     `set gyro_notch1_cutoff = ${s.notch1.cutoff}`,

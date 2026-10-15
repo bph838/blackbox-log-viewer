@@ -5,7 +5,7 @@
 // Ranges are the firmware's CLI limits (rotorflight-firmware RF-4.6.x src/main/cli/settings.c);
 // where the Configurator offers a narrower range it is reported as a warning, not an error.
 
-import { cloneSettings } from "../header_settings.js";
+import { cloneSettings, lpfTypeCli } from "../header_settings.js";
 import { RPM_FILTER_NOTCH_COUNT } from "../filters/rpm_filter.js";
 
 export const FILTER_TOOL_NAME = "propose_filter_config";
@@ -269,6 +269,9 @@ export function changesToCli(changes) {
       if (c.parameter.startsWith("feature_")) {
         const feature = c.parameter.slice("feature_".length);
         return c.new ? `feature ${feature}` : `feature -${feature}`;
+      }
+      if (c.parameter === "gyro_lpf1_type" || c.parameter === "gyro_lpf2_type") {
+        return `set ${c.parameter} = ${lpfTypeCli(c.new)}`;
       }
       return `set ${c.parameter} = ${Array.isArray(c.new) ? c.new.join(",") : c.new}`;
     })

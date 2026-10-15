@@ -91,7 +91,8 @@ describe("filter suggestion tool", () => {
     b.dynNotch.enabled = false;
     const d = diffSettings(a, b);
     expect(d.map((c) => c.parameter)).toEqual(["gyro_lpf2_type", "gyro_lpf2_static_hz", "feature_DYN_NOTCH"]);
-    expect(changesToCli(d)).toBe("set gyro_lpf2_type = 2\nset gyro_lpf2_static_hz = 150\nfeature -DYN_NOTCH");
+    // lowpass types are written by name - the CLI rejects the number
+    expect(changesToCli(d)).toBe("set gyro_lpf2_type = SECOND_ORDER\nset gyro_lpf2_static_hz = 150\nfeature -DYN_NOTCH");
   });
 });
 

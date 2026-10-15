@@ -66,6 +66,9 @@ describe("settings from the log header", () => {
   test("CLI export uses Rotorflight names", () => {
     const cli = settingsToCli(settingsFromSysConfig(sysConfig));
     expect(cli).toContain("set gyro_lpf1_static_hz = 55");
+    expect(cli).toContain("set gyro_lpf1_type = FIRST_ORDER");
+    expect(cli).toContain("set gyro_lpf2_type = NONE");
+    expect(cli).not.toMatch(/gyro_lpf\d_type = \d/);
     expect(cli).toContain("feature -DYN_NOTCH");
     expect(cli).toContain("feature RPM_FILTER");
     expect(cli).toContain("set gyro_rpm_notch_center_roll = 0,0,0,0,66,-66,0,0,0,0,0,0,0,0,0,0");
