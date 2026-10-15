@@ -45,7 +45,7 @@ export const useImagineStore = defineStore("imagine", () => {
 
   // Which filters are drawn on the chart (lowpass cutoffs, static notches, dynamic notch).
   // Everything is shown each time Imagine opens.
-  const chartOverlays = reactive({ lowpass: true, notch: true, dynNotch: true, rpm: true });
+  const chartOverlays = reactive({ lowpass: true, notch: true, dynNotch: true, rpm: true, rpmMin: true });
   // The RPM notch row the mouse is over in the Filters panel: { axis, sources: [..] } or null
   const rpmHighlight = ref(null);
   function setChartOverlay(name, on) {

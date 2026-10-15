@@ -210,9 +210,38 @@ function drawOverlays() {
   ctx.save();
   ctx.font = "11px monospace";
   ctx.textBaseline = "middle";
+  if (store.chartOverlays.rpmMin) drawRpmMinimum(g);
   if (store.chartOverlays.rpm) drawRpmNotches(g);
   if (store.chartOverlays.dynNotch) drawDynNotch(g);
   ctx.restore();
+}
+
+// The RPM filter's Minimum Frequency: below the line notches are off (parked at the minimum),
+// and in the shaded zone up to 1.25x it they fade in, so a harmonic there is only partly removed.
+function drawRpmMinimum(g) {
+  const rpm = store.settings?.rpm;
+  if (!rpm?.enabled) return;
+  const { ctx, H, xOf } = g;
+  const maxNotchHz = 0.45 * store.rates.filterRateHz;
+  const minHz = Math.min(Math.max(rpm.minHz, 10), 0.5 * maxNotchHz);
+  const fadeHz = 1.25 * minHz;
+  if (minHz > g.maxHz) return;
+  const x0 = xOf(minHz);
+  const x1 = xOf(Math.min(fadeHz, g.maxHz));
+  const grad = ctx.createLinearGradient(x0, 0, x1, 0);
+  grad.addColorStop(0, `rgba(${RPM_COLOR}, 0.16)`);
+  grad.addColorStop(1, `rgba(${RPM_COLOR}, 0.02)`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(x0, 0, x1 - x0, H);
+  ctx.strokeStyle = `rgba(${RPM_COLOR}, 0.7)`;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([2, 3]);
+  ctx.beginPath();
+  ctx.moveTo(x0, 0);
+  ctx.lineTo(x0, H);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  g.label(`RPM min ${minHz} Hz · fades in to ${fadeHz.toFixed(fadeHz % 1 ? 1 : 0)} Hz`, x0 + 4, H - 46, RPM_COLOR, 0.9);
 }
 
 // Each RPM notch as a triangle from its cutoff up to its centre, like the static notches. A notch
@@ -443,7 +472,7 @@ watch(
 );
 watch(() => store.settings, updateMarkers, { deep: true });
 watch(
-  () => [store.chartOverlays.dynNotch, store.chartOverlays.rpm, dynStats.value, store.rpmHighlight, rpmMarkers.value],
+  () => [store.chartOverlays.dynNotch, store.chartOverlays.rpm, store.chartOverlays.rpmMin, dynStats.value, store.rpmHighlight, rpmMarkers.value],
   () => drawOverlays(),
 );
 watch(() => [store.chartOverlays.lowpass, store.chartOverlays.notch], updateMarkers);

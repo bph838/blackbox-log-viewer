@@ -2,6 +2,14 @@
   <section class="overflow-hidden rounded-md border border-default bg-elevated/40">
     <header class="flex items-stretch border-b-4" :style="{ borderColor: AXES[axis].color }">
       <h3 class="flex flex-1 items-center bg-elevated px-3 py-1.5 text-sm font-semibold">RPM Filter Notches</h3>
+      <div class="flex items-center bg-elevated pr-1">
+        <ImagineChartToggle
+          :on="imagine.chartOverlays.rpm"
+          what="RPM notches"
+          detail="where each notch sits at the median headspeed for the chart's axis, with the range it moves over in the flight"
+          @toggle="imagine.setChartOverlay('rpm', $event)"
+        />
+      </div>
       <button
         v-for="(a, i) in AXES"
         :key="a.label"
@@ -131,6 +139,7 @@ import { rpmBankFrequency } from "../filters/rpm_filter.js";
 import ImagineField from "./ImagineField.vue";
 import ImagineSubSection from "./ImagineSubSection.vue";
 import ImagineRpmList from "./ImagineRpmList.vue";
+import ImagineChartToggle from "./ImagineChartToggle.vue";
 
 const props = defineProps({
   rpm: { type: Object, required: true }, // settings.rpm (CLI arrays), edited in place

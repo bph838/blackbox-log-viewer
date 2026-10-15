@@ -135,10 +135,10 @@
       <ImagineSection title="RPM Filter" :help="HELP.rpm">
         <template #header>
           <ImagineChartToggle
-            :on="store.chartOverlays.rpm"
-            what="RPM notches"
-            detail="where each notch sits at the median headspeed for the chart's axis, with the range it moves over in the flight"
-            @toggle="store.setChartOverlay('rpm', $event)"
+            :on="store.chartOverlays.rpmMin"
+            what="RPM minimum frequency"
+            detail="below it RPM notches are off, and up to 1.25x it they are only partly faded in"
+            @toggle="store.setChartOverlay('rpmMin', $event)"
           />
         </template>
         <UAlert
