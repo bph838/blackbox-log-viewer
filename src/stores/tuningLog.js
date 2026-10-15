@@ -79,6 +79,8 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
   );
   const syncing = ref(false);
   const syncError = ref(null); // { message, offline } from the last failed sync, cleared on success
+  // { sentBytes, totalBytes } while a sync is uploading, else null
+  const syncProgress = ref(null);
   const lastSyncedAt = ref(null);
   // { logId, at } when a sync last brought changes made on another computer into the current log,
   // so the dialog can say so. Cleared by dismissCloudUpdate() or switching logs.
@@ -193,7 +195,16 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
       : await db.getLog(logId);
     if (!start) return;
 
-    const result = await Cloud.syncLog(activeClient, start.log, start.sync);
+    let result;
+    try {
+      result = await Cloud.syncLog(activeClient, start.log, start.sync, {
+        onProgress: (sentBytes, totalBytes) => {
+          syncProgress.value = { sentBytes, totalBytes };
+        },
+      });
+    } finally {
+      syncProgress.value = null;
+    }
     if (result.deletedInCloud) {
       // Deleted on another computer - delete it here too.
       await deleteLocalLog(logId);
@@ -707,6 +718,7 @@ export const useTuningLogStore = defineStore("tuningLog", () => {
     totalPendingCount,
     cloudEnabled,
     syncStatus,
+    syncProgress,
     syncError,
     lastSyncedAt,
     cloudUpdate,

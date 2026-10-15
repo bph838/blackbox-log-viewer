@@ -194,8 +194,9 @@ export async function downloadLog(client, row) {
  * locally or in the cloud) and its new sync state, whether anything was committed, and whether
  * the cloud copy had anything new for this computer.
  * Throws a GitHubError if GitHub can't be reached or refuses the change.
+ * onProgress(sentBytes, totalBytes), if given, follows the upload (see commitFiles).
  */
-export async function syncLog(client, local, sync, { now = () => new Date().toISOString() } = {}) {
+export async function syncLog(client, local, sync, { now = () => new Date().toISOString(), onProgress } = {}) {
   const dir = sync.cloudDir || defaultLogDir(local);
 
   for (let attempt = 1; ; attempt++) {
@@ -252,6 +253,7 @@ export async function syncLog(client, local, sync, { now = () => new Date().toIS
       result = await client.commitFiles({
         files,
         deletes,
+        onProgress,
         message: `Tuning log "${merged.name}" (${merged.craftName || "unnamed craft"})`,
       });
     } catch (error) {

@@ -66,6 +66,40 @@ export function base64ToUtf8(base64) {
   return new TextDecoder().decode(bytes);
 }
 
+function fileBase64(file) {
+  return file.base64 !== undefined ? file.base64 : utf8ToBase64(file.text);
+}
+
+function fileSize(file) {
+  if (file.base64 === undefined) return new TextEncoder().encode(file.text).length;
+  const padding = (file.base64.match(/=*$/) || [""])[0].length;
+  return Math.floor((file.base64.length * 3) / 4) - padding;
+}
+
+/**
+ * Adds up the upload progress of several files into one onProgress(sentBytes, totalBytes) for
+ * commitFiles - each file counting by its own size, so one big image outweighs a small log.json.
+ * uploading(file) gives the per-request callback for request()'s onUploadProgress.
+ */
+function uploadProgress(files, onProgress) {
+  const totalBytes = files.reduce((sum, file) => sum + fileSize(file), 0);
+  let doneBytes = 0;
+  const report = (sent) => onProgress && onProgress(Math.min(totalBytes, sent), totalBytes);
+
+  report(0);
+  return {
+    uploading(file) {
+      if (!onProgress) return undefined;
+      const size = fileSize(file);
+      return (loaded, total) => report(doneBytes + (total ? (loaded / total) * size : 0));
+    },
+    done(file) {
+      doneBytes += fileSize(file);
+      report(doneBytes);
+    },
+  };
+}
+
 function encodePath(path) {
   return path.split("/").map(encodeURIComponent).join("/");
 }
@@ -88,7 +122,36 @@ export function createGitHubClient(options) {
   // path -> { etag, value } for conditional GETs.
   const etagCache = new Map();
 
-  async function request(method, path, { body, etagKey } = {}) {
+  /**
+   * fetch() can't report how much of a request body has been sent, so uploads that want progress
+   * go through XMLHttpRequest instead - wrapped to look like the bits of a fetch Response that
+   * request() uses. Only when the default fetch is in use (tests inject their own).
+   */
+  function xhrFetch(url, init, onUploadProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open(init.method, url);
+      for (const [name, value] of Object.entries(init.headers)) xhr.setRequestHeader(name, value);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onUploadProgress(e.loaded, e.total);
+      };
+      xhr.onload = () =>
+        resolve({
+          status: xhr.status,
+          ok: xhr.status >= 200 && xhr.status < 300,
+          statusText: xhr.statusText,
+          text: () => Promise.resolve(xhr.responseText),
+          headers: { get: (name) => xhr.getResponseHeader(name) },
+        });
+      xhr.onerror = () => reject(new Error("network error"));
+      xhr.onabort = () => reject(new Error("aborted"));
+      xhr.send(init.body);
+    });
+  }
+
+  const canReportUploadProgress = !options.fetch && typeof XMLHttpRequest !== "undefined";
+
+  async function request(method, path, { body, etagKey, onUploadProgress } = {}) {
     const headers = {
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
@@ -101,13 +164,17 @@ export function createGitHubClient(options) {
 
     let response;
     try {
-      response = await fetchImpl(`${API}${path}`, {
+      const init = {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
         // ETags are handled here, so the browser's own HTTP cache must not answer for GitHub.
         cache: "no-store",
-      });
+      };
+      response =
+        onUploadProgress && canReportUploadProgress && init.body !== undefined
+          ? await xhrFetch(`${API}${path}`, init, onUploadProgress)
+          : await fetchImpl(`${API}${path}`, init);
     } catch (error) {
       throw new GitHubError(`Could not reach GitHub (${error.message || "network error"}).`, { network: true });
     }
@@ -398,7 +465,7 @@ export function createGitHubClient(options) {
    * Writes several files in a single commit on top of the current branch head, through the Git
    * Data API. Throws a GitHubError with isConflict if the branch moved on meanwhile.
    */
-  async function commitFilesAtomically({ files, deletes, message }) {
+  async function commitFilesAtomically({ files, deletes, message, progress }) {
     const ref = await resolveBranch();
 
     let head = await getHead(ref);
@@ -414,10 +481,12 @@ export function createGitHubClient(options) {
     const tree = [];
 
     for (const file of files) {
-      const content = file.base64 !== undefined ? file.base64 : utf8ToBase64(file.text);
+      const content = fileBase64(file);
       const { data: blob } = await request("POST", `${repoPath}/git/blobs`, {
         body: { content, encoding: "base64" },
+        onUploadProgress: progress.uploading(file),
       });
+      progress.done(file);
       shas[file.path] = blob.sha;
       tree.push({ path: file.path, mode: "100644", type: "blob", sha: blob.sha });
     }
@@ -466,15 +535,16 @@ export function createGitHubClient(options) {
    * point at others (log.json, then index.json) last. A file changed elsewhere since it was read
    * here makes GitHub refuse the write (409), reported as a conflict like the atomic path.
    */
-  async function commitFilesOneByOne({ files, deletes, message }) {
+  async function commitFilesOneByOne({ files, deletes, message, progress }) {
     const ref = await resolveBranch();
     const shas = {};
     const commitMessage = message || "Update tuning logs";
 
     for (const file of files) {
-      const content = file.base64 !== undefined ? file.base64 : utf8ToBase64(file.text);
+      const content = fileBase64(file);
       const existing = await getFileBase64(file.path);
       if (existing && existing.base64 === content) {
+        progress.done(file);
         shas[file.path] = existing.sha;
         continue;
       }
@@ -482,7 +552,9 @@ export function createGitHubClient(options) {
       try {
         const { data } = await request("PUT", `${repoPath}/contents/${encodePath(file.path)}`, {
           body: { message: commitMessage, content, branch: ref, ...(existing ? { sha: existing.sha } : {}) },
+          onUploadProgress: progress.uploading(file),
         });
+        progress.done(file);
         shas[file.path] = data.content.sha;
       } catch (error) {
         if (error.status === 409 || (error.status === 422 && /sha/i.test(error.message))) {
@@ -510,11 +582,13 @@ export function createGitHubClient(options) {
    * Writes several files - in a single commit when the token allows it, otherwise one at a time.
    *   files:   [{ path, text }] or [{ path, base64 }]
    *   deletes: [path] - paths to remove (ignored if they don't exist)
+   *   onProgress(sentBytes, totalBytes): optional - called as the files upload, sizes being the
+   *            files' own (not the encoded request bodies')
    * Resolves { commitSha, shas: { path: blobSha } }. Throws a GitHubError with isConflict if the
    * files were changed elsewhere while this was being prepared - re-read, merge and try again.
    */
-  async function commitFiles({ files = [], deletes = [], message }) {
-    const options = { files, deletes, message };
+  async function commitFiles({ files = [], deletes = [], message, onProgress }) {
+    const options = { files, deletes, message, progress: uploadProgress(files, onProgress) };
     if (saveOneByOne) return commitFilesOneByOne(options);
 
     try {
@@ -522,6 +596,7 @@ export function createGitHubClient(options) {
     } catch (error) {
       if (!error.isPermission) throw error;
       saveOneByOne = true;
+      options.progress = uploadProgress(files, onProgress);
       return commitFilesOneByOne(options);
     }
   }

@@ -97,6 +97,21 @@ describe("createGitHubClient", () => {
     expect(await client.getJsonFile("index.json")).toBeNull();
   });
 
+  it("reports upload progress by file size, ending at 100%", async () => {
+    const calls = [];
+    await client.commitFiles({
+      files: [
+        { path: "a.txt", text: "abcd" },
+        { path: "b.png", base64: "iVBORw0K" },
+      ],
+      onProgress: (sent, total) => calls.push([sent, total]),
+    });
+
+    expect(calls[0]).toEqual([0, 10]);
+    expect(calls).toContainEqual([4, 10]);
+    expect(calls.at(-1)).toEqual([10, 10]);
+  });
+
   it("initialises an empty repo and commits several files at once", async () => {
     await client.commitFiles({
       files: [

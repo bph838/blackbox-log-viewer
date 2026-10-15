@@ -30,8 +30,7 @@
           </UPopover>
           <span v-if="tuningLogStore.totalCostUsd" class="text-xs text-dimmed"
             >Total: {{ formatCost(tuningLogStore.totalCostUsd) }}</span
-          >
-          <TuningLogSyncStatus />
+          >          <TuningLogSyncStatus />
         </div>
         <div class="flex items-center gap-1">
           <UPopover

@@ -31,6 +31,12 @@ const props = defineProps({
 
 const tuningLogStore = useTuningLogStore();
 
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function plural(count, word) {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
@@ -40,13 +46,24 @@ const status = computed(() => {
   const waiting = pending ? `${plural(pending, "change")} saved on this computer` : "";
 
   switch (tuningLogStore.syncStatus) {
-    case "syncing":
+    case "syncing": {
+      const progress = tuningLogStore.syncProgress;
+      if (progress && progress.totalBytes) {
+        const percent = Math.floor((progress.sentBytes / progress.totalBytes) * 100);
+        return {
+          icon: "i-lucide-refresh-cw",
+          label: `Uploading ${formatBytes(progress.totalBytes)} · ${percent}%`,
+          class: "text-dimmed",
+          tooltip: `Uploading to GitHub - ${formatBytes(progress.sentBytes)} of ${formatBytes(progress.totalBytes)} sent`,
+        };
+      }
       return {
         icon: "i-lucide-refresh-cw",
         label: "Syncing…",
         class: "text-dimmed",
         tooltip: "Syncing tuning logs with GitHub",
       };
+    }
     case "synced":
       return {
         icon: "i-lucide-cloud-check",
