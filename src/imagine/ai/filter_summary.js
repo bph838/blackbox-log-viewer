@@ -8,6 +8,7 @@
 import { bandRms, welchPsd } from "../analysis.js";
 import { settingsToCli } from "../header_settings.js";
 import { resolveRpmBanks, rpmSourceName } from "../filters/rpm_filter.js";
+import { describeAxisNotches } from "./filter_tool.js";
 
 export const AXES = ["roll", "pitch", "yaw"];
 const PSD_SEGMENT = 1024;
@@ -227,19 +228,12 @@ function settingsSection(settings) {
       return `set ${m[1]} = ${values.slice(0, Math.max(1, last)).join(",")}`;
     });
   const banks = resolveRpmBanks(settings.rpm);
-  const readable = AXES.map((axis, a) => {
-    const parts = [];
-    for (let i = 0; i < 16; i++) {
-      if (!banks.source[a][i]) continue;
-      const c = banks.center[a][i];
-      parts.push(`${rpmSourceName(banks.source[a][i])} Q${fmt(banks.q[a][i] / 10)}${c ? ` offset ${fmt(c / 100, 2)}%` : ""}`);
-    }
-    return `${axis}: ${parts.join(", ") || "none"}`;
-  });
+  // in Configurator terms (source, SINGLE/DOUBLE/TRIPLE, Q) - the form suggestions use
+  const readable = AXES.map((axis, a) => `${axis}: ${describeAxisNotches(banks, a)}`);
   return [
     "## Current filter settings (Rotorflight CLI names and units)",
     ...lines,
-    `RPM notches in effect${settings.rpm.preset ? ` (preset ${settings.rpm.preset})` : ""}${settings.rpm.enabled ? "" : " - RPM filter is OFF"}:`,
+    `RPM notches in effect, as Configurator rows${settings.rpm.preset ? ` (preset ${settings.rpm.preset})` : ""}${settings.rpm.enabled ? "" : " - RPM filter is OFF"}:`,
     ...readable.map((r) => `  ${r}`),
   ].join("\n");
 }

@@ -14,7 +14,16 @@
 
     <ul v-if="config.changes.length" class="space-y-1 px-2.5 py-1.5">
       <li v-for="c in config.changes" :key="c.parameter">
-        <div class="flex items-baseline gap-2">
+        <!-- RPM notches: a whole axis in Configurator rows, old above new -->
+        <div v-if="c.multiline">
+          <div>{{ c.label }}</div>
+          <div class="text-dimmed line-through">{{ c.oldText }}</div>
+          <div class="flex gap-1 font-semibold">
+            <UIcon name="i-lucide-arrow-right" class="mt-0.5 size-3 shrink-0 text-dimmed" />
+            <span>{{ c.newText }}</span>
+          </div>
+        </div>
+        <div v-else class="flex items-baseline gap-2">
           <span class="min-w-0 flex-1 truncate" :title="c.parameter">{{ c.label }}</span>
           <span class="shrink-0 whitespace-nowrap font-mono tabular-nums">
             <span class="text-dimmed line-through">{{ c.oldText }}</span>

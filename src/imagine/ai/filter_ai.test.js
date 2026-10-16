@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { FILTER_TOOL, FILTER_PARAM_NAMES, validateProposal, toolResultText, diffSettings, changesToCli } from "./filter_tool.js";
+import { FILTER_TOOL, FILTER_PARAM_NAMES, TOOL_PARAM_NAMES, validateProposal, toolResultText, diffSettings, changesToCli } from "./filter_tool.js";
+import { layoutProblems } from "../rpm_notch_layout.js";
 import { analyseAxisNoise, foldFrequency, identifyPeak, rotorFrequencies } from "./filter_summary.js";
 
 const base = () => ({
@@ -18,14 +19,26 @@ const base = () => ({
   },
 });
 
+// yaw has a main rotor x1 triple with Q 1.5 in the middle and Q 4.0 sides - not a Configurator layout
+function mixedYaw() {
+  const b = base();
+  b.rpm.source[2] = [11, 11, 11, ...new Array(13).fill(0)];
+  b.rpm.center[2] = [-133, 0, 133, ...new Array(13).fill(0)];
+  b.rpm.q[2] = [40, 15, 40, ...new Array(13).fill(0)];
+  return b;
+}
+
 describe("filter suggestion tool", () => {
-  test("schema is strict and lists every parameter", () => {
+  test("schema is strict and lists every parameter except the raw notch banks", () => {
     expect(FILTER_TOOL.strict).toBe(true);
     expect(FILTER_TOOL.input_schema.additionalProperties).toBe(false);
     const param = FILTER_TOOL.input_schema.properties.changes.items.properties.parameter;
-    expect(param.enum).toEqual(FILTER_PARAM_NAMES);
+    expect(param.enum).toEqual(TOOL_PARAM_NAMES);
+    expect(TOOL_PARAM_NAMES).toContain("feature_DYN_NOTCH");
+    expect(TOOL_PARAM_NAMES).toContain("gyro_rpm_notch_preset");
     expect(FILTER_PARAM_NAMES).toContain("gyro_rpm_notch_q_yaw");
-    expect(FILTER_PARAM_NAMES).toContain("feature_DYN_NOTCH");
+    expect(TOOL_PARAM_NAMES).not.toContain("gyro_rpm_notch_q_yaw");
+    expect(FILTER_TOOL.input_schema.required).toContain("rpm_notches");
   });
 
   test("a valid proposal is applied to a copy, with old -> new for the card", () => {
@@ -37,7 +50,16 @@ describe("filter suggestion tool", () => {
         changes: [
           { parameter: "gyro_lpf1_static_hz", value: [70], reason: "less noise above 70 Hz" },
           { parameter: "dyn_notch_q", value: [30], reason: "narrower" },
-          { parameter: "gyro_rpm_notch_q_roll", value: [60, 30], reason: "deeper x1" },
+        ],
+        rpm_notches: [
+          {
+            axis: "roll",
+            notches: [
+              { source: 11, type: "TRIPLE", q: 4 },
+              { source: 12, type: "SINGLE", q: 3 },
+            ],
+            reason: "wider x1",
+          },
         ],
       },
       b,
@@ -45,24 +67,35 @@ describe("filter suggestion tool", () => {
     expect(v.ok).toBe(true);
     expect(v.settings.lpf1.staticHz).toBe(70);
     expect(b.lpf1.staticHz).toBe(90); // base untouched
-    expect(v.settings.rpm.q[0].slice(0, 3)).toEqual([60, 30, 0]);
+    expect(b.rpm.source[0].slice(0, 3)).toEqual([11, 12, 0]);
+    // TRIPLE Q4: centre plus ±trunc(200/4)
+    expect(v.settings.rpm.source[0].slice(0, 5)).toEqual([11, 11, 11, 12, 0]);
+    expect([...v.settings.rpm.center[0].slice(0, 3)].sort((x, y) => x - y)).toEqual([-50, 0, 50]);
+    expect(v.settings.rpm.q[0].slice(0, 4)).toEqual([40, 40, 40, 30]);
     expect(v.settings.rpm.q[0].length).toBe(16);
     const q = v.changes.find((c) => c.parameter === "dyn_notch_q");
     expect([q.oldText, q.newText]).toEqual(["2.5", "3.0"]);
+    const roll = v.changes.find((c) => c.parameter === "rpm_notches_roll");
+    expect(roll.newText).toMatch(/TRIPLE Q4\.0/);
+    expect(roll.multiline).toBe(true);
+    const cli = changesToCli(v.changes);
+    expect(cli).toMatch(/^set gyro_rpm_notch_source_roll = 11,11,11,12,0,/m);
+    expect(cli).toMatch(/^set gyro_rpm_notch_center_roll = /m);
+    expect(cli).toMatch(/^set gyro_rpm_notch_q_roll = 40,40,40,30,0,/m);
     expect(toolResultText(v)).toMatch(/nothing has been applied/);
   });
 
-  test("firmware ranges, integers, sources and cross-checks are enforced", () => {
+  test("firmware ranges, integers and cross-checks are enforced", () => {
     const bad = validateProposal(
       {
         changes: [
           { parameter: "dyn_notch_max_hz", value: [600], reason: "" },
           { parameter: "gyro_lpf1_static_hz", value: [70.5], reason: "" },
-          { parameter: "gyro_rpm_notch_source_pitch", value: [11, 19], reason: "" },
           { parameter: "made_up", value: [1], reason: "" },
           { parameter: "gyro_notch1_hz", value: [100], reason: "" },
           { parameter: "gyro_notch1_cutoff", value: [120], reason: "" },
         ],
+        rpm_notches: [],
       },
       base(),
     );
@@ -71,17 +104,81 @@ describe("filter suggestion tool", () => {
     const text = bad.errors.join("\n");
     expect(text).toMatch(/dyn_notch_max_hz = 600 is outside the firmware range 100–500/);
     expect(text).toMatch(/whole numbers/);
-    expect(text).toMatch(/invalid source/);
     expect(text).toMatch(/Unknown parameter "made_up"/);
     expect(text).toMatch(/gyro_notch1_cutoff \(120\) must be below gyro_notch1_hz \(100\)/);
     expect(toolResultText(bad)).toMatch(/rejected/);
   });
 
-  test("warnings for Configurator ranges and presets", () => {
-    const v = validateProposal({ changes: [{ parameter: "gyro_rpm_notch_q_roll", value: [10, 30], reason: "" }, { parameter: "gyro_rpm_notch_preset", value: [2], reason: "" }] }, base());
+  test("only Configurator RPM layouts can be proposed", () => {
+    const raw = validateProposal({ changes: [{ parameter: "gyro_rpm_notch_q_roll", value: [60, 30], reason: "" }] }, base());
+    expect(raw.ok).toBe(false);
+    expect(raw.errors.join("\n")).toMatch(/can't be set directly - give that axis's notches in rpm_notches/);
+
+    const bad = validateProposal(
+      {
+        changes: [],
+        rpm_notches: [
+          {
+            axis: "pitch",
+            notches: [
+              { source: 19, type: "SINGLE", q: 3 },
+              { source: 13, type: "DOUBLE", q: 3 },
+              { source: 11, type: "SINGLE", q: 12 },
+              { source: 12, type: "WIDE", q: 3 },
+              { source: 21, type: "SINGLE", q: 3 },
+              { source: 21, type: "SINGLE", q: 3 },
+            ],
+            reason: "",
+          },
+          { axis: "pitch", notches: [], reason: "" },
+          { axis: "up", notches: [], reason: "" },
+        ],
+      },
+      base(),
+    );
+    expect(bad.ok).toBe(false);
+    const text = bad.errors.join("\n");
+    expect(text).toMatch(/not a Configurator RPM source/);
+    expect(text).toMatch(/DOUBLE is only available for main\/tail rotor harmonic 1 and 2/);
+    expect(text).toMatch(/Q 12 is outside the Configurator's 1.5-10 range/);
+    expect(text).toMatch(/type must be SINGLE, DOUBLE or TRIPLE/);
+    expect(text).toMatch(/listed more than once - one row per source/);
+    expect(text).toMatch(/pitch is listed more than once/);
+    expect(text).toMatch(/unknown axis "up"/);
+
+    const tooMany = validateProposal(
+      {
+        changes: [],
+        rpm_notches: [
+          {
+            axis: "yaw",
+            notches: [11, 12, 21, 22]
+              .map((source) => ({ source, type: "TRIPLE", q: 3 }))
+              .concat([13, 14, 15, 16, 17].map((source) => ({ source, type: "SINGLE", q: 3 }))),
+            reason: "",
+          },
+        ],
+      },
+      base(),
+    );
+    expect(tooMany.errors.join("\n")).toMatch(/17 notches/);
+  });
+
+  test("warnings for presets and leftover custom layouts", () => {
+    const v = validateProposal(
+      {
+        changes: [{ parameter: "gyro_rpm_notch_preset", value: [2], reason: "" }],
+        rpm_notches: [{ axis: "roll", notches: [{ source: 11, type: "SINGLE", q: 6 }], reason: "" }],
+      },
+      base(),
+    );
     expect(v.ok).toBe(true);
-    expect(v.warnings.join("\n")).toMatch(/outside the Configurator's 1.5–10 range/);
     expect(v.warnings.join("\n")).toMatch(/ignored while gyro_rpm_notch_preset is 2/);
+    expect(v.warnings.join("\n")).toMatch(/A preset replaces all custom RPM notches/);
+
+    const custom = validateProposal({ changes: [{ parameter: "dyn_notch_q", value: [30], reason: "" }], rpm_notches: [] }, mixedYaw());
+    expect(custom.ok).toBe(true);
+    expect(custom.warnings.join("\n")).toMatch(/yaw RPM notches still use a custom layout/);
   });
 
   test("diff and CLI lines", () => {
@@ -93,6 +190,16 @@ describe("filter suggestion tool", () => {
     expect(d.map((c) => c.parameter)).toEqual(["gyro_lpf2_type", "gyro_lpf2_static_hz", "feature_DYN_NOTCH"]);
     // lowpass types are written by name - the CLI rejects the number
     expect(changesToCli(d)).toBe("set gyro_lpf2_type = SECOND_ORDER\nset gyro_lpf2_static_hz = 150\nfeature -DYN_NOTCH");
+  });
+});
+
+describe("Configurator layout problems", () => {
+  test("explains why a bank doesn't fit", () => {
+    const b = mixedYaw();
+    expect(layoutProblems(b.rpm, 0)).toEqual([]);
+    const p = layoutProblems(b.rpm, 2);
+    expect(p).toHaveLength(1);
+    expect(p[0]).toMatch(/mixed Q \(4\.0 \/ 1\.5\)/);
   });
 });
 

@@ -101,17 +101,23 @@
           variant="subtle"
           icon="i-lucide-triangle-alert"
           title="Custom RPM notch configuration in use"
-          description="These notches can't be shown in the Configurator's layout (it needs one Q per source, Q 1.5–10 and standard double/triple spacing), so they are listed slot by slot as in the CLI."
+          description="The log's notches don't fit the Configurator's layout, so Imagine can't edit them. They are shown below as in the CLI; convert them to the Configurator layout to edit them."
           class="mb-2"
-        />
-        <ImagineRpmList :rpm="rpm" :axis="axis" :speeds="speeds" :rotor="rotor" :nyquist="nyquist" @hover-slot="hoverSlot" />
+        >
+          <template v-if="problems.length" #description>
+            <p>The log's notches don't fit the Configurator's layout, so Imagine can't edit them. Convert them to the Configurator layout to edit them.</p>
+            <ul class="mt-1 list-disc pl-4">
+              <li v-for="p in problems" :key="p">{{ p }}</li>
+            </ul>
+          </template>
+        </UAlert>
+        <ImagineRpmList readonly :rpm="rpm" :axis="axis" :speeds="speeds" :rotor="rotor" :nyquist="nyquist" @hover-slot="hoverSlot" />
         <div class="mt-2 flex justify-end">
           <UButton
             label="Convert to Configurator layout"
             icon="i-lucide-wand-sparkles"
-            size="xs"
-            variant="outline"
-            color="neutral"
+            size="sm"
+            color="primary"
             title="One row per source: notch count becomes Single/Double/Triple and Q becomes the median Q of that source's notches (clamped to 1.5–10). This changes the filter slightly."
             @click="convert"
           />
@@ -128,6 +134,7 @@ import {
   convertToLayout,
   DEFAULT_Q,
   generateRpmLayout,
+  layoutProblems,
   MAX_Q,
   MIN_Q,
   notchCount,
@@ -187,6 +194,10 @@ const memory = reactive([{}, {}, {}]);
 const layout = computed(() => parseRpmLayout(props.rpm));
 const bank = computed(() => layout.value?.[axis.value] ?? {});
 const count = computed(() => notchCount(bank.value));
+// why the current axis doesn't fit (all axes count: the layout covers all three)
+const problems = computed(() =>
+  layout.value ? [] : [0, 1, 2].flatMap((a) => layoutProblems(props.rpm, a).map((p) => (a === axis.value ? p : `${AXES[a].label} – ${p}`))),
+);
 
 const ORDINAL = ["", "Fundamental Frequency", "2<sup>nd</sup> Harmonic", "3<sup>rd</sup> Harmonic", "4<sup>th</sup> Harmonic",
   "5<sup>th</sup> Harmonic", "6<sup>th</sup> Harmonic", "7<sup>th</sup> Harmonic", "8<sup>th</sup> Harmonic"];

@@ -171,3 +171,91 @@ export function convertToLayout(rpm) {
   // a layout the Configurator can show converts without change; anything else is approximated
   return { banks, changed: parseRpmLayout(rpm) === null };
 }
+
+const SOURCE_NAMES = {
+  10: "Main motor",
+  20: "Tail motor",
+};
+function sourceName(source) {
+  if (SOURCE_NAMES[source]) return SOURCE_NAMES[source];
+  if (source >= 11 && source <= 18) return `Main rotor ×${source - 10}`;
+  if (source >= 21 && source <= 28) return `Tail rotor ×${source - 20}`;
+  return String(source);
+}
+const TYPE_NAMES = { 1: "SINGLE", 2: "DOUBLE", 3: "TRIPLE" };
+
+/** One axis's rows in Configurator terms, e.g. "Main rotor ×1 TRIPLE Q1.5; Main rotor ×3 Q4.0". */
+export function describeBank(bank) {
+  const rows = RPM_SOURCE.filter((s) => bank?.[s]?.enabled).map((s) => {
+    const row = bank[s];
+    const type = row.type > 1 ? ` ${TYPE_NAMES[row.type]}` : "";
+    return `${sourceName(s)}${type} Q${Number(row.q).toFixed(1)}`;
+  });
+  return rows.join("; ") || "none";
+}
+
+/** Configurator rows for one axis of CLI arrays, or null if that axis can't be shown in the Configurator. */
+export function axisLayout(rpm, axis) {
+  const single = {
+    source: [rpm.source[axis] ?? [], [], []],
+    center: [rpm.center[axis] ?? [], [], []],
+    q: [rpm.q[axis] ?? [], [], []],
+  };
+  const parsed = parseRpmLayout(single);
+  return parsed ? parsed[0] : null;
+}
+
+/** CLI arrays (16 slots each) for one axis's Configurator rows. */
+export function axisArrays(bank) {
+  const g = generateRpmLayout([bank]);
+  return { source: g.source[0], center: g.center[0], q: g.q[0] };
+}
+
+/** An empty set of Configurator rows (every source off). */
+export function emptyBank() {
+  const bank = {};
+  for (const source of RPM_SOURCE) bank[source] = { enabled: false, type: NOTCH_TYPE.SINGLE, q: DEFAULT_Q };
+  return bank;
+}
+
+/**
+ * Why one axis's notches don't fit the Configurator's layout, one line per source - e.g.
+ * "Main rotor ×1: mixed Q (1.5 / 4.0)". Empty when the axis fits.
+ */
+export function layoutProblems(rpm, axis) {
+  const sources = rpm.source[axis] ?? [];
+  const centers = rpm.center[axis] ?? [];
+  const qs = rpm.q[axis] ?? [];
+  const bySource = new Map();
+  sources.forEach((s, i) => {
+    if (!s || !qs[i]) return;
+    if (!bySource.has(s)) bySource.set(s, []);
+    bySource.get(s).push({ slot: i, q: qs[i] / 10, center: centers[i] || 0 });
+  });
+  const out = [];
+  for (const [s, notches] of bySource) {
+    const name = sourceName(s);
+    const reasons = [];
+    if (!RPM_SOURCE.includes(s)) reasons.push("not a source the Configurator offers");
+    const slots = notches.map((n) => n.slot);
+    if (slots.some((slot, i) => i > 0 && slot !== slots[i - 1] + 1)) reasons.push("its notches aren't in adjacent slots");
+    const qValues = [...new Set(notches.map((n) => n.q))];
+    if (qValues.length > 1) reasons.push(`mixed Q (${qValues.map((q) => q.toFixed(1)).join(" / ")})`);
+    const outOfRange = qValues.filter((q) => q < MIN_Q || q > MAX_Q);
+    if (outOfRange.length) reasons.push(`Q ${outOfRange.map((q) => q.toFixed(1)).join(", ")} outside ${MIN_Q}–${MAX_Q}`);
+    if (notches.length > 3) reasons.push(`${notches.length} notches (at most 3)`);
+    if (notches.length > 1 && !MULTI_NOTCH_SOURCE.includes(s)) reasons.push("double/triple notches only exist for rotor ×1 and ×2");
+    if (qValues.length === 1 && notches.length >= 1 && notches.length <= 3) {
+      const q = qValues[0];
+      const offsets = notches.map((n) => n.center).sort((a, b) => a - b);
+      const expected =
+        notches.length === 1 ? [0] : notches.length === 2 ? [-doubleCenter(q), doubleCenter(q)] : [-tripleCenter(q), 0, tripleCenter(q)];
+      if (JSON.stringify(offsets) !== JSON.stringify(expected)) {
+        const pct = (v) => `${v > 0 ? "+" : ""}${(v / 100).toFixed(2)}%`;
+        reasons.push(`offsets ${offsets.map(pct).join(" ")} instead of the standard ${expected.map(pct).join(" ")} for Q ${q.toFixed(1)}`);
+      }
+    }
+    if (reasons.length) out.push(`${name}: ${reasons.join("; ")}`);
+  }
+  return out;
+}

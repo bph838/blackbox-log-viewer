@@ -83,7 +83,7 @@ describe("conversation model", () => {
 
   test("system prompt names the tool and every parameter", () => {
     expect(AI_FILTERS_SYSTEM_PROMPT).toContain(FILTER_TOOL_NAME);
-    expect(AI_FILTERS_SYSTEM_PROMPT).toContain("gyro_rpm_notch_center_yaw");
+    expect(AI_FILTERS_SYSTEM_PROMPT).toContain("rpm_notches");
     expect(AI_FILTERS_SYSTEM_PROMPT).toContain("dyn_notch_q: Dynamic Filter · Notch Q; 10–100");
   });
 
@@ -195,9 +195,8 @@ describe("AI Filters store with a fake Claude", () => {
           summary: "Notch the main rotor",
           changes: [
             { parameter: "feature_RPM_FILTER", value: [1], reason: "42 Hz peak" },
-            { parameter: "gyro_rpm_notch_source_roll", value: [11], reason: "x1" },
-            { parameter: "gyro_rpm_notch_q_roll", value: [50], reason: "Q 5" },
           ],
+          rpm_notches: [{ axis: "roll", notches: [{ source: 11, type: "SINGLE", q: 5 }], reason: "x1" }],
         }),
       ],
       stop_reason: "tool_use",
@@ -205,7 +204,7 @@ describe("AI Filters store with a fake Claude", () => {
     });
     expect(ai.busy).toBe(false);
     const config = ai.current.configs[0];
-    expect(config.changes.map((c) => c.parameter)).toEqual(["feature_RPM_FILTER", "gyro_rpm_notch_source_roll", "gyro_rpm_notch_q_roll"]);
+    expect(config.changes.map((c) => c.parameter)).toEqual(["feature_RPM_FILTER", "rpm_notches_roll"]);
     expect(ai.current.costUsd).toBeGreaterThan(0);
 
     await ai.applyConfig(config.id);

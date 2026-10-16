@@ -7,12 +7,23 @@
 
 import { cloneSettings, lpfTypeCli } from "../header_settings.js";
 import { RPM_FILTER_NOTCH_COUNT } from "../filters/rpm_filter.js";
+import {
+  axisArrays,
+  axisLayout,
+  describeBank,
+  emptyBank,
+  MAX_Q,
+  MIN_Q,
+  MULTI_NOTCH_SOURCE,
+  notchCount,
+  NOTCH_TYPE,
+  RPM_SOURCE,
+} from "../rpm_notch_layout.js";
 
 export const FILTER_TOOL_NAME = "propose_filter_config";
 
 const AXES = ["roll", "pitch", "yaw"];
 const AXIS_INDEX = { roll: 0, pitch: 1, yaw: 2 };
-const RPM_SOURCES = new Set([0, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22, 23, 24, 25, 26, 27, 28]);
 const LPF_TYPE_NAMES = ["NONE", "1st order", "2nd order", "PT1", "PT2", "PT3", "Order1", "Butter", "Bessel", "Damped"];
 
 function scalar(label, unit, min, max, get, set, extra = {}) {
@@ -68,6 +79,21 @@ for (const axis of AXES) {
 
 export const FILTER_PARAM_NAMES = Object.keys(FILTER_PARAMS);
 
+const BANK_PARAM = /^gyro_rpm_notch_(source|center|q)_(roll|pitch|yaw)$/;
+/**
+ * Parameters Claude sets directly. RPM notch banks are not among them: Claude proposes those as
+ * Configurator rows (rpm_notches), so a suggestion always fits the Configurator's RPM layout.
+ */
+export const TOOL_PARAM_NAMES = FILTER_PARAM_NAMES.filter((n) => !BANK_PARAM.test(n));
+
+const TYPE_VALUE = { SINGLE: NOTCH_TYPE.SINGLE, DOUBLE: NOTCH_TYPE.DOUBLE, TRIPLE: NOTCH_TYPE.TRIPLE };
+
+/** An axis's RPM notches in Configurator terms, for cards and summaries. */
+export function describeAxisNotches(rpm, axis) {
+  const layout = axisLayout(rpm, axis);
+  return layout ? describeBank(layout) : "custom layout the Configurator can't show";
+}
+
 /** Tool definition for the Messages API (strict schema; validated again client-side). */
 export const FILTER_TOOL = {
   name: FILTER_TOOL_NAME,
@@ -76,16 +102,18 @@ export const FILTER_TOOL = {
     "listing old -> new values and decides whether to apply them; nothing changes until they press Apply, " +
     "after which Imagine simulates the result and it may be sent back to you. Use Rotorflight CLI parameter " +
     "names and CLI units: Q values are x10 (25 means Q 2.5), RPM notch centre offsets are x10000, feature " +
-    "toggles are feature_DYN_NOTCH / feature_RPM_FILTER with 1 = on and 0 = off. Every value is a list of " +
-    "integers: one element for a single setting; for gyro_rpm_notch_source_*/center_*/q_* the full bank for " +
-    "that axis in slot order (up to 16, missing slots become 0). Only list parameters you want to change. " +
-    "Custom RPM banks are only used when gyro_rpm_notch_preset is 0.",
+    "toggles are feature_DYN_NOTCH / feature_RPM_FILTER with 1 = on and 0 = off. Every value in `changes` " +
+    "is a list with one integer. RPM notches are not set through `changes`: put them in `rpm_notches`, one " +
+    "entry per axis you change, listing every notch that axis should have afterwards (it replaces the axis), " +
+    "as Rotorflight Configurator rows (source, SINGLE/DOUBLE/TRIPLE, Q). Leave `rpm_notches` empty when the " +
+    "RPM notches don't change. Only list parameters you want to change. Custom RPM notches are only used " +
+    "when gyro_rpm_notch_preset is 0.",
   strict: true,
   eager_input_streaming: true,
   input_schema: {
     type: "object",
     additionalProperties: false,
-    required: ["name", "summary", "changes"],
+    required: ["name", "summary", "changes", "rpm_notches"],
     properties: {
       name: { type: "string", description: "Short label for this config, e.g. 'Step 1: LPF1 to 70 Hz'." },
       summary: { type: "string", description: "One or two sentences on what this step does and why." },
@@ -97,9 +125,42 @@ export const FILTER_TOOL = {
           additionalProperties: false,
           required: ["parameter", "value", "reason"],
           properties: {
-            parameter: { type: "string", enum: FILTER_PARAM_NAMES },
+            parameter: { type: "string", enum: TOOL_PARAM_NAMES },
             value: { type: "array", items: { type: "integer" } },
             reason: { type: "string", description: "Why, citing the peak or result it addresses." },
+          },
+        },
+      },
+      rpm_notches: {
+        type: "array",
+        description:
+          "RPM filter notches per axis, as Configurator rows. Each entry replaces that axis's notches entirely. " +
+          "Empty when the RPM notches don't change.",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["axis", "notches", "reason"],
+          properties: {
+            axis: { type: "string", enum: AXES },
+            notches: {
+              type: "array",
+              description:
+                "Every notch for this axis. source: 10 main motor (geared main motor only), 11-18 main rotor " +
+                "harmonic 1-8, 20 tail motor (motorised tail only), 21-24 tail rotor harmonic 1-4. type: DOUBLE " +
+                "or TRIPLE only for sources 11, 12, 21, 22. q: 1.5-10 in steps of 0.1. At most 16 notches per " +
+                "axis, counting DOUBLE as 2 and TRIPLE as 3.",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["source", "type", "q"],
+                properties: {
+                  source: { type: "integer", enum: RPM_SOURCE },
+                  type: { type: "string", enum: ["SINGLE", "DOUBLE", "TRIPLE"] },
+                  q: { type: "number" },
+                },
+              },
+            },
+            reason: { type: "string", description: "Why, citing the peaks it addresses." },
           },
         },
       },
@@ -131,7 +192,8 @@ export function validateProposal(input, baseSettings, rotor = null) {
     return { ok: false, errors: ["The proposal is empty."], warnings, changes, settings: null };
   }
   const list = Array.isArray(input.changes) ? input.changes : [];
-  if (!list.length) errors.push("The proposal has no changes.");
+  const rpmList = Array.isArray(input.rpm_notches) ? input.rpm_notches : [];
+  if (!list.length && !rpmList.length) errors.push("The proposal has no changes.");
 
   const seen = new Set();
   for (const change of list) {
@@ -139,6 +201,10 @@ export function validateProposal(input, baseSettings, rotor = null) {
     const def = FILTER_PARAMS[name];
     if (!def) {
       errors.push(`Unknown parameter "${name}".`);
+      continue;
+    }
+    if (BANK_PARAM.test(name)) {
+      errors.push(`${name} can't be set directly - give that axis's notches in rpm_notches instead.`);
       continue;
     }
     if (seen.has(name)) {
@@ -164,10 +230,6 @@ export function validateProposal(input, baseSettings, rotor = null) {
       errors.push(`${name} = ${bad.join(",")} is outside the firmware range ${def.min}–${def.max}.`);
       continue;
     }
-    if (name.startsWith("gyro_rpm_notch_source_") && value.some((v) => !RPM_SOURCES.has(v))) {
-      errors.push(`${name} has an invalid source; valid sources are 0 (off), 10–18 (main motor, main rotor x1–x8), 20–28 (tail motor, tail rotor x1–x8).`);
-      continue;
-    }
     const old = def.get(settings);
     def.set(settings, def.kind === "scalar" ? value[0] : value);
     const newValue = def.get(settings);
@@ -179,6 +241,81 @@ export function validateProposal(input, baseSettings, rotor = null) {
       oldText: display(def, old),
       newText: display(def, newValue),
       reason: String(change.reason ?? ""),
+    });
+  }
+
+  // RPM notches, as Configurator rows per axis
+  const seenAxes = new Set();
+  for (const entry of rpmList) {
+    const axisName = entry?.axis;
+    const a = AXIS_INDEX[axisName];
+    if (a === undefined) {
+      errors.push(`rpm_notches: unknown axis "${axisName}".`);
+      continue;
+    }
+    if (seenAxes.has(axisName)) {
+      errors.push(`rpm_notches: ${axisName} is listed more than once.`);
+      continue;
+    }
+    seenAxes.add(axisName);
+    const bank = emptyBank();
+    let ok = true;
+    for (const n of Array.isArray(entry.notches) ? entry.notches : []) {
+      const label = `rpm_notches ${axisName} source ${n?.source}`;
+      if (!RPM_SOURCE.includes(n?.source)) {
+        errors.push(`${label}: not a Configurator RPM source (10-18 main motor/rotor, 20-24 tail motor/rotor).`);
+        ok = false;
+        continue;
+      }
+      if (bank[n.source].enabled) {
+        errors.push(`${label}: listed more than once - one row per source, use DOUBLE/TRIPLE for wider notches.`);
+        ok = false;
+        continue;
+      }
+      const type = TYPE_VALUE[n.type];
+      if (!type) {
+        errors.push(`${label}: type must be SINGLE, DOUBLE or TRIPLE.`);
+        ok = false;
+        continue;
+      }
+      if (type > 1 && !MULTI_NOTCH_SOURCE.includes(n.source)) {
+        errors.push(`${label}: ${n.type} is only available for main/tail rotor harmonic 1 and 2 (sources 11, 12, 21, 22).`);
+        ok = false;
+        continue;
+      }
+      const q = Math.round(Number(n.q) * 10) / 10;
+      if (!Number.isFinite(q) || q < MIN_Q || q > MAX_Q) {
+        errors.push(`${label}: Q ${n.q} is outside the Configurator's ${MIN_Q}-${MAX_Q} range.`);
+        ok = false;
+        continue;
+      }
+      bank[n.source] = { enabled: true, type, q };
+    }
+    const count = notchCount(bank);
+    if (count > RPM_FILTER_NOTCH_COUNT) {
+      errors.push(`rpm_notches ${axisName}: ${count} notches (DOUBLE counts 2, TRIPLE 3); the firmware has ${RPM_FILTER_NOTCH_COUNT}.`);
+      ok = false;
+    }
+    if (!ok) continue;
+    const oldArrays = { source: settings.rpm.source[a].slice(), center: settings.rpm.center[a].slice(), q: settings.rpm.q[a].slice() };
+    const oldText = describeAxisNotches(settings.rpm, a);
+    const arrays = axisArrays(bank);
+    settings.rpm.source[a] = arrays.source;
+    settings.rpm.center[a] = arrays.center;
+    settings.rpm.q[a] = arrays.q;
+    if (bank[10]?.enabled && !(rotor?.mainGearRatio && rotor.mainGearRatio !== 1)) {
+      warnings.push(`${axisName}: the main motor notch only works with a geared main motor and a known main gear ratio.`);
+    }
+    changes.push({
+      parameter: `rpm_notches_${axisName}`,
+      axis: a,
+      label: `RPM Notches · ${axisName[0].toUpperCase()}${axisName.slice(1)}`,
+      old: oldArrays,
+      new: arrays,
+      oldText,
+      newText: describeBank(bank),
+      multiline: true,
+      reason: String(entry.reason ?? ""),
     });
   }
 
@@ -205,24 +342,16 @@ export function validateProposal(input, baseSettings, rotor = null) {
     }
   }
 
-  const bankChanged = changes.some((c) => c.parameter.startsWith("gyro_rpm_notch_source_") || c.parameter.startsWith("gyro_rpm_notch_center_") || c.parameter.startsWith("gyro_rpm_notch_q_"));
-  if (bankChanged && s.rpm.preset !== 0) {
-    warnings.push(`Custom RPM notch banks are ignored while gyro_rpm_notch_preset is ${s.rpm.preset}; set it to 0 to use them.`);
+  const rpmChanged = changes.some((c) => c.parameter.startsWith("rpm_notches_"));
+  if (rpmChanged && s.rpm.preset !== 0) {
+    warnings.push(`Custom RPM notches are ignored while gyro_rpm_notch_preset is ${s.rpm.preset}; set it to 0 to use them.`);
   }
-  if (bankChanged) {
-    for (let a = 0; a < 3; a++) {
-      for (let i = 0; i < RPM_FILTER_NOTCH_COUNT; i++) {
-        const src = s.rpm.source[a][i];
-        const q = s.rpm.q[a][i];
-        if ((src && !q) || (!src && q)) {
-          warnings.push(`${AXES[a]} RPM slot ${i + 1} has ${src ? "a source but Q 0" : "a Q but no source"}, so the firmware ignores it.`);
-        } else if (src && (q < 15 || q > 100)) {
-          warnings.push(`${AXES[a]} RPM slot ${i + 1} Q ${(q / 10).toFixed(1)} is outside the Configurator's 1.5–10 range (the firmware accepts 1.0–25.0).`);
-        }
-        if (src === 10 && !(rotor?.mainGearRatio && rotor.mainGearRatio !== 1)) {
-          warnings.push(`${AXES[a]} RPM slot ${i + 1} (main motor) only works with a geared main motor and a known main gear ratio.`);
-        }
-      }
+  if (s.rpm.enabled && s.rpm.preset === 0) {
+    const custom = AXES.filter((_, a) => !axisLayout(s.rpm, a));
+    if (custom.length) {
+      warnings.push(
+        `The ${custom.join(", ")} RPM notches still use a custom layout the Configurator can't show; give ${custom.length > 1 ? "those axes" : "that axis"} in rpm_notches to replace it.`,
+      );
     }
   }
   if (changes.some((c) => c.parameter === "gyro_rpm_notch_preset") && s.rpm.preset > 0) {
@@ -253,12 +382,32 @@ export function toolResultText(validation) {
 export function diffSettings(from, to) {
   const out = [];
   for (const [name, def] of Object.entries(FILTER_PARAMS)) {
+    if (BANK_PARAM.test(name)) continue;
     const a = def.get(from);
     const b = def.get(to);
     if (JSON.stringify(a) !== JSON.stringify(b)) {
       out.push({ parameter: name, label: def.label, old: a, new: b, oldText: display(def, a), newText: display(def, b), reason: "" });
     }
   }
+  // RPM notch banks, one change per axis, described as Configurator rows
+  AXES.forEach((axisName, a) => {
+    const pick = (st) => ({ source: st.rpm.source[a].slice(0, 16), center: st.rpm.center[a].slice(0, 16), q: st.rpm.q[a].slice(0, 16) });
+    const before = pick(from);
+    const after = pick(to);
+    if (JSON.stringify(before) !== JSON.stringify(after)) {
+      out.push({
+        parameter: `rpm_notches_${axisName}`,
+        axis: a,
+        label: `RPM Notches · ${axisName[0].toUpperCase()}${axisName.slice(1)}`,
+        old: before,
+        new: after,
+        oldText: describeAxisNotches(from.rpm, a),
+        newText: describeAxisNotches(to.rpm, a),
+        multiline: true,
+        reason: "",
+      });
+    }
+  });
   return out;
 }
 
@@ -269,6 +418,15 @@ export function changesToCli(changes) {
       if (c.parameter.startsWith("feature_")) {
         const feature = c.parameter.slice("feature_".length);
         return c.new ? `feature ${feature}` : `feature -${feature}`;
+      }
+      if (c.parameter.startsWith("rpm_notches_")) {
+        const axisName = c.parameter.slice("rpm_notches_".length);
+        const pad = (v) => [...v, ...new Array(Math.max(0, 16 - v.length)).fill(0)].slice(0, 16).join(",");
+        return [
+          `set gyro_rpm_notch_source_${axisName} = ${pad(c.new.source)}`,
+          `set gyro_rpm_notch_center_${axisName} = ${pad(c.new.center)}`,
+          `set gyro_rpm_notch_q_${axisName} = ${pad(c.new.q)}`,
+        ].join("\n");
       }
       if (c.parameter === "gyro_lpf1_type" || c.parameter === "gyro_lpf2_type") {
         return `set ${c.parameter} = ${lpfTypeCli(c.new)}`;

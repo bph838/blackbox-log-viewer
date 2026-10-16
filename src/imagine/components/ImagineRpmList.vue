@@ -7,13 +7,15 @@
           <th class="text-right font-normal">Q</th>
           <th class="text-right font-normal" title="Centre correction, % of the source frequency">Offset %</th>
           <th class="text-right font-normal">Hz</th>
-          <th></th>
+          <th v-if="!readonly"></th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="row in rows" :key="row.slot" class="hover:bg-elevated" @mouseenter="$emit('hover-slot', row.slot)" @mouseleave="$emit('hover-slot', null)">
           <td class="py-0.5 pr-1">
+            <span v-if="readonly">{{ sourceLabel(row.source) }}</span>
             <USelect
+              v-else
               :model-value="row.source"
               :items="RPM_SOURCE_OPTIONS"
               size="xs"
@@ -21,8 +23,10 @@
               @update:model-value="rpm.source[axis][row.slot] = $event"
             />
           </td>
-          <td class="text-right">
+          <td class="text-right tabular-nums">
+            <span v-if="readonly">{{ (row.q / 10).toFixed(1) }}</span>
             <UInputNumber
+              v-else
               :model-value="row.q / 10"
               :min="1"
               :max="25"
@@ -35,8 +39,10 @@
               @update:model-value="(v) => v != null && (rpm.q[axis][row.slot] = Math.round(v * 10))"
             />
           </td>
-          <td class="text-right">
+          <td class="text-right tabular-nums">
+            <span v-if="readonly">{{ (row.center / 100).toFixed(2) }}</span>
             <UInputNumber
+              v-else
               :model-value="row.center / 100"
               :min="-20"
               :max="20"
@@ -50,21 +56,22 @@
             />
           </td>
           <td class="pl-1 text-right tabular-nums" :class="hzClass(row.hz)">{{ row.hz == null ? "–" : row.hz.toFixed(1) }}</td>
-          <td class="pl-1 text-right">
+          <td v-if="!readonly" class="pl-1 text-right">
             <UButton icon="i-lucide-x" size="xs" variant="ghost" color="neutral" title="Remove notch" @click="remove(row.slot)" />
           </td>
         </tr>
         <tr v-if="!rows.length">
-          <td colspan="5" class="py-1 text-dimmed">No notches on this axis.</td>
+          <td :colspan="readonly ? 4 : 5" class="py-1 text-dimmed">No notches on this axis.</td>
         </tr>
       </tbody>
     </table>
-    <UButton class="mt-1" label="Add notch" icon="i-lucide-plus" size="xs" variant="outline" color="neutral" :disabled="rows.length >= 16" @click="add" />
+    <UButton v-if="!readonly" class="mt-1" label="Add notch" icon="i-lucide-plus" size="xs" variant="outline" color="neutral" :disabled="rows.length >= 16" @click="add" />
   </div>
 </template>
 
 <script setup>
-// Slot-by-slot editor for RPM notch banks the Configurator's layout can't show (the CLI view).
+// Slot-by-slot view of RPM notch banks the Configurator's layout can't show (the CLI view).
+// Read-only by default: such banks are only shown, and converted before they can be edited.
 import { computed } from "vue";
 import { rpmBankFrequency, RPM_SOURCE_OPTIONS } from "../filters/rpm_filter.js";
 
@@ -75,7 +82,12 @@ const props = defineProps({
   speeds: { type: Object, default: null },
   rotor: { type: Object, default: null },
   nyquist: { type: Number, default: 0 },
+  readonly: { type: Boolean, default: true },
 });
+
+function sourceLabel(source) {
+  return RPM_SOURCE_OPTIONS.find((o) => o.value === source)?.label ?? `Source ${source}`;
+}
 
 const rows = computed(() => {
   const out = [];
