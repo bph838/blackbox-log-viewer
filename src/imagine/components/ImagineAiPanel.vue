@@ -220,17 +220,14 @@ import { useAiFiltersStore } from "../ai/ai_filters_store.js";
 import { displayTurns } from "../ai/conversation.js";
 import { renderMarkdown } from "../ai/markdown.js";
 import ImagineAiConfigCard from "./ImagineAiConfigCard.vue";
+import AI_FILTER_QUESTIONS from "../../data/ai_filter_questions.json";
 
 const ai = useAiFiltersStore();
 const imagine = useImagineStore();
 const settingsStore = useSettingsStore();
 
-const STARTERS = [
-  "What filters would you set up on this helicopter?",
-  "Look at my noise and suggest a first step.",
-  "Can I reduce filter delay without letting more noise through?",
-  "Is my RPM filter set up well for these peaks?",
-];
+// Starter questions shown in an empty conversation - edit src/data/ai_filter_questions.json
+const STARTERS = (AI_FILTER_QUESTIONS.questions || []).filter((q) => typeof q === "string" && q.trim());
 const CHIP_ICON = { summary: "i-lucide-file-chart-column", result: "i-lucide-chart-no-axes-column", settings: "i-lucide-sliders-horizontal" };
 
 const draft = ref("");
