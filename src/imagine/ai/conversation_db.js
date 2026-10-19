@@ -32,6 +32,7 @@ function summarize(record) {
     createdAt: record.createdAt,
     configCount: (record.configs || []).length,
     costUsd: record.costUsd || 0,
+    deleted: !!record.deleted,
   };
 }
 
@@ -49,10 +50,12 @@ export function createConversationDb(backend = defaultBackend()) {
       const all = (await backend.getAll(STORE)).map(summarize);
       const key = craftName === undefined ? null : craftKeyOf(craftName);
       return all
-        .filter((c) => key === null || c.craftKey === key)
+        .filter((c) => !c.deleted && (key === null || c.craftKey === key))
         .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
     },
     get: (id) => backend.get(STORE, id),
+    /** Every full record, deletion tombstones included (for the cloud sync). */
+    all: () => backend.getAll(STORE),
     // a plain copy, so Vue proxies never reach IndexedDB
     put: (record) => queue(() => backend.put(STORE, JSON.parse(JSON.stringify(record)))),
     delete: (id) => queue(() => backend.delete(STORE, id)),

@@ -14,11 +14,16 @@
         v-for="(a, i) in AXES"
         :key="a.label"
         type="button"
-        class="w-16 cursor-pointer text-xs font-semibold text-white transition"
+        class="relative w-16 cursor-pointer text-xs font-semibold text-white transition"
         :style="{ background: a.color, filter: axis === i ? 'none' : 'brightness(0.6)' }"
         @click="axis = i"
       >
         {{ a.label }}
+        <span
+          v-if="axisChanged[i]"
+          class="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-warning"
+          :title="`${a.label} notches changed from the log`"
+        />
       </button>
     </header>
 
@@ -59,6 +64,8 @@
                   v-if="row.typeLabel"
                   :label="row.typeLabel"
                   :disabled="!bank[row.source].enabled"
+                  :changed="enabledChanged(row.source) || typeChanged(row.source)"
+                  :changed-title="changeTitle(row, 'type')"
                 >
                   <USelect
                     :model-value="shown(row.source).type"
@@ -72,6 +79,8 @@
                 <ImagineField
                   :label="row.qLabel"
                   :disabled="!bank[row.source].enabled"
+                  :changed="(!row.typeLabel && enabledChanged(row.source)) || qChanged(row.source)"
+                  :changed-title="changeTitle(row, 'q')"
                   :hint="hzText(row.source)"
                   :hint-class="hzClass(row.source)"
                   :hint-title="hzTitle(row.source)"
@@ -150,6 +159,7 @@ import ImagineChartToggle from "./ImagineChartToggle.vue";
 
 const props = defineProps({
   rpm: { type: Object, required: true }, // settings.rpm (CLI arrays), edited in place
+  logRpm: { type: Object, default: null }, // the log's settings.rpm, for the "changed" dots
   speeds: { type: Object, default: null },
   rotor: { type: Object, default: null },
   nyquist: { type: Number, default: 0 },
@@ -227,6 +237,58 @@ const groups = computed(() => {
     { label: "Tail Rotor", rows: [1, 2, 3, 4].map((h) => harmonicRow(20 + h, h)) },
   ];
 });
+
+// ---- what differs from the log (the orange dots, as on the other settings) ----
+
+// The log's notches in the same layout. A log that doesn't fit the Configurator layout is
+// compared as converted, so rows only show what was changed after converting (the axis tab
+// still shows the conversion itself).
+const logLayout = computed(() => {
+  if (!props.logRpm) return null;
+  return parseRpmLayout(props.logRpm) ?? convertToLayout(props.logRpm).banks;
+});
+
+const axisChanged = computed(() =>
+  [0, 1, 2].map((a) => {
+    if (!props.logRpm) return false;
+    return ["source", "center", "q"].some(
+      (k) => JSON.stringify(props.rpm[k]?.[a] ?? []) !== JSON.stringify(props.logRpm[k]?.[a] ?? []),
+    );
+  }),
+);
+
+function logRow(source) {
+  return logLayout.value?.[axis.value]?.[source] ?? { enabled: false };
+}
+
+function enabledChanged(source) {
+  if (!logLayout.value) return false;
+  return !!bank.value[source]?.enabled !== !!logRow(source).enabled;
+}
+
+function bothEnabled(source) {
+  return !!logLayout.value && !!bank.value[source]?.enabled && !!logRow(source).enabled;
+}
+
+function typeChanged(source) {
+  return bothEnabled(source) && bank.value[source].type !== logRow(source).type;
+}
+
+function qChanged(source) {
+  return bothEnabled(source) && bank.value[source].q !== logRow(source).q;
+}
+
+const TYPE_NAME = { [NOTCH_TYPE.SINGLE]: "SINGLE", [NOTCH_TYPE.DOUBLE]: "DOUBLE", [NOTCH_TYPE.TRIPLE]: "TRIPLE" };
+
+// The switch has no dot of its own: an on/off change shows on the row's first field.
+function changeTitle(row, field) {
+  const was = logRow(row.source);
+  if (enabledChanged(row.source) && (field === "type" || !row.typeLabel)) {
+    return was.enabled ? "Switched off - on in the log" : "Switched on - off in the log";
+  }
+  if (field === "type") return `Changed from the log value (${TYPE_NAME[was.type] ?? was.type})`;
+  return `Changed from the log value (${was.q?.toFixed(1)})`;
+}
 
 function shown(source) {
   const row = bank.value[source];

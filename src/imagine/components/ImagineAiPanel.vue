@@ -24,7 +24,9 @@
     </div>
 
     <div v-if="confirmingDelete" class="flex items-center gap-2 border-b border-default bg-error/10 px-3 py-1.5 text-xs">
-      <span class="flex-1">Delete “{{ ai.current?.title }}” and its saved configs? This can't be undone.</span>
+      <span class="flex-1">
+        Delete “{{ ai.current?.title }}” and its saved configs{{ ai.current?.cloud?.version ? " - here, in GitHub and on your other computers" : "" }}? This can't be undone.
+      </span>
       <UButton size="xs" variant="ghost" color="neutral" label="Cancel" @click="confirmingDelete = false" />
       <UButton size="xs" color="error" label="Delete" @click="onDelete" />
     </div>
@@ -32,6 +34,13 @@
     <div class="flex items-center gap-2 border-b border-default px-2 py-1 text-xs">
       <USelect v-model="ai.model" :items="modelItems" size="xs" class="w-44" title="Model (shared with the Tuning Log)" />
       <span class="ml-auto text-dimmed" :title="usageTitle">{{ costText }}</span>
+      <TuningLogSyncStatus :store="ai" subject="AI Filters conversations" unit="conversation" />
+    </div>
+
+    <div v-if="ai.cloudNotice" class="flex items-center gap-2 border-b border-default bg-info/10 px-3 py-1.5 text-xs">
+      <UIcon name="i-lucide-cloud-download" class="size-3.5 shrink-0" />
+      <span class="flex-1">{{ ai.cloudNotice }}</span>
+      <UButton icon="i-lucide-x" size="xs" variant="ghost" color="neutral" title="Dismiss" @click="ai.cloudNotice = ''" />
     </div>
 
     <!-- API key -->
@@ -220,6 +229,7 @@ import { useAiFiltersStore } from "../ai/ai_filters_store.js";
 import { displayTurns } from "../ai/conversation.js";
 import { renderMarkdown } from "../ai/markdown.js";
 import ImagineAiConfigCard from "./ImagineAiConfigCard.vue";
+import TuningLogSyncStatus from "../../components/TuningLogSyncStatus.vue";
 import AI_FILTER_QUESTIONS from "../../data/ai_filter_questions.json";
 
 const ai = useAiFiltersStore();

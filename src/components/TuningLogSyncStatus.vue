@@ -4,13 +4,13 @@
       type="button"
       class="flex items-center gap-1 text-xs rounded px-1.5 py-0.5 hover:bg-elevated"
       :class="indicator.class"
-      :disabled="tuningLogStore.syncStatus === 'syncing'"
-      @click="tuningLogStore.syncNow()"
+      :disabled="syncStore.syncStatus === 'syncing'"
+      @click="syncStore.syncNow()"
     >
       <UIcon
         :name="indicator.icon"
         class="size-3.5"
-        :class="{ 'animate-spin': tuningLogStore.syncStatus === 'syncing' }"
+        :class="{ 'animate-spin': syncStore.syncStatus === 'syncing' }"
       />
       {{ indicator.label }}
     </button>
@@ -21,15 +21,21 @@
 // Tuning log cloud (GitHub) sync status - syncing, changes waiting, offline, failed - as a small
 // button that syncs now when clicked. Shown in the Tuning Log dialog, and in the main toolbar
 // (with hideWhenSynced) so a sync in progress or needing attention is visible without opening it.
+// Also used for Imagine's AI Filters conversations: pass their store, subject and unit.
 import { computed } from "vue";
 import { useTuningLogStore } from "../stores/tuningLog.js";
 
 const props = defineProps({
   // Show nothing when everything's synced - only when there's something to see.
   hideWhenSynced: { type: Boolean, default: false },
+  // Any store with syncStatus, syncError, syncNow() and totalPendingCount or pendingCount.
+  store: { type: Object, default: null },
+  // What's being synced, for the tooltips, and what a pending count counts.
+  subject: { type: String, default: "tuning logs" },
+  unit: { type: String, default: "change" },
 });
 
-const tuningLogStore = useTuningLogStore();
+const syncStore = props.store || useTuningLogStore();
 
 function formatBytes(bytes) {
   if (bytes < 1024) return `${Math.round(bytes)} B`;
@@ -42,12 +48,13 @@ function plural(count, word) {
 }
 
 const status = computed(() => {
-  const pending = tuningLogStore.totalPendingCount;
-  const waiting = pending ? `${plural(pending, "change")} saved on this computer` : "";
+  const pending = syncStore.totalPendingCount ?? syncStore.pendingCount ?? 0;
+  const unit = props.unit;
+  const waiting = pending ? `${plural(pending, unit)} saved on this computer` : "";
 
-  switch (tuningLogStore.syncStatus) {
+  switch (syncStore.syncStatus) {
     case "syncing": {
-      const progress = tuningLogStore.syncProgress;
+      const progress = syncStore.syncProgress;
       if (progress && progress.totalBytes) {
         const percent = Math.floor((progress.sentBytes / progress.totalBytes) * 100);
         return {
@@ -61,7 +68,7 @@ const status = computed(() => {
         icon: "i-lucide-refresh-cw",
         label: "Syncing…",
         class: "text-dimmed",
-        tooltip: "Syncing tuning logs with GitHub",
+        tooltip: `Syncing ${props.subject} with GitHub`,
       };
     }
     case "synced":
@@ -74,14 +81,14 @@ const status = computed(() => {
     case "pending":
       return {
         icon: "i-lucide-cloud-upload",
-        label: `${plural(pending, "change")} to upload`,
+        label: `${plural(pending, unit)} to upload`,
         class: "text-dimmed",
         tooltip: "Changes are uploaded to GitHub a few seconds after you stop editing. Click to upload now.",
       };
     case "offline":
       return {
         icon: "i-lucide-cloud-off",
-        label: pending ? `Offline · ${plural(pending, "change")} waiting` : "Offline",
+        label: pending ? `Offline · ${plural(pending, unit)} waiting` : "Offline",
         class: "text-warning",
         tooltip: `Can't reach GitHub.${waiting ? ` ${waiting}, and will upload` : " Will sync"} automatically when back online. Click to retry now.`,
       };
@@ -90,7 +97,7 @@ const status = computed(() => {
         icon: "i-lucide-cloud-alert",
         label: "Sync failed",
         class: "text-error",
-        tooltip: `${(tuningLogStore.syncError?.message || "Sync failed").replace(/\.+$/, "")}.${waiting ? ` ${waiting} - nothing is lost.` : ""} Click to retry.`,
+        tooltip: `${(syncStore.syncError?.message || "Sync failed").replace(/\.+$/, "")}.${waiting ? ` ${waiting} - nothing is lost.` : ""} Click to retry.`,
       };
     default:
       return null;
@@ -98,6 +105,6 @@ const status = computed(() => {
 });
 
 const indicator = computed(() =>
-  props.hideWhenSynced && tuningLogStore.syncStatus === "synced" ? null : status.value,
+  props.hideWhenSynced && syncStore.syncStatus === "synced" ? null : status.value,
 );
 </script>

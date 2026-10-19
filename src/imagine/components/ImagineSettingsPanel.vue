@@ -176,6 +176,7 @@
       <ImagineRpmNotches
         v-if="s.rpm.enabled && s.rpm.preset === 0"
         :rpm="s.rpm"
+        :log-rpm="log?.rpm ?? null"
         :speeds="store.rotorSpeeds"
         :rotor="store.rotor"
         :nyquist="nyquist"

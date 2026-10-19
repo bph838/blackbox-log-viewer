@@ -3,12 +3,14 @@
 // applying configs to the Filters panel and feeding Imagine's results back.
 
 import { defineStore } from "pinia";
-import { computed, ref, shallowRef } from "vue";
+import { computed, ref, shallowRef, watch } from "vue";
+import { createGitHubClient } from "../../github_client.js";
 import { useSettingsStore } from "../../stores/settings.js";
 import { resolveAiModel } from "../../user_settings_data.js";
 import { streamClaude } from "../../tuning_ai.js";
 import { useImagineStore } from "../imagine_store.js";
 import { createConversationDb } from "./conversation_db.js";
+import { isDirty, syncConversations } from "./conversation_cloud.js";
 import {
   addUserConfig,
   appendUserMessage,
@@ -24,6 +26,19 @@ let db = createConversationDb();
 /** Tests swap in a memory-backed db. */
 export function setConversationDb(newDb) {
   db = newDb;
+}
+
+// Wait after the last change before syncing to GitHub (so a burst of edits is one commit), and
+// before retrying after a failure - the same as the Tuning Log.
+let syncDelayMs = 3000;
+let retryDelayMs = 60000;
+let clientFactory = createGitHubClient;
+
+/** For tests: the GitHub client factory and sync delays (null = only syncNow() syncs). */
+export function setAiFiltersCloudForTests(options) {
+  if (options.clientFactory) clientFactory = options.clientFactory;
+  if ("syncDelayMs" in options) syncDelayMs = options.syncDelayMs;
+  if ("retryDelayMs" in options) retryDelayMs = options.retryDelayMs;
 }
 
 const PANEL_KEY = "imagine.aiPanel";
@@ -87,6 +102,8 @@ export const useAiFiltersStore = defineStore("imagineAiFilters", () => {
 
   function persist() {
     if (!current.value) return Promise.resolve();
+    current.value.rev = (current.value.rev || 0) + 1;
+    scheduleSync();
     return db
       .put(current.value)
       .then(refreshList)
@@ -95,9 +112,164 @@ export const useAiFiltersStore = defineStore("imagineAiFilters", () => {
 
   async function refreshList() {
     conversations.value = await db.list(craftName.value);
+    pendingCount.value = (await db.all()).filter(isDirty).length;
   }
 
+  // ---- GitHub sync (the Tuning Log's repo and token, Settings -> Cloud Storage) ----
+
+  const cloudEnabled = computed(
+    () => !!(settingsStore.userSettings.githubRepo && settingsStore.userSettings.githubToken),
+  );
+  const syncing = ref(false);
+  const syncError = ref(null); // { message, offline }
+  const pendingCount = ref(0); // conversations with changes not yet in the cloud
+  const cloudNotice = ref(""); // e.g. both computers changed the same conversation
+  // off | syncing | offline | error | pending | synced - as the Tuning Log's
+  const syncStatus = computed(() => {
+    if (!cloudEnabled.value) return "off";
+    if (syncing.value) return "syncing";
+    if (syncError.value) return syncError.value.offline ? "offline" : "error";
+    if (pendingCount.value) return "pending";
+    return "synced";
+  });
+
+  let client = null;
+  let clientKey = "";
+  function getClient() {
+    const s = settingsStore.userSettings;
+    if (!s.githubRepo || !s.githubToken) return null;
+    const key = `${s.githubRepo}|${s.githubBranch}|${s.githubToken}`;
+    if (key !== clientKey) {
+      client = clientFactory({ repo: s.githubRepo, branch: s.githubBranch, token: s.githubToken });
+      clientKey = key;
+    }
+    return client;
+  }
+
+  let syncTimer = null;
+  function scheduleSync(delay = syncDelayMs) {
+    if (!cloudEnabled.value || syncDelayMs === null || delay === null) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      syncTimer = null;
+      syncNow();
+    }, delay);
+  }
+
+  /** The record as it is now on this computer - the open one may be ahead of the database. */
+  async function latestLocal(id) {
+    if (current.value?.id === id) return current.value;
+    return (await db.get(id)) || null;
+  }
+
+  async function applySyncResult(result) {
+    for (const { id, baseRev } of result.removed) {
+      const now = await latestLocal(id);
+      // Deleted elsewhere but changed here meanwhile: keep it, it'll be uploaded again.
+      if (now && !now.deleted && (now.rev || 0) !== baseRev) continue;
+      if (current.value?.id === id) current.value = null;
+      await db.delete(id);
+    }
+
+    for (const { record, baseRev, uploaded } of result.saved) {
+      const now = await latestLocal(record.id);
+      const unchanged = baseRev === null ? !now : !!now && (now.rev || 0) === baseRev;
+      if (!unchanged) {
+        // Changed here while syncing: keep this computer's version, note what's in the cloud.
+        if (uploaded && now) {
+          now.cloud = record.cloud;
+          await db.put(now);
+        }
+        continue;
+      }
+      if (current.value?.id === record.id) {
+        if (uploaded) current.value.cloud = record.cloud;
+        else current.value = record;
+        await db.put(current.value);
+      } else {
+        await db.put(record);
+      }
+    }
+
+    for (const { id, copyId } of result.conflicts) {
+      if (current.value?.id === id) await openConversation(copyId);
+      cloudNotice.value =
+        "A conversation was changed both here and on another computer. Both versions are kept - " +
+        "this computer's is marked “(this computer)”.";
+    }
+  }
+
+  let syncPromise = null;
+  let syncAgain = false;
+
+  /**
+   * Uploads conversations changed here and brings in ones changed (or new, for this heli) on
+   * other computers. Never throws - failures show in syncStatus and are retried later.
+   */
+  function syncNow() {
+    if (syncPromise) {
+      syncAgain = true;
+      return syncPromise;
+    }
+    const activeClient = getClient();
+    if (!activeClient) return Promise.resolve();
+
+    clearTimeout(syncTimer);
+    syncing.value = true;
+    syncPromise = (async () => {
+      let failed = false;
+      try {
+        if (globalThis.navigator && globalThis.navigator.onLine === false) {
+          throw Object.assign(new Error("Offline"), { isNetwork: true });
+        }
+        // Leave the open conversation alone mid-request: its history isn't valid until Claude answers.
+        const skip = busy.value && current.value ? current.value.id : null;
+        const locals = (await db.all())
+          .filter((r) => r.id !== skip)
+          .map((r) => (r.id === current.value?.id ? clone(current.value) : r));
+        const result = await syncConversations(activeClient, locals, {
+          craftName: imagine.hasLog ? craftName.value : null,
+        });
+        await applySyncResult(result);
+        syncError.value = null;
+        if (skip) syncAgain = true;
+      } catch (e) {
+        failed = true;
+        syncError.value = { message: e.message, offline: !!e.isNetwork };
+        if (!e.isNetwork) console.error("AI Filters sync failed", e);
+      } finally {
+        syncing.value = false;
+        syncPromise = null;
+        await refreshList().catch(() => {});
+        if (syncAgain) {
+          syncAgain = false;
+          scheduleSync(busy.value ? syncDelayMs : 0);
+        } else if (failed && pendingCount.value) {
+          scheduleSync(retryDelayMs);
+        }
+      }
+    })();
+    return syncPromise;
+  }
+
+  if (globalThis.addEventListener) {
+    globalThis.addEventListener("online", () => scheduleSync(0));
+  }
+  watch(
+    () => [
+      settingsStore.userSettings.githubRepo,
+      settingsStore.userSettings.githubBranch,
+      settingsStore.userSettings.githubToken,
+    ],
+    () => {
+      syncError.value = null;
+      scheduleSync(0);
+    },
+  );
+
   async function loadForCraft() {
+    // Bring in this heli's conversations from other computers (and upload anything waiting).
+    if (cloudEnabled.value) await syncNow();
     await refreshList();
     if (current.value && current.value.craftName.toLowerCase() !== craftName.value.toLowerCase()) {
       current.value = null;
@@ -132,7 +304,21 @@ export const useAiFiltersStore = defineStore("imagineAiFilters", () => {
   }
 
   async function deleteConversation(id) {
-    await db.delete(id);
+    const record = await latestLocal(id);
+    if (record?.cloud?.version) {
+      // In the cloud: keep a tombstone until the cloud copy is deleted too.
+      await db.put({
+        id,
+        deleted: true,
+        craftName: record.craftName,
+        title: record.title,
+        cloud: record.cloud,
+        rev: (record.rev || 0) + 1,
+      });
+      scheduleSync(0);
+    } else {
+      await db.delete(id);
+    }
     if (current.value?.id === id) current.value = null;
     await refreshList();
   }
@@ -399,6 +585,12 @@ export const useAiFiltersStore = defineStore("imagineAiFilters", () => {
     lastRequest,
     hasApiKey,
     model,
+    cloudEnabled,
+    syncStatus,
+    syncError,
+    pendingCount,
+    cloudNotice,
+    syncNow,
     craftName,
     setOpen,
     setWidth,
