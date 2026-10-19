@@ -16,6 +16,7 @@ import { settingsFromSysConfig, ratesFromSysConfig, checkFirmware } from "./head
 import { simulateGyroFilters } from "./simulate.js";
 import { compareAxis } from "./analysis.js";
 import { chainResponse } from "./response.js";
+import { FilterSearch } from "./search/search.js";
 
 const LOG_PATH = process.env.IMAGINE_SAMPLE_LOG;
 const AXES = ["roll", "pitch", "yaw"];
@@ -117,5 +118,45 @@ describe.skipIf(!LOG_PATH)("Imagine validation against a real log", () => {
     for (const m of metrics) {
       expect(m.correlation).toBeGreaterThan(0.99);
     }
+  }, 600000);
+
+  test("the filter search verifies its best setups with the full simulation", () => {
+    const flightLog = new FlightLog(new Uint8Array(fs.readFileSync(LOG_PATH)));
+    flightLog.openLog(Number(process.env.IMAGINE_LOG_INDEX ?? 0));
+    const sysConfig = flightLog.getSysConfig();
+    const data = extractLogData(flightLog);
+    const rates = ratesFromSysConfig(sysConfig, data.measuredLogRateHz);
+    const settings = settingsFromSysConfig(sysConfig);
+    const tailPerHead = process.env.IMAGINE_TAIL_RATIO ? Number(process.env.IMAGINE_TAIL_RATIO) : null;
+    const tailspeed = data.tailspeed ?? (tailPerHead != null ? data.headspeed.map((h) => h * tailPerHead) : null);
+
+    const search = new FilterSearch({
+      raw: data.raw,
+      headspeed: data.headspeed,
+      tailspeed,
+      rates,
+      rotor: rotorFor(data, tailPerHead),
+      settings,
+      start: 0,
+      end: data.count,
+      settleSamples: Math.round(rates.logRateHz),
+      boundaryHz: 20,
+    });
+    const r = search.run();
+    const log = r.verified.find((v) => v.index === r.logIndex);
+    const lines = [
+      `Search: ${r.evaluated} setups in ${(r.elapsedMs / 1000).toFixed(1)} s, ${r.verified.length} verified, dyn notch factors ${JSON.stringify(r.dynNotchFactors)}`,
+      `Log settings: ${log.delayMs.toFixed(2)} ms, ${log.noiseRms.toFixed(3)} deg/s (estimate ${log.estimatedNoiseRms.toFixed(3)})`,
+    ];
+    for (const i of r.front) {
+      const v = r.verified.find((x) => x.index === i);
+      const changes = v.choices.filter((c) => c.changed).map((c) => `${c.id}=${c.option}`).join(" ");
+      lines.push(`  ${v.delayMs.toFixed(2)} ms  ${v.noiseRms.toFixed(3)} deg/s (est ${v.estimatedNoiseRms.toFixed(3)}, band ${v.bandLossDb.toFixed(1)} dB)  ${changes || "log settings"}`);
+    }
+    console.log(lines.join("\n"));
+
+    // without a dynamic notch the estimate is close to the full simulation
+    if (!settings.dynNotch.enabled) expect(Math.abs(log.estimatedNoiseRms / log.noiseRms - 1)).toBeLessThan(0.05);
+    expect(r.front.length).toBeGreaterThan(2);
   }, 600000);
 });

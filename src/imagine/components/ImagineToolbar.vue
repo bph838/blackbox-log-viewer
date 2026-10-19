@@ -50,6 +50,16 @@
     <div class="ml-auto flex items-center gap-2">
       <span v-if="store.statusMessage && store.status === 'ready'" class="text-xs text-dimmed">{{ store.statusMessage }}</span>
       <UButton
+        v-if="store.hasLog"
+        label="Filter search"
+        icon="i-lucide-chart-scatter"
+        size="xs"
+        :variant="search.open ? 'solid' : 'outline'"
+        :color="search.open ? 'primary' : 'neutral'"
+        title="Search for the filter setups with the least noise for the least delay (replaces the spectrum while open)"
+        @click="search.open = !search.open"
+      />
+      <UButton
         label="AI Filters"
         icon="i-lucide-sparkles"
         size="xs"
@@ -68,9 +78,11 @@
 import { computed, ref } from "vue";
 import { useImagineStore } from "../imagine_store.js";
 import { useAiFiltersStore } from "../ai/ai_filters_store.js";
+import { useFilterSearchStore } from "../search/search_store.js";
 
 const store = useImagineStore();
 const ai = useAiFiltersStore();
+const search = useFilterSearchStore();
 const fileInput = ref(null);
 const emit = defineEmits(["open-file"]);
 

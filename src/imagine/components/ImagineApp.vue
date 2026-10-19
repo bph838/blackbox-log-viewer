@@ -35,7 +35,8 @@
             class="rounded-none"
           />
           <div class="min-h-0 flex-1">
-            <ImagineSpectrum />
+            <ImagineSearchView v-if="search.open" />
+            <ImagineSpectrum v-else />
           </div>
           <ImagineResults />
         </main>
@@ -103,9 +104,12 @@ import ImagineAiPanel from "./ImagineAiPanel.vue";
 import { useAiFiltersStore } from "../ai/ai_filters_store.js";
 import ImagineSpectrum from "./ImagineSpectrum.vue";
 import ImagineResults from "./ImagineResults.vue";
+import ImagineSearchView from "./ImagineSearchView.vue";
+import { useFilterSearchStore } from "../search/search_store.js";
 
 const store = useImagineStore();
 const ai = useAiFiltersStore();
+const search = useFilterSearchStore();
 
 // The Filters panel can collapse to a narrow strip to give the chart more room (remembered).
 const FILTERS_KEY = "imagine.filtersCollapsed";

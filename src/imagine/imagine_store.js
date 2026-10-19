@@ -378,6 +378,7 @@ export const useImagineStore = defineStore("imagine", () => {
     openSubLog,
     resetSettings,
     applySettings: setSettings,
+    simulationInput,
     imagine,
     invalidateResults,
     setTimeRange,
