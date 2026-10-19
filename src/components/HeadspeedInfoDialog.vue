@@ -17,6 +17,7 @@
             <div class="text-xs text-muted">{{ item.label }}</div>
             <div class="text-2xl font-semibold">{{ item.value }}</div>
             <div class="text-xs text-dimmed">rpm</div>
+            <div class="mt-1 text-sm">{{ item.hz }} <span class="text-xs text-dimmed">Hz</span></div>
           </div>
         </div>
         <p class="text-xs text-dimmed mt-3">
@@ -66,12 +67,17 @@ watch(open, (isOpen) => {
   }
 });
 
+// rpm, and the main rotor frequency (Hz = rpm / 60) to match against the spectrum
+function speed(rpm) {
+  return { value: Math.round(rpm), hz: (rpm / 60).toFixed(1) };
+}
+
 const items = computed(() =>
   stats.value
     ? [
-        { label: "Average", value: Math.round(stats.value.average) },
-        { label: "Min", value: Math.round(stats.value.min) },
-        { label: "Max", value: Math.round(stats.value.max) },
+        { label: "Average", ...speed(stats.value.average) },
+        { label: "Min", ...speed(stats.value.min) },
+        { label: "Max", ...speed(stats.value.max) },
       ]
     : [],
 );

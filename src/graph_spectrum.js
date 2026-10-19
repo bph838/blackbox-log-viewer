@@ -12,6 +12,9 @@ import { useGraphStore } from "./stores/graph.js";
 import { useAppStore } from "./stores/app.js";
 import { useCraftConfigStore } from "./stores/craftConfig.js";
 
+// Height (px) of the drop-downs drawn over the top of the analyser on hover
+const ANALYSER_CONTROLS_HEIGHT = 34;
+
 export function FlightLogAnalyser(flightLog, canvas, analyserCanvas) {
   const { userSettings } = useSettingsStore();
   const graphStore = useGraphStore();
@@ -41,6 +44,8 @@ export function FlightLogAnalyser(flightLog, canvas, analyserCanvas) {
     const logRateInfo = GraphSpectrumCalc.initialize(flightLog, sysConfig);
     GraphSpectrumPlot.initialize(analyserCanvas, sysConfig);
     GraphSpectrumPlot.setLogRateWarningInfo(logRateInfo);
+    // keep the marker lines below the Frequency / filter drop-downs shown on hover
+    GraphSpectrumPlot.setMarkerTopSpace(ANALYSER_CONTROLS_HEIGHT);
 
     // Initialize user settings defaults
     userSettings.spectrumType =

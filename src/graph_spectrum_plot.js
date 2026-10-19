@@ -59,6 +59,9 @@ export const GraphSpectrumPlot = {
   // Leave the lowpass/notch filter labels off (their lines still draw). Imagine shows them itself,
   // only for the filter under the mouse.
   _hideFilterLabels: false,
+  // Pixels kept clear at the top of the plot for controls drawn over it (the analyser's hover
+  // drop-downs). Vertical marker lines and their labels start below this.
+  _markerTopSpace: 0,
   // _minPSD, _maxPSD, _lowLevelPSD will initialize later in FlightLogAnalyser from stored settings
   _minPSD: 0,
   _maxPSD: 0,
@@ -135,6 +138,11 @@ GraphSpectrumPlot.setLowLevelPSD = function (lowLevel) {
 
 GraphSpectrumPlot.setHideFilterLabels = function (hide) {
   this._hideFilterLabels = !!hide;
+  this._invalidateCache();
+};
+
+GraphSpectrumPlot.setMarkerTopSpace = function (pixels) {
+  this._markerTopSpace = Math.max(0, pixels || 0);
   this._invalidateCache();
 };
 
@@ -1370,13 +1378,14 @@ GraphSpectrumPlot._drawVerticalMarkerLine = function (
   canvasCtx.lineWidth = realLineWidth || 1;
   canvasCtx.strokeStyle = stroke || "rgba(128,128,255,0.50)";
 
-  canvasCtx.moveTo(x, OFFSET - 10);
+  const top = OFFSET + this._markerTopSpace;
+  canvasCtx.moveTo(x, top - 10);
   canvasCtx.lineTo(x, HEIGHT);
 
   canvasCtx.stroke();
 
   if (label != null) {
-    this._drawAxisLabel(canvasCtx, label.trim(), x + 2, OFFSET + 1, "left");
+    this._drawAxisLabel(canvasCtx, label.trim(), x + 2, top + 1, "left");
   }
 
   return x;
@@ -1508,6 +1517,7 @@ GraphSpectrumPlot._drawRotorRpmLines = function (
       frequency: mainFrequency,
       label: mainLabel ? `Main Rotor - ${mainLabel}` : "Main Rotor",
       stroke: "rgba(255,255,0,0.85)",
+      isMain: true,
     },
     {
       frequency: ratios.tail != null ? mainFrequency * ratios.tail : null,
@@ -1528,7 +1538,9 @@ GraphSpectrumPlot._drawRotorRpmLines = function (
       continue;
     }
 
-    const label = ` ${line.label} (${Math.round(line.frequency * 60)}rpm)`;
+    const rpm = `${Math.round(line.frequency * 60)}rpm`;
+    // the main rotor also shows its frequency, to match it against the spectrum's Hz axis
+    const label = line.isMain ? ` ${line.label} (${line.frequency.toFixed(1)}Hz, ${rpm})` : ` ${line.label} (${rpm})`;
     this._drawVerticalMarkerLine(
       canvasCtx,
       line.frequency,
