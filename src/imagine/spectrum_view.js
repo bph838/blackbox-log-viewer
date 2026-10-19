@@ -1,7 +1,9 @@
 // Builds the data for the shared GraphSpectrumPlot.
 //
-// "linear" is the Analyser's Frequency view: the unfiltered gyro as the bar spectrum, with the
-// imagined and logged filtered gyro (and optionally the unfiltered gyro) as overlay lines.
+// "linear" is the Analyser's Frequency view: a bar spectrum (the unfiltered gyro, or with
+// show.barsSource the logged filtered or imagined gyro), with the imagined and logged filtered gyro
+// (and optionally the unfiltered gyro) as overlay lines. The vertical scale always comes from the
+// unfiltered gyro, so switching the bars shows how much the filters take out.
 // "db" uses the Analyser's power spectral density view, where every series is a line on a dB axis,
 // which makes the attenuation of each filter easy to read.
 
@@ -35,6 +37,19 @@ function envelopePoints(magnitudes, binHz, scale) {
     points.push({ x: ((i + end - 1) / 2) * binHz, y: peak * scale });
   }
   return points;
+}
+
+export const BAR_SOURCES = Object.freeze({
+  unfiltered: "Unfiltered Gyro",
+  logged: "Logged Filtered Gyro",
+  imagined: "Imagined Gyro",
+});
+
+/** The samples for the bars: show.barsSource if it's available, otherwise the unfiltered gyro. */
+export function barSamples(data, imagined, axis, source) {
+  if (source === "logged" && data.logged) return { source, samples: data.logged[axis] };
+  if (source === "imagined" && imagined) return { source, samples: imagined.filtered[axis] };
+  return { source: "unfiltered", samples: data.raw[axis] };
 }
 
 function series(data, imagined, axis, show) {
@@ -71,6 +86,8 @@ function buildLinear({ data, imagined, axis, range, rateHz, show, analyserStyle 
   const raw = amplitudeSpectrum(data.raw[axis], start, end, 2048, spectrumOptions);
   const bins = raw.binCount;
   const binHz = rateHz / 2 / bins;
+  const bar = barSamples(data, imagined, axis, show.barsSource);
+  const barSpec = bar.source === "unfiltered" ? raw : amplitudeSpectrum(bar.samples, start, end, 2048, spectrumOptions);
 
   let peak = 0;
   const firstScaleBin = Math.ceil(SCALE_FROM_HZ / binHz);
@@ -78,17 +95,17 @@ function buildLinear({ data, imagined, axis, range, rateHz, show, analyserStyle 
   let maxNoiseIdx = firstNoiseBin;
   for (let i = firstScaleBin; i < bins; i++) {
     if (raw.magnitudes[i] > peak) peak = raw.magnitudes[i];
-    if (i >= firstNoiseBin && raw.magnitudes[i] > raw.magnitudes[maxNoiseIdx]) maxNoiseIdx = i;
+    if (i >= firstNoiseBin && barSpec.magnitudes[i] > barSpec.magnitudes[maxNoiseIdx]) maxNoiseIdx = i;
   }
   let scale = peak > 0 ? TARGET_HEIGHT / peak : 1;
   if (analyserStyle) scale = 1 / curve.half;
 
   const scaled = new Float64Array(bins);
-  for (let i = 0; i < bins; i++) scaled[i] = raw.magnitudes[i] * scale;
+  for (let i = 0; i < bins; i++) scaled[i] = barSpec.magnitudes[i] * scale;
 
   const fftData = {
     fieldIndex: axis,
-    fieldName: `Unfiltered Gyro [${AXIS_NAMES[axis].toLowerCase()}]`,
+    fieldName: `${BAR_SOURCES[bar.source]} [${AXIS_NAMES[axis].toLowerCase()}]`,
     fftLength: bins,
     fftOutput: scaled,
     maxNoiseFrequency: maxNoiseIdx * binHz,
@@ -98,7 +115,8 @@ function buildLinear({ data, imagined, axis, range, rateHz, show, analyserStyle 
   const curves = [];
   const colors = [];
   for (const s of series(data, imagined, axis, show)) {
-    const spec = s.samples === data.raw[axis] ? raw : amplitudeSpectrum(s.samples, start, end, 2048, spectrumOptions);
+    const spec =
+      s.samples === data.raw[axis] ? raw : s.samples === bar.samples ? barSpec : amplitudeSpectrum(s.samples, start, end, 2048, spectrumOptions);
     curves.push({
       name: s.style.name,
       points: envelopePoints(spec.magnitudes, binHz, scale),
@@ -157,7 +175,8 @@ function buildDb({ data, imagined, axis, range, rateHz, show }) {
 /**
  * @param {object} p
  *   data, imagined, axis, range {start, end}, rateHz,
- *   show {unfiltered, imagined, logged}, mode "linear" | "db",
+ *   show {unfiltered, imagined, logged, barsSource: "unfiltered" | "logged" | "imagined"},
+ *   mode "linear" | "db",
  *   analyserStyle null, or {hanning} to draw the Linear view like the main Analyser
  * @returns {{fftData, curves, colors}}
  */

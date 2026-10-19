@@ -33,12 +33,22 @@
           :title="analyserStyleTitle"
           :disabled="mode === 'db'"
         />
-        <UCheckbox
-          v-model="show.bars"
-          label="Bars"
-          title="Show the unfiltered spectrum as bars behind the lines"
-          :disabled="mode === 'db'"
-        />
+        <div class="flex items-center gap-1.5">
+          <UCheckbox
+            v-model="show.bars"
+            label="Bars"
+            title="Show a spectrum as bars behind the lines"
+            :disabled="mode === 'db'"
+          />
+          <USelect
+            v-model="show.barsSource"
+            :items="barSourceItems"
+            size="xs"
+            class="w-32"
+            :disabled="mode === 'db' || !show.bars"
+            title="Which gyro the bars show. The height scale stays the unfiltered gyro's, so filtered bars show how much the filters remove."
+          />
+        </div>
         <UCheckbox v-model="show.unfiltered" label="Unfiltered line" :disabled="mode === 'db'" />
         <UCheckbox v-model="show.imagined" :disabled="!store.imagined">
           <template #label><span :style="{ color: CURVE_STYLE.imagined.color }">Imagined</span></template>
@@ -68,7 +78,8 @@
       </div>
 
       <span class="ml-auto text-xs text-dimmed">
-        <template v-if="zoomed">Drag or scroll to move around · </template>Hold Shift for harmonics, Ctrl for rotor lines
+        <template v-if="zoomed">Drag or scroll to move around · </template>Hold Shift for harmonics, Ctrl for rotor lines ·
+        <span title="Show the harmonics (N) or the main / tail / motor rotor lines (J) of the average headspeed over the analysed range. Press again to hide.">N / J at avg headspeed</span>
       </span>
     </div>
 
@@ -117,6 +128,12 @@
         Settings changed. Press Imagine to update the orange curve.
       </div>
       <div
+        v-if="pinMessage"
+        class="pointer-events-none absolute bottom-8 left-1/2 -translate-x-1/2 rounded bg-neutral-800/90 px-3 py-1 text-xs text-white"
+      >
+        {{ pinMessage }}
+      </div>
+      <div
         v-if="busy"
         class="pointer-events-none absolute right-3 top-2 rounded bg-neutral-800/80 px-2 py-1 text-xs text-white"
       >
@@ -140,7 +157,16 @@ const container = ref(null);
 const scroller = ref(null);
 const canvas = ref(null);
 const overlay = ref(null);
-const show = reactive({ bars: true, unfiltered: false, imagined: true, logged: false });
+const show = reactive({ bars: true, barsSource: "unfiltered", unfiltered: false, imagined: true, logged: false });
+const barSourceItems = computed(() => [
+  { label: "Unfiltered", value: "unfiltered" },
+  { label: "Logged filtered", value: "logged", disabled: !store.data?.logged },
+  { label: "Imagined", value: "imagined", disabled: !store.imagined },
+]);
+// back to Unfiltered when the chosen data goes (another log, or no Imagine run yet)
+watch(barSourceItems, (items) => {
+  if (items.find((i) => i.value === show.barsSource)?.disabled) show.barsSource = "unfiltered";
+});
 const zoomX = ref(100);
 const zoomY = ref(100);
 const busy = ref(false);
@@ -648,8 +674,93 @@ function clearMouse() {
   draw();
 }
 
+// ---- N / J: the Shift / Ctrl hover lines pinned to the average headspeed (as in the main app) ----
+const HEADSPEED_MIN_RPM = 500; // as headspeed_stats.js: below this the rotor isn't spooled up
+const pinMessage = ref("");
+let pinMessageTimer = null;
+
+function flashPinMessage(text) {
+  pinMessage.value = text;
+  clearTimeout(pinMessageTimer);
+  pinMessageTimer = setTimeout(() => (pinMessage.value = ""), 3500);
+}
+
+/** Average headspeed (rpm) while spooled up over the analysed range, or null. */
+function averageHeadspeed() {
+  const d = store.data;
+  if (!d?.hasHeadspeed || !d.headspeed) return null;
+  let sum = 0;
+  let count = 0;
+  for (let i = store.range.start; i < store.range.end; i++) {
+    const v = d.headspeed[i];
+    if (Number.isFinite(v) && v >= HEADSPEED_MIN_RPM) {
+      sum += v;
+      count++;
+    }
+  }
+  return count ? sum / count : null;
+}
+
+function rotorGearRatios() {
+  const r = store.rotor;
+  return r?.mainGearRatio ? { main: 1 / r.mainGearRatio, tail: r.tailPerHead ?? null } : null;
+}
+
+/** Pins (or re-pins, keeping the mode) the lines; returns false when there's no headspeed. */
+function pinHeadspeed(mode) {
+  const avg = averageHeadspeed();
+  if (avg == null) return false;
+  if (mode === "gearRatio") GraphSpectrumPlot.setRotorGearRatios(rotorGearRatios());
+  GraphSpectrumPlot.setPinnedFundamental(avg / 60, "avg headspeed", mode);
+  return true;
+}
+
+function togglePin(mode) {
+  if (!hasData) return;
+  if (GraphSpectrumPlot.getPinnedFundamental()?.mode === mode) {
+    GraphSpectrumPlot.setPinnedFundamental(null);
+    pinMessage.value = "";
+    draw();
+    return;
+  }
+  pinMessage.value = "";
+  if (!pinHeadspeed(mode)) {
+    flashPinMessage(
+      store.data?.hasHeadspeed
+        ? "The rotor isn't spooled up in the analysed range, so there's no average headspeed."
+        : "This log has no headspeed, so there's no average headspeed to show.",
+    );
+    return;
+  }
+  if (mode === "gearRatio" && !rotorGearRatios()) {
+    flashPinMessage("No craft config loaded: only the main rotor line can be shown.");
+  }
+  draw();
+}
+
+function onKeyDown(e) {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.repeat) return;
+  const t = e.target;
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  if (e.code === "KeyN") togglePin("harmonics");
+  else if (e.code === "KeyJ") togglePin("gearRatio");
+  else return;
+  e.preventDefault();
+}
+
+// Keep pinned lines on the average of the range being analysed
 watch(
-  () => [store.data, store.imagined, store.axis, store.range.start, store.range.end, show.unfiltered, show.imagined, show.logged, mode.value, analyserStyle.value],
+  () => [store.data, store.range.start, store.range.end, store.rotor],
+  () => {
+    const pinned = GraphSpectrumPlot.getPinnedFundamental();
+    if (!pinned) return;
+    if (!pinHeadspeed(pinned.mode)) GraphSpectrumPlot.setPinnedFundamental(null);
+    draw();
+  },
+);
+
+watch(
+  () => [store.data, store.imagined, store.axis, store.range.start, store.range.end, show.unfiltered, show.imagined, show.logged, show.barsSource, mode.value, analyserStyle.value],
   rebuild,
 );
 watch(() => store.settings, updateMarkers, { deep: true });
@@ -672,6 +783,7 @@ watch(zoomX, () => {
 watch([zoomY, mode], () => layout());
 
 onMounted(() => {
+  window.addEventListener("keydown", onKeyDown);
   GraphSpectrumPlot.initialize(canvas.value, markerSysConfig(store.settings, store.chartOverlays));
   GraphSpectrumPlot.setOverdraw(SPECTRUM_OVERDRAW_TYPE.GYRO_FILTERS);
   GraphSpectrumPlot.setFullScreen(true);
@@ -684,6 +796,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
+  window.removeEventListener("keydown", onKeyDown);
+  clearTimeout(pinMessageTimer);
 });
 </script>
 
