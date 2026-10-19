@@ -53,6 +53,9 @@ export const GraphSpectrumPlot = {
   _sysConfig: null,
   _zoomX: 1.0,
   _zoomY: 1.0,
+  // Frequency grid lines/labels across the plot. Imagine raises it when it draws the plot wider
+  // than its scrolling view, so the visible part still has labels.
+  _xTicks: 5,
   // _minPSD, _maxPSD, _lowLevelPSD will initialize later in FlightLogAnalyser from stored settings
   _minPSD: 0,
   _maxPSD: 0,
@@ -125,6 +128,11 @@ GraphSpectrumPlot.setLowLevelPSD = function (lowLevel) {
     this._invalidateCache();
     this._invalidateDataCache();
   }
+};
+
+GraphSpectrumPlot.setXTicks = function (ticks) {
+  this._xTicks = Math.max(1, Math.round(ticks) || 5);
+  this._invalidateCache();
 };
 
 GraphSpectrumPlot.setSize = function (width, height) {
@@ -1246,7 +1254,7 @@ GraphSpectrumPlot._drawHorizontalGridLines = function (
   MARGIN_UP_LABEL,
   unitsLabel,
 ) {
-  const TICKS = 5;
+  const TICKS = this._xTicks || 5;
   const ticksInterval = maxValue / TICKS;
 
   let currentTick = 0;

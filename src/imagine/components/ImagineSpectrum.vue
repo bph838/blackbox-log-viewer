@@ -55,14 +55,52 @@
           <span>Zoom Y</span>
           <USlider v-model="zoomY" :min="10" :max="1000" :step="10" class="w-24" @dblclick="zoomY = 100" />
         </template>
+        <UButton
+          icon="i-lucide-rotate-ccw"
+          label="Reset"
+          size="xs"
+          variant="ghost"
+          color="neutral"
+          :disabled="zoomX === 100 && zoomY === 100"
+          title="Put both zooms back to 100%"
+          @click="resetZoom"
+        />
       </div>
 
-      <span class="ml-auto text-xs text-dimmed">Hold Shift for harmonics, Ctrl for rotor lines</span>
+      <span class="ml-auto text-xs text-dimmed">
+        <template v-if="zoomed">Drag or scroll to move around · </template>Hold Shift for harmonics, Ctrl for rotor lines
+      </span>
     </div>
 
     <div ref="container" class="relative min-h-0 flex-1 bg-black">
-      <canvas ref="canvas" class="absolute inset-0" @mousemove="onMouseMove" @mouseleave="onMouseLeave" />
-      <canvas ref="overlay" class="pointer-events-none absolute inset-0" />
+      <!-- Zoomed in, the plot is drawn larger than the view and scrolls (see layout()) -->
+      <div
+        ref="scroller"
+        class="spectrum-scroller absolute inset-0"
+        :class="zoomed ? 'overflow-auto' : 'overflow-hidden'"
+        @wheel="onWheel"
+        @scroll="onScroll"
+      >
+        <div class="relative" :style="{ width: `${plotSize.width}px`, height: `${plotSize.height}px` }">
+          <canvas
+            ref="canvas"
+            class="absolute inset-0"
+            :class="{ 'cursor-grab': zoomed && !panning, 'cursor-grabbing': panning }"
+            @mousemove="onMouseMove"
+            @mouseleave="onMouseLeave"
+            @pointerdown="startPan"
+          />
+          <canvas ref="overlay" class="pointer-events-none absolute inset-0" />
+        </div>
+      </div>
+      <!-- the plot's own frequency labels are at its bottom: pinned here while scrolled up from it -->
+      <div
+        v-if="ruler.length"
+        class="pointer-events-none absolute inset-x-0 h-5 bg-black/70 font-mono text-[11px] text-white"
+        :style="{ bottom: `${scrollbarSize || 0}px` }"
+      >
+        <span v-for="t in ruler" :key="t.hz" class="absolute top-0.5 -translate-x-1/2" :style="{ left: `${t.x}px` }">{{ t.hz }}Hz</span>
+      </div>
       <div
         v-if="hover"
         class="pointer-events-none absolute top-2 rounded bg-neutral-900/85 px-2 py-1 font-mono text-xs leading-tight text-white"
@@ -89,7 +127,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useSettingsStore } from "../../stores/settings.js";
 import { GraphSpectrumPlot, SPECTRUM_OVERDRAW_TYPE, SPECTRUM_TYPE } from "../../graph_spectrum_plot.js";
 import { AXIS_NAMES, useImagineStore } from "../imagine_store.js";
@@ -99,6 +137,7 @@ import { rpmNotchMarkers } from "../rpm_overlay.js";
 
 const store = useImagineStore();
 const container = ref(null);
+const scroller = ref(null);
 const canvas = ref(null);
 const overlay = ref(null);
 const show = reactive({ bars: true, unfiltered: false, imagined: true, logged: false });
@@ -137,6 +176,7 @@ const analyserStyleTitle = computed(
     "Off: Hann window and the tallest peak scaled to fit.",
 );
 let hasData = false;
+const hasPlot = ref(false); // hasData, for computeds
 let resizeObserver = null;
 let mouseActive = false;
 
@@ -194,7 +234,7 @@ function drawOverlays() {
     marginLeft,
     W,
     H: c.height - 10, // plot MARGIN
-    maxHz: (0.5 * store.rates.logRateHz) / (zoomX.value / 100),
+    maxHz: 0.5 * store.rates.logRateHz, // the whole plot; zooming makes it wider instead
   };
   g.xOf = (f) => marginLeft + (f / g.maxHz) * W;
   // text on a dark box so it stays readable over the bars and the Analyser's own labels
@@ -365,13 +405,154 @@ function drawDynNotch(g) {
   }
 }
 
-function resize() {
+// ---- Zoom and scrolling ----
+// Rather than the Analyser's zoom (which always shows from 0 Hz and clips tall peaks), the plot
+// is drawn zoomX times wider - and in Linear, up to zoomY times taller - than the view, inside a
+// scrolling box, so any part of it can be reached. Past MAX_PLOT_PIXELS the extra Y zoom goes back
+// to the Analyser's (clipping) zoom, to keep the canvases a sensible size.
+const MAX_PLOT_PIXELS = 24e6;
+const plotSize = reactive({ width: 1, height: 1 });
+const zoomed = computed(() => zoomX.value > 100 || (mode.value === "linear" && zoomY.value > 100));
+const panning = ref(false);
+const scrollbarSize = ref(null);
+const scrollPos = reactive({ left: 0, top: 0, viewW: 0, viewH: 0 });
+
+function onScroll() {
+  const sc = scroller.value;
+  if (!sc) return;
+  scrollPos.left = sc.scrollLeft;
+  scrollPos.top = sc.scrollTop;
+  scrollPos.viewW = sc.clientWidth;
+  scrollPos.viewH = sc.clientHeight;
+}
+
+// Frequency labels for the visible part of the plot, at round steps.
+const ruler = computed(() => {
+  if (!zoomed.value || !store.rates || !hasPlot.value) return [];
+  if (plotSize.height - scrollPos.top - scrollPos.viewH < 24) return []; // the plot's own are in view
+  const marginLeft = GraphSpectrumPlot._getActualMarginLeft();
+  const maxHz = 0.5 * store.rates.logRateHz;
+  const hzPerPx = maxHz / Math.max(1, plotSize.width - marginLeft);
+  const span = scrollPos.viewW * hzPerPx;
+  const step = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500].find((st) => span / st <= 8) ?? 1000;
+  const ticks = [];
+  for (let hz = Math.ceil((scrollPos.left - marginLeft) * hzPerPx / step) * step; hz <= maxHz; hz += step) {
+    const x = marginLeft + hz / hzPerPx - scrollPos.left;
+    if (x > scrollPos.viewW - 20) break;
+    if (x >= 20) ticks.push({ hz, x });
+  }
+  return ticks;
+});
+
+// About 5 grid lines per view width, at a round step that divides the whole range (the plot
+// spaces its labels evenly from 0 Hz to the end).
+function xTickCount(fx) {
+  const maxHz = store.rates ? 0.5 * store.rates.logRateHz : 0;
+  const want = 5 * fx;
+  if (!maxHz) return Math.round(want);
+  let best = null;
+  for (let t = Math.max(1, Math.floor(want * 0.6)); t <= Math.ceil(want * 1.6); t++) {
+    const step = maxHz / t;
+    if (!Number.isInteger(step)) continue;
+    const roundness = step % 10 === 0 ? 0 : step % 5 === 0 ? 1 : 2;
+    const score = roundness * 10 + Math.abs(t - want) / want;
+    if (!best || score < best.score) best = { t, score };
+  }
+  return best ? best.t : Math.round(want);
+}
+
+function measureScrollbar() {
+  const probe = document.createElement("div");
+  probe.className = "spectrum-scroller";
+  probe.style.cssText = "position:absolute;visibility:hidden;width:100px;height:100px;overflow:scroll";
+  document.body.appendChild(probe);
+  const size = probe.offsetWidth - probe.clientWidth;
+  probe.remove();
+  return size;
+}
+
+function layout() {
   const el = container.value;
-  if (!el || !canvas.value) return;
-  const width = Math.max(1, Math.floor(el.clientWidth));
-  const height = Math.max(1, Math.floor(el.clientHeight));
+  const sc = scroller.value;
+  if (!el || !sc || !canvas.value) return;
+  if (scrollbarSize.value === null) scrollbarSize.value = measureScrollbar();
+  const bar = scrollbarSize.value;
+
+  const fx = zoomX.value / 100;
+  const zy = mode.value === "linear" ? zoomY.value / 100 : 1;
+  const viewW = Math.max(1, Math.floor(el.clientWidth));
+  const viewH = Math.max(1, Math.floor(el.clientHeight));
+  // room for the scrollbar(s) that will appear
+  const tallerWanted = zy > 1;
+  const w = Math.max(1, viewW - (tallerWanted ? bar : 0));
+  const h = Math.max(1, viewH - (fx > 1 ? bar : 0));
+  const width = Math.round(w * fx);
+  const fy = tallerWanted ? Math.max(1, Math.min(zy, MAX_PLOT_PIXELS / (width * h))) : 1;
+  const height = Math.round(h * fy);
+
+  // keep the frequency at the left of the view (0 Hz to start with, as the Analyser's zoom) and
+  // the distance from the bottom in place
+  const leftX = sc.scrollWidth > 0 ? sc.scrollLeft / sc.scrollWidth : 0;
+  const fromBottom = sc.scrollHeight > 0 ? (sc.scrollHeight - sc.scrollTop - sc.clientHeight) / sc.scrollHeight : 0;
+
+  plotSize.width = width;
+  plotSize.height = height;
+  GraphSpectrumPlot.setXTicks(xTickCount(fx));
+  // zoomY < 1 magnifies in the Analyser; whatever the taller canvas doesn't cover is left to it
+  GraphSpectrumPlot.setZoom(1, mode.value === "linear" ? fy / zy : 100 / zoomY.value);
   GraphSpectrumPlot.setSize(width, height);
   draw();
+
+  nextTick(() => {
+    sc.scrollLeft = leftX * sc.scrollWidth;
+    sc.scrollTop = sc.scrollHeight - sc.clientHeight - fromBottom * sc.scrollHeight;
+    onScroll();
+  });
+}
+
+function resize() {
+  layout();
+}
+
+function resetZoom() {
+  zoomX.value = 100;
+  zoomY.value = 100;
+}
+
+// The mouse wheel scrolls up/down when the plot is taller than the view, otherwise sideways.
+function onWheel(e) {
+  const sc = scroller.value;
+  if (!sc || !zoomed.value || e.ctrlKey) return;
+  const canScrollY = sc.scrollHeight > sc.clientHeight;
+  const canScrollX = sc.scrollWidth > sc.clientWidth;
+  if (!canScrollY && canScrollX && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+    sc.scrollLeft += e.deltaY;
+    e.preventDefault();
+  }
+}
+
+// Drag the plot to move around it.
+function startPan(e) {
+  const sc = scroller.value;
+  if (!zoomed.value || !sc || e.button !== 0 || e.shiftKey || e.ctrlKey) return;
+  const start = { x: e.clientX, y: e.clientY, left: sc.scrollLeft, top: sc.scrollTop };
+  const target = e.currentTarget;
+  target.setPointerCapture?.(e.pointerId);
+  panning.value = true;
+  const move = (ev) => {
+    sc.scrollLeft = start.left - (ev.clientX - start.x);
+    sc.scrollTop = start.top - (ev.clientY - start.y);
+  };
+  const up = () => {
+    panning.value = false;
+    target.removeEventListener("pointermove", move);
+    target.removeEventListener("pointerup", up);
+    target.removeEventListener("pointercancel", up);
+  };
+  target.addEventListener("pointermove", move);
+  target.addEventListener("pointerup", up);
+  target.addEventListener("pointercancel", up);
+  e.preventDefault();
 }
 
 function rebuild() {
@@ -397,6 +578,7 @@ function rebuild() {
       );
       GraphSpectrumPlot.setOverlayCurves(view.curves);
       hasData = true;
+      hasPlot.value = true;
       draw();
     } finally {
       busy.value = false;
@@ -410,7 +592,7 @@ function updateMarkers() {
 }
 
 // Frequency under the mouse, shown in the top left of the chart. The plot's x axis runs from 0 Hz
-// at its left margin to (log rate / 2) / zoom at the right edge.
+// at its left margin to log rate / 2 at the right edge of the (possibly scrolled) plot.
 const hover = ref(null);
 
 function updateHover(e) {
@@ -426,7 +608,7 @@ function updateHover(e) {
     hover.value = null;
     return;
   }
-  const maxHz = (0.5 * store.rates.logRateHz) / (zoomX.value / 100);
+  const maxHz = 0.5 * store.rates.logRateHz; // across the whole (possibly scrolled) plot
   const hz = (x / width) * maxHz;
   const head = store.rotorSpeeds?.head;
   hover.value = {
@@ -483,15 +665,11 @@ watch(
     draw();
   },
 );
-watch(zoomX, (v) => {
-  GraphSpectrumPlot.setZoom(v / 100, 100 / zoomY.value);
+watch(zoomX, () => {
   GraphSpectrumPlot.setMousePosition(0, 0);
-  draw();
+  layout();
 });
-watch(zoomY, (v) => {
-  GraphSpectrumPlot.setZoom(zoomX.value / 100, 100 / v);
-  draw();
-});
+watch([zoomY, mode], () => layout());
 
 onMounted(() => {
   GraphSpectrumPlot.initialize(canvas.value, markerSysConfig(store.settings, store.chartOverlays));
@@ -508,3 +686,10 @@ onBeforeUnmount(() => {
   resizeObserver?.disconnect();
 });
 </script>
+
+<style>
+.spectrum-scroller {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.3) transparent;
+}
+</style>
