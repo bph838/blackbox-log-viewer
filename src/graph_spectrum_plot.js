@@ -56,6 +56,9 @@ export const GraphSpectrumPlot = {
   // Frequency grid lines/labels across the plot. Imagine raises it when it draws the plot wider
   // than its scrolling view, so the visible part still has labels.
   _xTicks: 5,
+  // Leave the lowpass/notch filter labels off (their lines still draw). Imagine shows them itself,
+  // only for the filter under the mouse.
+  _hideFilterLabels: false,
   // _minPSD, _maxPSD, _lowLevelPSD will initialize later in FlightLogAnalyser from stored settings
   _minPSD: 0,
   _maxPSD: 0,
@@ -128,6 +131,11 @@ GraphSpectrumPlot.setLowLevelPSD = function (lowLevel) {
     this._invalidateCache();
     this._invalidateDataCache();
   }
+};
+
+GraphSpectrumPlot.setHideFilterLabels = function (hide) {
+  this._hideFilterLabels = !!hide;
+  this._invalidateCache();
 };
 
 GraphSpectrumPlot.setXTicks = function (ticks) {
@@ -1590,7 +1598,7 @@ GraphSpectrumPlot._drawLowpassFilter = function (
   stroke,
   lineWidth,
 ) {
-  const lpfLabel = `${label} ${frequency.toFixed(0)}Hz`;
+  const lpfLabel = this._hideFilterLabels ? null : `${label} ${frequency.toFixed(0)}Hz`;
   return this._drawVerticalMarkerLine(
     canvasCtx,
     frequency,
@@ -1618,9 +1626,9 @@ GraphSpectrumPlot._drawLowpassDynFilter = function (
   lineWidth,
 ) {
   // frequency1 line with label
-  const dynFilterLabel = `${label} ${frequency1.toFixed(
-    0,
-  )}-${frequency2.toFixed(0)}Hz`;
+  const dynFilterLabel = this._hideFilterLabels
+    ? null
+    : `${label} ${frequency1.toFixed(0)}-${frequency2.toFixed(0)}Hz`;
   const x1 = this._drawVerticalMarkerLine(
     canvasCtx,
     frequency1,
@@ -1750,9 +1758,9 @@ GraphSpectrumPlot._drawNotchFilter = function (
   canvasCtx.stroke();
 
   // center with label
-  const labelNotch = `${label} center ${center.toFixed(
-    0,
-  )}Hz, cutoff ${cutoff.toFixed(0)}Hz`;
+  const labelNotch = this._hideFilterLabels
+    ? null
+    : `${label} center ${center.toFixed(0)}Hz, cutoff ${cutoff.toFixed(0)}Hz`;
   this._drawVerticalMarkerLine(
     canvasCtx,
     center,

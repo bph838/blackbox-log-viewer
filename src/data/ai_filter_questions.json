@@ -4,6 +4,7 @@
     "Look at my noise and suggest a first step.",
     "Can I reduce filter delay without letting more noise through?",
     "Is my RPM filter set up well for these peaks?",
-    "Are there any unnecessary duplicate or overlapping filters that are being applied?"
+    "Are there any unnecessary duplicate or overlapping filters that are being applied?",
+    "Are there any filters that could be tighted up?"
   ]
 }

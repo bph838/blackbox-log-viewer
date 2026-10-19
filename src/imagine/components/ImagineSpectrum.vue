@@ -151,6 +151,7 @@ import { AXIS_NAMES, useImagineStore } from "../imagine_store.js";
 import { buildSpectrumView, CURVE_STYLE, markerSysConfig } from "../spectrum_view.js";
 import { dynNotchStats, notchLowerCutoff } from "../dyn_notch_overlay.js";
 import { rpmNotchMarkers } from "../rpm_overlay.js";
+import { FILTER_TYPE } from "../../flightlog_fielddefs.js";
 
 const store = useImagineStore();
 const container = ref(null);
@@ -263,6 +264,13 @@ function drawOverlays() {
     maxHz: 0.5 * store.rates.logRateHz, // the whole plot; zooming makes it wider instead
   };
   g.xOf = (f) => marginLeft + (f / g.maxHz) * W;
+  // Filter text only for what's under the mouse: hovered(lo, hi) says whether the mouse is
+  // between two frequencies (with a few pixels' slack), and show() queues a label for it.
+  const slackHz = (6 / Math.max(1, W)) * g.maxHz;
+  const at = hoverHz.value;
+  g.hovered = (lo, hi = lo) => at != null && at >= lo - slackHz && at <= hi + slackHz;
+  g.labels = [];
+  g.show = (text, hz, color, alpha = 1) => g.labels.push({ text, hz, color, alpha });
   // text on a dark box so it stays readable over the bars and the Analyser's own labels
   g.label = (text, x, y, color, alpha = 1) => {
     const w = ctx.measureText(text).width + 6;
@@ -279,7 +287,40 @@ function drawOverlays() {
   if (store.chartOverlays.rpmMin) drawRpmMinimum(g);
   if (store.chartOverlays.rpm) drawRpmNotches(g);
   if (store.chartOverlays.dynNotch) drawDynNotch(g);
+  queueStaticFilterLabels(g);
+  // hovered labels stacked from the top of the visible part (the plot may be scrolled), each
+  // starting at its filter but clear of the frequency readout in the top left corner
+  const readoutRight = scrollPos.left + marginLeft + 150;
+  g.labels.forEach((l, i) => {
+    const y = scrollPos.top + 16 + i * 15;
+    const x = Math.max(g.xOf(l.hz) + 4, y - scrollPos.top < 75 ? readoutRight : 0);
+    g.label(l.text, x, y, l.color, l.alpha);
+  });
   ctx.restore();
+}
+
+// The lowpass and static notch labels the plot would draw (it's told not to - see onMounted),
+// for the one under the mouse.
+const LPF_COLOR = "94, 194, 98";
+const NOTCH_COLOR = "45, 212, 191";
+function queueStaticFilterLabels(g) {
+  const sc = markerSysConfig(store.settings, store.chartOverlays);
+  const typeName = (t) => FILTER_TYPE[t] ?? t;
+  const [dynMin, dynMax] = sc.gyro_lowpass_dyn_hz;
+  if (dynMin > 0 && dynMax > dynMin) {
+    if (g.hovered(dynMin, dynMax)) g.show(`GYRO LPF (${typeName(sc.gyro_soft_type)}) Dyn cutoff ${dynMin}-${dynMax}Hz`, dynMin, LPF_COLOR);
+  } else if (sc.gyro_lowpass_hz > 0 && g.hovered(sc.gyro_lowpass_hz)) {
+    g.show(`GYRO LPF (${typeName(sc.gyro_soft_type)}) cutoff ${sc.gyro_lowpass_hz}Hz`, sc.gyro_lowpass_hz, LPF_COLOR);
+  }
+  if (sc.gyro_lowpass2_hz > 0 && g.hovered(sc.gyro_lowpass2_hz)) {
+    g.show(`GYRO LPF2 (${typeName(sc.gyro_soft2_type)}) cutoff ${sc.gyro_lowpass2_hz}Hz`, sc.gyro_lowpass2_hz, LPF_COLOR);
+  }
+  sc.gyro_notch_hz.forEach((hz, i) => {
+    const cutoff = sc.gyro_notch_cutoff[i];
+    if (hz > 0 && cutoff > 0 && g.hovered(cutoff, 2 * hz - cutoff)) {
+      g.show(`GYRO Notch ${i + 1} center ${hz}Hz, cutoff ${cutoff}Hz`, hz, NOTCH_COLOR);
+    }
+  });
 }
 
 // The RPM filter's Minimum Frequency: below the line notches are off (parked at the minimum),
@@ -307,7 +348,9 @@ function drawRpmMinimum(g) {
   ctx.lineTo(x0, H);
   ctx.stroke();
   ctx.setLineDash([]);
-  g.label(`RPM min ${minHz} Hz · fades in to ${fadeHz.toFixed(fadeHz % 1 ? 1 : 0)} Hz`, x0 + 4, H - 46, RPM_COLOR, 0.9);
+  if (g.hovered(minHz, fadeHz)) {
+    g.show(`RPM min ${minHz} Hz · fades in to ${fadeHz.toFixed(fadeHz % 1 ? 1 : 0)} Hz`, minHz, RPM_COLOR);
+  }
 }
 
 // Each RPM notch as a triangle from its cutoff up to its centre, like the static notches. A notch
@@ -316,7 +359,7 @@ function drawRpmMinimum(g) {
 function drawRpmNotches(g) {
   const markers = rpmMarkers.value;
   if (!markers.length) return;
-  const { ctx, H, xOf, label } = g;
+  const { ctx, H, xOf } = g;
   const hl = store.rpmHighlight && store.rpmHighlight.axis === store.axis ? store.rpmHighlight : null;
   const isHl = (m) => !!hl && ((hl.sources && hl.sources.includes(m.source)) || (hl.slots && hl.slots.includes(m.slot)));
   const top = 55;
@@ -342,22 +385,13 @@ function drawRpmNotches(g) {
     }
   }
 
-  // labels only for the hovered row, so a full bank stays readable
-  const labelled = markers.filter(isHl);
-  labelled.forEach((m, i) => {
+  // labels only for the notch under the mouse or the hovered settings row
+  for (const m of markers) {
+    if (!isHl(m) && !g.hovered(m.cutoffHz, 2 * m.hz - m.cutoffHz)) continue;
     const fade = m.fader < 1 ? ` · only ${Math.round(m.fader * 100)}% (fading in above ${store.settings.rpm.minHz} Hz)` : "";
     const spread = m.spread ? ` · moves ${m.spread[0].toFixed(0)}–${m.spread[1].toFixed(0)} Hz` : "";
-    label(`${m.name} ${m.hz.toFixed(1)} Hz Q${m.q.toFixed(1)}${fade}${spread}`, xOf(m.hz) + 4, H - 44 - i * 15, RPM_COLOR);
-  });
-  if (!labelled.length) {
-    const axisName = ["roll", "pitch", "yaw"][store.axis];
-    label(
-      `RPM notches (${axisName}) at ${Math.round(store.rotorSpeeds.head)} rpm - hover a notch row to see it`,
-      g.marginLeft + 4,
-      H - 28,
-      RPM_COLOR,
-      0.9,
-    );
+    const rpm = store.rotorSpeeds?.head ? ` at ${Math.round(store.rotorSpeeds.head)} rpm` : "";
+    g.show(`RPM ${m.name} ${m.hz.toFixed(1)} Hz Q${m.q.toFixed(1)}${rpm}${fade}${spread}`, m.hz, RPM_COLOR);
   }
 }
 
@@ -369,8 +403,7 @@ function drawDynNotch(g) {
   const dn = store.settings.dynNotch;
   const stats = dynStats.value;
   if (!dn?.enabled && !stats) return;
-  const { ctx, H, xOf, W, maxHz, marginLeft } = g;
-  const label = (text, x, y, alpha = 1) => g.label(text, x, y, DYN_COLOR, alpha);
+  const { ctx, H, xOf, W, maxHz } = g;
 
   // range band for the current settings
   if (dn?.enabled) {
@@ -390,8 +423,10 @@ function drawDynNotch(g) {
     ctx.lineTo(x1, H);
     ctx.stroke();
     ctx.setLineDash([]);
-    const note = stats ? "" : " · press Imagine to see the notches";
-    label(`Dynamic notch range ${min}–${max} Hz${note}`, x0 + 4, 12);
+    if (g.hovered(min) || g.hovered(max)) {
+      const note = stats ? "" : " · press Imagine to see the notches";
+      g.show(`Dynamic notch range ${min}–${max} Hz${note}`, min, DYN_COLOR);
+    }
   }
 
   // tracked notches from the last Imagine run
@@ -412,7 +447,10 @@ function drawDynNotch(g) {
       ctx.lineTo(xOf(f), apexY);
       ctx.lineTo(xOf(2 * f - cutoff), H);
       ctx.stroke();
-      label(`DN${p + 1} ${f.toFixed(0)} Hz Q${q.toFixed(1)}`, xOf(f) + 4, apexY, dirty ? 0.6 : 1);
+      if (g.hovered(cutoff, 2 * f - cutoff)) {
+        const from = dirty ? " · from the last Imagine run" : "";
+        g.show(`Dynamic notch ${p + 1} ${f.toFixed(0)} Hz Q${q.toFixed(1)}${from}`, f, DYN_COLOR, dirty ? 0.8 : 1);
+      }
     });
 
     // time spent at each frequency
@@ -424,9 +462,6 @@ function drawDynNotch(g) {
         ctx.fillStyle = `rgba(${DYN_COLOR}, ${0.15 + 0.85 * (v / stats.maxBin)})`;
         ctx.fillRect(xOf(b * stats.binHz), H - 7, binW, 7);
       }
-    }
-    if (dirty) {
-      label("Dynamic notches from the last Imagine run", marginLeft + 4, H - 16, 0.8);
     }
   }
 }
@@ -620,6 +655,7 @@ function updateMarkers() {
 // Frequency under the mouse, shown in the top left of the chart. The plot's x axis runs from 0 Hz
 // at its left margin to log rate / 2 at the right edge of the (possibly scrolled) plot.
 const hover = ref(null);
+const hoverHz = computed(() => hover.value?.hz ?? null);
 
 function updateHover(e) {
   if (!hasData || !store.rates || !canvas.value) {
@@ -765,7 +801,7 @@ watch(
 );
 watch(() => store.settings, updateMarkers, { deep: true });
 watch(
-  () => [store.chartOverlays.dynNotch, store.chartOverlays.rpm, store.chartOverlays.rpmMin, dynStats.value, store.rpmHighlight, rpmMarkers.value],
+  () => [store.chartOverlays.dynNotch, store.chartOverlays.rpm, store.chartOverlays.rpmMin, dynStats.value, store.rpmHighlight, rpmMarkers.value, hoverHz.value],
   () => drawOverlays(),
 );
 watch(() => [store.chartOverlays.lowpass, store.chartOverlays.notch], updateMarkers);
@@ -788,6 +824,7 @@ onMounted(() => {
   GraphSpectrumPlot.setOverdraw(SPECTRUM_OVERDRAW_TYPE.GYRO_FILTERS);
   GraphSpectrumPlot.setFullScreen(true);
   GraphSpectrumPlot.setShowMainBars(show.bars);
+  GraphSpectrumPlot.setHideFilterLabels(true);
   resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(container.value);
   resize();
@@ -796,6 +833,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
+  GraphSpectrumPlot.setHideFilterLabels(false);
   window.removeEventListener("keydown", onKeyDown);
   clearTimeout(pinMessageTimer);
 });
