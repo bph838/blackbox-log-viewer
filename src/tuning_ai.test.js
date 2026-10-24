@@ -63,13 +63,39 @@ describe("buildHistoryMessages", () => {
     log.entries[3].config = "p: 0";
     log.entries[3].notes = "windy";
     const messages = buildHistoryMessages(log, null, 0);
-    expect(messages.map((m) => (m.role === "user" ? m.content[0].text.match(/p: \d/)[0] : m.content))).toEqual([
+    expect(messages.map((m) => (m.role === "user" ? m.content[0].text.match(/p: \d|unchanged since/)[0] : m.content))).toEqual([
       "p: 0",
-      "p: 0",
+      "unchanged since",
       "answer",
-      "p: 0",
+      "unchanged since",
       "p: 4",
     ]);
+  });
+
+  it("sends the first entry's whole config, then only what changed", () => {
+    const log = makeLog(3);
+    log.entries[0].config = 'Log start datetime: "a"\nrollPID: [45,60,20]\ngyro_lowpass_hz: 100';
+    log.entries[1].config = 'Log start datetime: "b"\nrollPID: [50,60,20]\ngyro_lowpass_hz: 100';
+    log.entries[2].config = 'Log start datetime: "c"\nrollPID: [50,60,20]\ngyro_lowpass_hz: 100\nyaw_tta: 10';
+    const texts = buildHistoryMessages(log, null, 0).map((m) => m.content[0].text);
+
+    expect(texts[0]).toContain("gyro_lowpass_hz: 100");
+    expect(texts[1]).toContain("Configuration changes since the previous entry");
+    expect(texts[1]).toContain("rollPID: [50,60,20] (was [45,60,20])");
+    expect(texts[1]).not.toContain("gyro_lowpass_hz");
+    expect(texts[1]).not.toContain("Log start datetime");
+    expect(texts[2]).toContain("yaw_tta: 10 (new)");
+    expect(texts[2]).not.toContain("rollPID");
+  });
+
+  it("drops older images a few at a time, so the history stays the same as entries are added", () => {
+    const firstImage = (count) => buildHistoryMessages(makeLog(count), null, 10).findIndex((m) => imageCount(m));
+    // Images start at entry 0 up to 10 entries, then 5 drop at once and stay dropped for 5 entries.
+    expect([10, 11, 12, 15, 16].map(firstImage)).toEqual([0, 5, 5, 5, 10]);
+    // Never more than the limit.
+    for (let count = 1; count < 30; count++) {
+      expect(buildHistoryMessages(makeLog(count), null, 10).filter(imageCount).length).toBeLessThanOrEqual(10);
+    }
   });
 
   it("keeps each entry's last AI answer as an assistant message", () => {

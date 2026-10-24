@@ -116,6 +116,39 @@ export function configsMatch(a, b) {
 }
 
 /**
+ * The settings in config summary `current` that differ from `previous`, one line each - the
+ * current line with the old value after it ("rollPID: [50,60,20] (was [45,60,20])"), or for a
+ * setting only in `previous`, that it's gone. Per-flight header values are left out.
+ */
+export function configChanges(previous, current) {
+  const parse = (summary) => {
+    const map = new Map();
+    for (const line of String(summary || "").split("\n")) {
+      const at = line.indexOf(": ");
+      const key = at === -1 ? line : line.slice(0, at);
+      if (line && !PER_FLIGHT_CONFIG_KEYS.has(key)) map.set(key, at === -1 ? "" : line.slice(at + 2));
+    }
+    return map;
+  };
+
+  const before = parse(previous);
+  const after = parse(current);
+  const changes = [];
+
+  for (const [key, value] of after) {
+    if (!before.has(key)) {
+      changes.push(`${key}: ${value} (new)`);
+    } else if (before.get(key) !== value) {
+      changes.push(`${key}: ${value} (was ${before.get(key)})`);
+    }
+  }
+  for (const [key, value] of before) {
+    if (!after.has(key)) changes.push(`${key}: (no longer in the log, was ${value})`);
+  }
+  return changes;
+}
+
+/**
  * Entry id -> the chronologically previous entry, for each entry whose config is unchanged from
  * that previous entry (i.e. nothing was re-tuned between the two flights).
  */

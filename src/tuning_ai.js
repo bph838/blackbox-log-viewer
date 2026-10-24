@@ -8,7 +8,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import AI_MODELS from "./data/ai_models.json";
 import { sliceToPromptText, sliceToSummaryText } from "./flight_slice.js";
-import { findSameConfigAsPrevious } from "./tuning_log.js";
+import { configChanges, findSameConfigAsPrevious } from "./tuning_log.js";
 
 const MODELS_BY_ID = {};
 for (const m of AI_MODELS.models) {
@@ -196,7 +196,13 @@ export function buildPromptText(options) {
   return text;
 }
 
-function entryToHistoryContent(entry, includeImage) {
+/**
+ * previousConfig: the config of the history entry sent just before this one, or null for the
+ * first - every later entry only lists the settings that changed since, which is most of what
+ * keeps a long history small (a full config is a few thousand characters, and rarely more than a
+ * few lines change between flights).
+ */
+function entryToHistoryContent(entry, includeImage, previousConfig) {
   const content = [];
 
   if (includeImage && entry.image) {
@@ -210,7 +216,14 @@ function entryToHistoryContent(entry, includeImage) {
   if (!includeImage && entry.image) {
     text += " (graph omitted to save tokens - see the configuration and earlier analysis below)";
   }
-  text += `\n\nConfiguration:\n${entry.config || "(none)"}`;
+  if (previousConfig && entry.config) {
+    const changes = configChanges(previousConfig, entry.config);
+    text += changes.length
+      ? `\n\nConfiguration changes since the previous entry (every other setting unchanged):\n${changes.join("\n")}`
+      : "\n\nConfiguration: unchanged since the previous entry.";
+  } else {
+    text += `\n\nConfiguration:\n${entry.config || "(none)"}`;
+  }
   if (entry.notes) {
     text += `\n\nUser notes: ${entry.notes}`;
   }
@@ -246,8 +259,9 @@ function lastAssistantText(entry) {
  * to follow what it has already advised, or notes the user has written about that flight.
  *
  * maxImages limits how many step response graphs the history carries, to save tokens: only the
- * most recent maxImages history entries keep their image, older ones are sent as text only
- * (config, notes, earlier analysis). null/undefined or a negative value sends every image.
+ * most recent history entries keep their image - at most maxImages, at times a few fewer - older
+ * ones are sent as text only (config changes, notes, earlier analysis). null/undefined or a
+ * negative value sends every image.
  */
 export function buildHistoryMessages(log, excludingEntryId, maxImages) {
   const messages = [];
@@ -260,10 +274,18 @@ export function buildHistoryMessages(log, excludingEntryId, maxImages) {
   );
 
   const sendAllImages = maxImages === null || maxImages === undefined || maxImages < 0;
-  const firstImageIndex = sendAllImages ? 0 : Math.max(0, entries.length - maxImages);
+  // Older images are dropped a few at a time rather than one per new entry: the request is cached
+  // (see streamClaude), and dropping an image changes the history from that entry on - so a
+  // window sliding by one would make every new entry pay full price for the last maxImages graphs
+  // again. Stepped, the history is unchanged apart from what's added, for several entries running.
+  const imageStep = Math.max(1, Math.min(5, Math.ceil(maxImages / 2)));
+  const firstImageIndex = sendAllImages
+    ? 0
+    : Math.ceil(Math.max(0, entries.length - maxImages) / imageStep) * imageStep;
 
   entries.forEach((entry, index) => {
-    messages.push({ role: "user", content: entryToHistoryContent(entry, index >= firstImageIndex) });
+    const previousConfig = index > 0 ? entries[index - 1].config : null;
+    messages.push({ role: "user", content: entryToHistoryContent(entry, index >= firstImageIndex, previousConfig) });
 
     const assistantText = lastAssistantText(entry);
     if (assistantText) {
