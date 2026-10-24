@@ -3,9 +3,22 @@
 //
 //   index.json                                  every log in the repo, grouped by craft - the only
 //                                               file read to find a heli's logs
-//   crafts/<craft-key>/<logId>/log.json         one log's text: entries, notes, AI conversations
+//   crafts/<craft-key>/<logId>/log.json         one log's name, craft, description and deletion
+//                                               tombstones, plus entryFiles: [{ id, hash }] - the
+//                                               list of its entries, in order
+//   crafts/<craft-key>/<logId>/entries/<id>.json one entry's text: config, notes, AI conversation
 //   crafts/<craft-key>/<logId>/images/<id>.png  one step response graph per entry, rewritten only
 //                                               when re-captured (entry.imageUpdatedAt changes)
+//
+// Entries rarely change once added, so each is its own file: adding one uploads just that entry
+// (and its image) plus the small log.json and index.json, and deleting one only rewrites log.json.
+// An entry's hash (of its text) says whether it changed, so a sync only downloads entries whose
+// hash isn't one this computer already has, and only uploads entries whose hash the cloud lacks.
+//
+// Logs uploaded before entries had their own files keep every entry inside log.json ("entries"
+// rather than "entryFiles"). Those are still read, and rewritten in the new layout the next time
+// they're synced (or all at once by migrateLegacyLogs). The whole log as one file is still what
+// Export/Import use (see stores/tuningLog.js exportToFile).
 //
 // sync.cloudUpdated is the log's index.json "updated" stamp when this computer was last in step with
 // the cloud copy, so a different stamp in the index means another computer has changed it since.
@@ -19,6 +32,7 @@
 // computer commits in between, it re-reads, re-merges and tries again.
 
 import { craftKey, mergeLogs, markSynced, stripImages } from "./tuning_log_sync.js";
+import { hashHex } from "./tuning_log.js";
 
 export const INDEX_PATH = "index.json";
 const MAX_ATTEMPTS = 3;
@@ -32,8 +46,127 @@ function logPath(dir) {
   return `${dir}/log.json`;
 }
 
+function entryPath(dir, entryId) {
+  return `${dir}/entries/${entryId}.json`;
+}
+
 function imagePath(dir, entryId) {
   return `${dir}/images/${entryId}.png`;
+}
+
+/** Hash of an entry's text (no image data), as listed in log.json's entryFiles. */
+export function entryHash(entry) {
+  return hashHex(JSON.stringify(entry));
+}
+
+/**
+ * A copy of `object` with key `from` replaced by `to` (set to `value`) in the same position, so
+ * the log reads back with the same key order it was written with (logs are compared as JSON).
+ */
+function replaceKey(object, from, to, value) {
+  const result = {};
+  for (const [key, existing] of Object.entries(object)) {
+    if (key === from) {
+      result[to] = value;
+    } else if (key !== to) {
+      result[key] = existing;
+    }
+  }
+  if (!(from in object)) result[to] = value;
+  return result;
+}
+
+/** Whether a log.json is in the old layout, with every entry inside it. */
+function isLegacyLogFile(json) {
+  // An older version of the app syncing a new-layout log writes "entries" back (keeping a stale
+  // "entryFiles"), so "entries" wins whenever it's there.
+  return Array.isArray(json && json.entries);
+}
+
+/**
+ * Reads a log's log.json and the entry files it lists. Entries whose hash matches one in `known`
+ * (logs this computer already has, without images) are taken from there instead of downloaded.
+ * Resolves null if there's no log.json, otherwise
+ *   { sha, log, legacy, hashes: Map(entryId -> hash) of the entry files in the cloud }
+ * An entry file that's missing is left out (another computer that has the entry will put it back).
+ */
+async function readCloudLog(client, dir, known = []) {
+  const file = await client.getJsonFile(logPath(dir));
+  if (!file) return null;
+
+  const json = file.json || {};
+  if (isLegacyLogFile(json)) {
+    const log = { ...json };
+    delete log.entryFiles;
+    log.deletedEntries = log.deletedEntries || [];
+    // Entry files left from before an older app rewrote it: all rewritten (no hash is trusted),
+    // and any no longer in the log deleted.
+    const stale = Array.isArray(json.entryFiles) ? json.entryFiles : [];
+    return { sha: file.sha, log, legacy: true, hashes: new Map(stale.map((row) => [row.id, null])) };
+  }
+
+  const rows = Array.isArray(json.entryFiles) ? json.entryFiles : [];
+  const knownByHash = new Map();
+  for (const log of known) {
+    for (const entry of (log && log.entries) || []) {
+      knownByHash.set(`${entry.id}:${entryHash(entry)}`, entry);
+    }
+  }
+
+  const entries = new Map();
+  const missing = [];
+  for (const row of rows) {
+    const entry = knownByHash.get(`${row.id}:${row.hash}`);
+    if (entry) {
+      entries.set(row.id, clone(entry));
+    } else {
+      missing.push(row);
+    }
+  }
+
+  await inBatches(missing, DOWNLOAD_CONCURRENCY, async (row) => {
+    const entryFile = await client.getJsonFile(entryPath(dir, row.id));
+    if (entryFile) {
+      entries.set(row.id, entryFile.json);
+    } else {
+      console.warn(`Tuning log entry ${entryPath(dir, row.id)} is missing from the cloud`);
+    }
+  });
+
+  const log = replaceKey(
+    json,
+    "entryFiles",
+    "entries",
+    rows.filter((row) => entries.has(row.id)).map((row) => entries.get(row.id)),
+  );
+  log.deletedEntries = log.deletedEntries || [];
+  return { sha: file.sha, log, legacy: false, hashes: new Map(rows.map((row) => [row.id, row.hash])) };
+}
+
+/**
+ * The files that store `log` (without images) in the new layout, given what the cloud has
+ * (a readCloudLog result, or null): the entry files that changed, entry files to delete, and
+ * log.json - in that order, so with the one-file-at-a-time fallback log.json never lists an entry
+ * whose file isn't there yet.
+ */
+function logFiles(dir, log, cloud) {
+  const files = [];
+  const rows = [];
+  for (const entry of log.entries || []) {
+    const hash = entryHash(entry);
+    rows.push({ id: entry.id, hash });
+    if (!cloud || cloud.hashes.get(entry.id) !== hash) {
+      files.push({ path: entryPath(dir, entry.id), text: JSON.stringify(entry, null, 2) });
+    }
+  }
+
+  const ids = new Set(rows.map((row) => row.id));
+  const deletes = cloud ? [...cloud.hashes.keys()].filter((id) => !ids.has(id)).map((id) => entryPath(dir, id)) : [];
+
+  const logJson = replaceKey(log, "entries", "entryFiles", rows);
+  files.push({ path: logPath(dir), text: JSON.stringify(logJson, null, 2) });
+
+  return { files, deletes };
 }
 
 function dataUrlToBase64(dataUrl) {
@@ -174,15 +307,13 @@ async function downloadMissingImages(client, dir, log) {
  * file is missing.
  */
 export async function downloadLog(client, row) {
-  const file = await client.getJsonFile(logPath(row.path));
-  if (!file) return null;
+  const cloud = await readCloudLog(client, row.path);
+  if (!cloud) return null;
 
-  const log = file.json;
-  log.entries = log.entries || [];
-  log.deletedEntries = log.deletedEntries || [];
+  const log = cloud.log;
   await downloadMissingImages(client, row.path, log);
 
-  const sync = markSynced({ pending: [] }, log, file.sha);
+  const sync = markSynced({ pending: [] }, log, cloud.sha);
   sync.cloudDir = row.path;
   sync.cloudUpdated = row.updated || null;
   return { log, sync };
@@ -200,15 +331,16 @@ export async function syncLog(client, local, sync, { now = () => new Date().toIS
   const dir = sync.cloudDir || defaultLogDir(local);
 
   for (let attempt = 1; ; attempt++) {
-    const remoteFile = await client.getJsonFile(logPath(dir));
-    const remote = remoteFile ? remoteFile.json : null;
+    // Entry files are only downloaded if log.json lists one this computer hasn't got.
+    const cloud = await readCloudLog(client, dir, [sync.base, stripImages(local)]);
+    const remote = cloud ? cloud.log : null;
 
     // It was in the cloud before and isn't now: deleted (see deleteLog) - don't bring it back.
-    if (!remoteFile && sync.baseSha) {
+    if (!cloud && sync.baseSha) {
       return { log: local, sync, uploaded: false, downloaded: false, deletedInCloud: true };
     }
 
-    if (remoteFile && remoteFile.sha === sync.baseSha && !sync.pending.length) {
+    if (cloud && cloud.sha === sync.baseSha && !sync.pending.length && !cloud.legacy) {
       return { log: local, sync, uploaded: false, downloaded: false };
     }
 
@@ -217,10 +349,11 @@ export async function syncLog(client, local, sync, { now = () => new Date().toIS
     await downloadMissingImages(client, dir, merged);
 
     const mergedText = stripImages(merged);
-    const needsUpload = !remote || !same(mergedText, remote);
+    // An old-layout log.json is rewritten in the new layout even if nothing else changed.
+    const needsUpload = !cloud || cloud.legacy || !same(mergedText, remote);
 
     if (!needsUpload) {
-      const newSync = markSynced(clone(sync), merged, remoteFile.sha);
+      const newSync = markSynced(clone(sync), merged, cloud.sha);
       newSync.cloudDir = dir;
       newSync.cloudUpdated = indexRowUpdated(await fetchIndex(client), local.logId);
       return { log: merged, sync: newSync, uploaded: false, downloaded };
@@ -241,7 +374,9 @@ export async function syncLog(client, local, sync, { now = () => new Date().toIS
 
     const deletes = [...remoteImageIds].filter((id) => !mergedIds.has(id)).map((id) => imagePath(dir, id));
 
-    files.push({ path: logPath(dir), text: JSON.stringify(mergedText, null, 2) });
+    const text = logFiles(dir, mergedText, cloud);
+    files.push(...text.files);
+    deletes.push(...text.deletes);
 
     const index = await fetchIndex(client);
     const updated = now();
@@ -282,8 +417,13 @@ export async function deleteLog(client, logId, fallbackDir = null) {
     const deletes = [];
     const logFile = dir ? await client.getJsonFile(logPath(dir)) : null;
     if (logFile) {
-      for (const entry of (logFile.json && logFile.json.entries) || []) {
+      const json = logFile.json || {};
+      for (const entry of json.entries || []) {
         if (entry.hasImage) deletes.push(imagePath(dir, entry.id));
+      }
+      // log.json doesn't say which entries have images - deleting one that isn't there is skipped.
+      for (const row of json.entryFiles || []) {
+        deletes.push(entryPath(dir, row.id), imagePath(dir, row.id));
       }
       deletes.push(logPath(dir));
     }
@@ -294,11 +434,46 @@ export async function deleteLog(client, logId, fallbackDir = null) {
 
     const name = (row && row.name) || (logFile && logFile.json && logFile.json.name) || logId;
     try {
-      await client.commitFiles({ files, deletes, message: `Delete tuning log "${name}"` });
+      await client.commitFiles({ files, deletes: [...new Set(deletes)], message: `Delete tuning log "${name}"` });
       return true;
     } catch (error) {
       if (error.isConflict && attempt < MAX_ATTEMPTS) continue;
       throw error;
     }
   }
+}
+
+/**
+ * Rewrites every log in the repo that's still in the old layout (all entries inside log.json) in
+ * the new one, one commit per log. Logs are left where they are and index.json is unchanged; other
+ * computers pick up the new layout on their next sync without downloading anything new.
+ * onProgress(done, total), if given, is called after each log. Resolves { migrated, total }.
+ * Throws a GitHubError if GitHub can't be reached or refuses.
+ */
+export async function migrateLegacyLogs(client, { onProgress } = {}) {
+  const rows = Object.values((await fetchIndex(client)).crafts).flatMap((group) =>
+    Object.entries(group.logs || {}).map(([logId, row]) => ({ logId, ...row })),
+  );
+
+  let migrated = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    for (let attempt = 1; ; attempt++) {
+      const cloud = await readCloudLog(client, row.path);
+      if (!cloud || !cloud.legacy) break;
+
+      const { files, deletes } = logFiles(row.path, cloud.log, cloud);
+      try {
+        await client.commitFiles({ files, deletes, message: `Tuning log "${row.name}": one file per entry` });
+        migrated++;
+        break;
+      } catch (error) {
+        if (error.isConflict && attempt < MAX_ATTEMPTS) continue;
+        throw error;
+      }
+    }
+    if (onProgress) onProgress(i + 1, rows.length);
+  }
+
+  return { migrated, total: rows.length };
 }

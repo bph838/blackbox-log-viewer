@@ -397,6 +397,28 @@
                 >{{ githubTestResult.message }}</span
               >
             </div>
+            <div class="flex items-center gap-2">
+              <UButton
+                variant="outline"
+                color="neutral"
+                size="xs"
+                icon="i-lucide-files"
+                label="Convert logs to one file per entry"
+                :loading="githubMigrating"
+                :disabled="!local.githubRepo || !local.githubToken"
+                @click="onMigrateGithub"
+              />
+              <span
+                v-if="githubMigrateResult"
+                class="text-xs"
+                :class="githubMigrateResult.ok ? 'text-success' : 'text-error'"
+                >{{ githubMigrateResult.message }}</span
+              >
+            </div>
+            <p class="text-xs text-dimmed">
+              Logs saved by older versions keep every entry in one file, re-uploaded on every
+              change. They're converted when next synced anyway - this converts them all now.
+            </p>
           </UiBox>
 
           <!-- Map Settings (hidden for now, may be needed again later)
@@ -435,6 +457,7 @@ import { useSettingsStore } from "../stores/settings.js";
 import { FLIGHT_LOG_GOVSTATES, FLIGHT_LOG_AIRBORNE_STATES } from "../flightlog_fielddefs.js";
 import { availableAiModels, resolveAiModel } from "../user_settings_data.js";
 import { createGitHubClient } from "../github_client.js";
+import { migrateLegacyLogs } from "../tuning_log_cloud.js";
 import { FLIGHT_SLICE_SAMPLE_RATES, DEFAULT_FLIGHT_SLICE_SAMPLE_RATE } from "../flight_slice.js";
 
 const open = defineModel("open", { type: Boolean, default: false });
@@ -511,6 +534,34 @@ async function onTestGithub() {
     githubTestResult.value = { ok: false, message: error.message };
   } finally {
     githubTesting.value = false;
+  }
+}
+
+const githubMigrating = ref(false);
+const githubMigrateResult = ref(null);
+
+async function onMigrateGithub() {
+  githubMigrating.value = true;
+  githubMigrateResult.value = null;
+  try {
+    const client = createGitHubClient({
+      repo: local.value.githubRepo,
+      branch: local.value.githubBranch,
+      token: local.value.githubToken,
+    });
+    const { migrated, total } = await migrateLegacyLogs(client, {
+      onProgress: (done, count) => {
+        githubMigrateResult.value = { ok: true, message: `Checked ${done} of ${count} logs...` };
+      },
+    });
+    githubMigrateResult.value = {
+      ok: true,
+      message: migrated ? `Converted ${migrated} of ${total} logs.` : `All ${total} logs already use one file per entry.`,
+    };
+  } catch (error) {
+    githubMigrateResult.value = { ok: false, message: error.message };
+  } finally {
+    githubMigrating.value = false;
   }
 }
 

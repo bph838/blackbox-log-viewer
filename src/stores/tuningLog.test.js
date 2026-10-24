@@ -164,7 +164,7 @@ describe("useTuningLogStore cloud sync", () => {
     expect(store.syncStatus).toBe("synced");
     expect(store.totalPendingCount).toBe(0);
     const logFile = Object.keys(fake.files()).find((p) => p.endsWith("/log.json"));
-    expect(JSON.parse(fake.files()[logFile]).entries).toHaveLength(1);
+    expect(JSON.parse(fake.files()[logFile]).entryFiles).toHaveLength(1);
   });
 
   it("uploads every log with unsynced changes, not just the current one", async () => {
@@ -214,8 +214,8 @@ describe("useTuningLogStore cloud sync", () => {
 
     await store.syncNow();
     expect(store.pendingChangeCount).toBe(0);
-    const logFile = Object.keys(fake.files()).find((p) => p.endsWith("/log.json"));
-    expect(JSON.parse(fake.files()[logFile]).entries[0].notes).toBe("typed during sync");
+    const entryFile = Object.keys(fake.files()).find((p) => p.endsWith(`/entries/${entry.id}.json`));
+    expect(JSON.parse(fake.files()[entryFile]).notes).toBe("typed during sync");
   });
 
   it("keeps an entry that was deleted and then captured again, on every computer", async () => {

@@ -12,6 +12,7 @@ import {
   emptyIndex,
   defaultLogDir,
   deleteLog,
+  migrateLegacyLogs,
 } from "./tuning_log_cloud.js";
 
 const IMG_A = "data:image/png;base64,QUFBQQ==";
@@ -62,8 +63,11 @@ describe("tuning log cloud sync", () => {
 
     const files = fake.files();
     const stored = JSON.parse(files[`${dir}/log.json`]);
-    expect(stored.entries[0].image).toBeUndefined();
-    expect(stored.entries[0].hasImage).toBe(true);
+    expect(stored.entries).toBeUndefined();
+    expect(stored.entryFiles).toEqual([{ id: entry.id, hash: expect.any(String) }]);
+    const storedEntry = JSON.parse(files[`${dir}/entries/${entry.id}.json`]);
+    expect(storedEntry.image).toBeUndefined();
+    expect(storedEntry.hasImage).toBe(true);
     expect(fake.fileBase64(`${dir}/images/${entry.id}.png`)).toBe("QUFBQQ==");
 
     const rows = indexRowsForCraft(await fetchIndex(client), "Tron 7.0");
@@ -93,8 +97,72 @@ describe("tuning log cloud sync", () => {
     const before = blobPosts();
     await sync(client, state);
 
-    // The new image, log.json and index.json - not the first image again.
-    expect(blobPosts() - before).toBe(3);
+    // The new image, its entry, log.json and index.json - not the first entry or image again.
+    expect(blobPosts() - before).toBe(4);
+  });
+
+  it("only uploads the entry that changed, and only downloads entries it hasn't got", async () => {
+    const pc1 = newLog();
+    add(pc1, "2026-09-01T00:00:00.000Z", IMG_A);
+    const edited = add(pc1, "2026-09-02T00:00:00.000Z", IMG_B);
+    await sync(client, pc1);
+    const pc2 = clone(pc1);
+
+    pc1.log.entries.find((e) => e.id === edited.id).notes = "too much bounce-back";
+    recordChange(pc1.sync, { op: OPS.UPDATE_NOTES, entryId: edited.id });
+    const blobPosts = () => fake.requests.filter((r) => r.method === "POST" && r.path.endsWith("/git/blobs")).length;
+    const posted = blobPosts();
+    await sync(client, pc1);
+    // The edited entry, log.json and index.json.
+    expect(blobPosts() - posted).toBe(3);
+
+    const entryReads = () => fake.requests.filter((r) => r.method === "GET" && r.path.includes("/entries/")).length;
+    const read = entryReads();
+    const result = await sync(client, pc2);
+    expect(result.downloaded).toBe(true);
+    expect(entryReads() - read).toBe(1);
+    expect(pc2.log.entries.find((e) => e.id === edited.id).notes).toBe("too much bounce-back");
+  });
+
+  it("reads a log in the old layout and rewrites it with one file per entry", async () => {
+    const pc1 = newLog();
+    const first = add(pc1, "2026-09-01T00:00:00.000Z", IMG_A, { notes: "old" });
+    await sync(client, pc1);
+    const dir = pc1.sync.cloudDir;
+
+    // As an older version of the app would have stored it.
+    const legacy = clone(pc1.sync.base);
+    fake.commitElsewhere({ [`${dir}/log.json`]: JSON.stringify(legacy), [`${dir}/entries/${first.id}.json`]: null });
+
+    const row = indexRowsForCraft(await fetchIndex(client), "TRON 7.0")[0];
+    const pc2 = await downloadLog(client, row);
+    expect(pc2.log.entries).toEqual([expect.objectContaining({ id: first.id, notes: "old", image: IMG_A })]);
+
+    const result = await sync(client, pc2);
+    expect(result.uploaded).toBe(true);
+    const stored = JSON.parse(fake.files()[`${dir}/log.json`]);
+    expect(stored.entries).toBeUndefined();
+    expect(stored.entryFiles.map((r) => r.id)).toEqual([first.id]);
+    expect(JSON.parse(fake.files()[`${dir}/entries/${first.id}.json`]).notes).toBe("old");
+
+    // pc1's copy is still in step (nothing to download, nothing lost).
+    const again = await sync(client, pc1);
+    expect(again.downloaded).toBe(false);
+    expect(pc1.log.entries.map((e) => e.id)).toEqual([first.id]);
+  });
+
+  it("converts every old-layout log in the repo at once", async () => {
+    const a = newLog("A");
+    add(a, "2026-09-01T00:00:00.000Z", IMG_A);
+    const b = newLog("B", "Goblin");
+    add(b, "2026-09-02T00:00:00.000Z", IMG_B);
+    await sync(client, a);
+    await sync(client, b);
+    fake.commitElsewhere({ [`${a.sync.cloudDir}/log.json`]: JSON.stringify(a.sync.base) });
+
+    expect(await migrateLegacyLogs(client)).toEqual({ migrated: 1, total: 2 });
+    expect(JSON.parse(fake.files()[`${a.sync.cloudDir}/log.json`]).entryFiles).toHaveLength(1);
+    expect(await migrateLegacyLogs(client)).toEqual({ migrated: 0, total: 2 });
   });
 
   it("re-uploads a re-captured image and passes it on to another computer", async () => {
@@ -174,7 +242,7 @@ describe("tuning log cloud sync", () => {
     const result = await sync(racingClient, pc1);
     expect(result.uploaded).toBe(true);
     expect(fake.files()["crafts/goblin/other/log.json"]).toBe("{}");
-    expect(JSON.parse(fake.files()[`${defaultLogDir(pc1.log)}/log.json`]).entries).toHaveLength(1);
+    expect(JSON.parse(fake.files()[`${defaultLogDir(pc1.log)}/log.json`]).entryFiles).toHaveLength(1);
   });
 
   it("propagates a deletion and removes the entry's image from the repo", async () => {
@@ -187,11 +255,12 @@ describe("tuning log cloud sync", () => {
     const pc2 = await downloadLog(client, indexRowsForCraft(await fetchIndex(client), "TRON 7.0")[0]);
 
     pc1.log.entries = [];
-    pc1.log.deletedEntries.push({ id: entry.id, deletedAt: new Date().toISOString() });
+    pc1.log.deletedEntries.push({ id: entry.id, deletedAt: new Date(Date.now() + 1000).toISOString() });
     recordChange(pc1.sync, { op: OPS.DELETE_ENTRY, entryId: entry.id });
     await sync(client, pc1);
 
     expect(fake.fileBase64(imageFile)).toBeUndefined();
+    expect(fake.files()[`${defaultLogDir(pc1.log)}/entries/${entry.id}.json`]).toBeUndefined();
 
     await sync(client, pc2);
     expect(pc2.log.entries).toEqual([]);
@@ -211,6 +280,7 @@ describe("tuning log cloud sync", () => {
     expect(await deleteLog(client, pc1.log.logId)).toBe(true);
     expect(fake.files()[`${dir}/log.json`]).toBeUndefined();
     expect(fake.fileBase64(`${dir}/images/${entry.id}.png`)).toBeUndefined();
+    expect(fake.files()[`${dir}/entries/${entry.id}.json`]).toBeUndefined();
     expect(indexRowsForCraft(await fetchIndex(client), "TRON 7.0").map((r) => r.name)).toEqual(["Tail"]);
 
     // A computer with a copy (even with changes of its own) is told, rather than re-uploading it.

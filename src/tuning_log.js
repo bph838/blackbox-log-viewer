@@ -17,7 +17,7 @@ function pad2(n) {
  * Stands in for the original's `md5(text)` - only used as a stable local id, never for anything
  * security-sensitive.
  */
-function hashHex(text) {
+export function hashHex(text) {
   let h1 = 0xdeadbeef ^ 0;
   let h2 = 0x41c6ce57 ^ 0;
 
