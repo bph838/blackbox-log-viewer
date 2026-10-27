@@ -599,8 +599,8 @@ const aiModelOptions = availableAiModels.map((m) => ({
 
 const aiEffortOptions = [
   { label: "Low (fastest, cheapest)", value: "low" },
-  { label: "Medium", value: "medium" },
-  { label: "High (default)", value: "high" },
+  { label: "Medium (default)", value: "medium" },
+  { label: "High", value: "high" },
   { label: "X-High", value: "xhigh" },
   { label: "Max (most thorough, slowest)", value: "max" },
 ];

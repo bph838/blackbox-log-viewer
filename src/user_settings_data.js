@@ -89,7 +89,7 @@ export const defaultUserSettings = {
   // aiApiKey is stored locally only, and only ever sent to api.anthropic.com.
   aiApiKey: "",
   aiModel: AI_MODELS.defaultModel,
-  aiEffort: "high",
+  aiEffort: "medium",
   aiSkillIds: [],
   // How many earlier entries' step response graphs go into the AI history (most recent first);
   // older entries are sent as text only. -1 sends them all.
