@@ -8,6 +8,22 @@
     <meta name="description" content="" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+    <!-- Sets the light or dark theme before the page is first drawn, so there's no flash of the wrong one.
+         Mirrors DarkTheme (src/dark_theme.js), which takes over once the app loads: 0 = dark, 1 = light, 2 = follow the system. -->
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      (function () {
+        var mode = 2;
+        try {
+          var saved = JSON.parse(localStorage.getItem("darkTheme"));
+          if (saved === 0 || saved === 1 || saved === 2) mode = saved;
+        } catch (e) {}
+        var dark = mode === 0 || (mode === 2 && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.classList.toggle("dark", dark);
+        document.documentElement.style.colorScheme = dark ? "dark" : "light";
+      })();
+    </script>
+
     <link rel="stylesheet" href="src/css/main.css" />
 
     <!-- Google tag (gtag.js) -->

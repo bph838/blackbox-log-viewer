@@ -4,7 +4,8 @@ import { ref, shallowRef } from "vue";
 export const useAppStore = defineStore("app", () => {
   const legendHidden = ref(false);
   const viewVideo = ref(true);
-  const darkThemeEnabled = ref(false);
+  // Seeded from the class index.html sets before first paint, so mounting doesn't flash light
+  const darkThemeEnabled = ref(globalThis.document?.documentElement.classList.contains("dark") ?? false);
 
   // Filename of loaded log (pushed from legacy code)
   const logFilename = ref("");

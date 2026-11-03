@@ -44,6 +44,29 @@ export const DarkTheme = {
   init: function (prefsStorage) {
     this.prefs = prefsStorage;
 
+    // Set up system preference monitoring before loading the saved mode:
+    // prefs.get calls back synchronously for localStorage, so apply() would
+    // otherwise run with no mediaQuery and AUTO would always resolve to light.
+    if (globalThis.matchMedia) {
+      this.mediaQuery = globalThis.matchMedia("(prefers-color-scheme: dark)");
+
+      const onSystemChange = () => {
+        if (this.currentMode === this.modes.AUTO) {
+          this.apply();
+          useAppStore().refreshGraph?.();
+        }
+      };
+
+      // Modern browsers
+      if (this.mediaQuery.addEventListener) {
+        this.mediaQuery.addEventListener("change", onSystemChange);
+      }
+      // Older browsers
+      else if (this.mediaQuery.addListener) {
+        this.mediaQuery.addListener(onSystemChange);
+      }
+    }
+
     // Load saved preference
     this.prefs.get(this.configName, (value) => {
       // Validate the persisted mode value
@@ -64,28 +87,6 @@ export const DarkTheme = {
       // Apply the theme based on loaded preference
       this.apply();
     });
-
-    // Set up system preference monitoring for AUTO mode
-    if (globalThis.matchMedia) {
-      this.mediaQuery = globalThis.matchMedia("(prefers-color-scheme: dark)");
-
-      // Modern browsers
-      if (this.mediaQuery.addEventListener) {
-        this.mediaQuery.addEventListener("change", () => {
-          if (this.currentMode === this.modes.AUTO) {
-            this.apply();
-          }
-        });
-      }
-      // Older browsers
-      else if (this.mediaQuery.addListener) {
-        this.mediaQuery.addListener(() => {
-          if (this.currentMode === this.modes.AUTO) {
-            this.apply();
-          }
-        });
-      }
-    }
   },
 
   /**
@@ -138,11 +139,13 @@ export const DarkTheme = {
   applyDark: function () {
     this.enabled = true;
     useAppStore().darkThemeEnabled = true;
+    document.documentElement.style.colorScheme = "dark";
   },
 
   applyNormal: function () {
     this.enabled = false;
     useAppStore().darkThemeEnabled = false;
+    document.documentElement.style.colorScheme = "light";
   },
 
   /**
