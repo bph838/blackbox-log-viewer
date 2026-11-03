@@ -289,10 +289,12 @@ function drawOverlays() {
   if (store.chartOverlays.dynNotch) drawDynNotch(g);
   queueStaticFilterLabels(g);
   // hovered labels stacked from the top of the visible part (the plot may be scrolled), each
-  // starting at its filter but clear of the frequency readout in the top left corner
+  // starting at its filter but clear of the frequency readout in the top left corner. While the
+  // Shift / Ctrl / N / J lines are showing, the stack starts below their labels instead.
   const readoutRight = scrollPos.left + marginLeft + 150;
+  const firstY = Math.max(scrollPos.top + 16, GraphSpectrumPlot.hoverLabelsBottom + 10);
   g.labels.forEach((l, i) => {
-    const y = scrollPos.top + 16 + i * 15;
+    const y = firstY + i * 15;
     const x = Math.max(g.xOf(l.hz) + 4, y - scrollPos.top < 75 ? readoutRight : 0);
     g.label(l.text, x, y, l.color, l.alpha);
   });

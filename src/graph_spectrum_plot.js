@@ -62,6 +62,10 @@ export const GraphSpectrumPlot = {
   // Pixels kept clear at the top of the plot for controls drawn over it (the analyser's hover
   // drop-downs). Vertical marker lines and their labels start below this.
   _markerTopSpace: 0,
+  // Canvas y just below the lowest label of the hover / pinned lines (SHIFT harmonics, CTRL rotor
+  // lines) from the last draw, or 0 when none are shown, so text drawn over the plot can sit below them.
+  hoverLabelsBottom: 0,
+  _hoverLabelsTrack: null,
   // _minPSD, _maxPSD, _lowLevelPSD will initialize later in FlightLogAnalyser from stored settings
   _minPSD: 0,
   _maxPSD: 0,
@@ -1190,6 +1194,7 @@ GraphSpectrumPlot._drawNotCachedElements = function () {
   const TOP = canvasCtx.canvas.offsetTop;
 
   canvasCtx.translate(LEFT, TOP);
+  this._hoverLabelsTrack = 0;
 
   const offset = 0;
   if (this._mousePosition.x > 0 || this._mousePosition.y > 0) {
@@ -1211,6 +1216,8 @@ GraphSpectrumPlot._drawNotCachedElements = function () {
     drawLines.call(this, canvasCtx, frequency, maximalFrequency, WIDTH, HEIGHT, 15 * offset + MARGIN, label);
   }
 
+  this.hoverLabelsBottom = this._hoverLabelsTrack ? TOP + this._hoverLabelsTrack : 0;
+  this._hoverLabelsTrack = null;
   canvasCtx.restore();
 };
 
@@ -1386,6 +1393,8 @@ GraphSpectrumPlot._drawVerticalMarkerLine = function (
 
   if (label != null) {
     this._drawAxisLabel(canvasCtx, label.trim(), x + 2, top + 1, "left");
+    // the label's baseline is at top + 1; leave room for descenders
+    if (this._hoverLabelsTrack != null) this._hoverLabelsTrack = Math.max(this._hoverLabelsTrack, top + 5);
   }
 
   return x;
