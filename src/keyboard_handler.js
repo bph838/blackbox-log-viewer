@@ -267,17 +267,17 @@ export function createKeydownHandler(ctx) {
       }
     },
     KeyT: handleKeyTable,
-    KeyN(e, shifted) {
-      pinAverageHeadspeed(e, shifted, "harmonics");
-    },
     KeyJ(e, shifted) {
-      pinAverageHeadspeed(e, shifted, "gearRatio");
-    },
-    KeyB(e, shifted) {
       if (!shifted) {
-        appStore.headspeedInfoDialogOpen = true;
+        appStore.headspeedInfoDialogOpen = !appStore.headspeedInfoDialogOpen;
         e.preventDefault();
       }
+    },
+    KeyK(e, shifted) {
+      pinAverageHeadspeed(e, shifted, "harmonics");
+    },
+    KeyL(e, shifted) {
+      pinAverageHeadspeed(e, shifted, "gearRatio");
     },
     KeyW(e) {
       if (e.shiftKey) {

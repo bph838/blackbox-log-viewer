@@ -47,7 +47,7 @@ export const GraphSpectrumPlot = {
   },
   _mouseMode: "harmonics", // "harmonics" (default) or "gearRatio" (CTRL-hover with a craft config loaded)
   _rotorGearRatios: null, // {main, tail} multipliers from the loaded craft config, while CTRL-hovering
-  _pinnedFundamental: null, // {frequency, label, mode} - lines drawn without a SHIFT/CTRL-hover (N/J keys: average headspeed)
+  _pinnedFundamental: null, // {frequency, label, mode} - lines drawn without a SHIFT/CTRL-hover (K/L keys: average headspeed)
   _overdrawType: null,
   _spectrumType: null,
   _sysConfig: null,
@@ -1518,7 +1518,7 @@ GraphSpectrumPlot._drawRotorRpmLines = function (
   OFFSET,
   mainLabel,
 ) {
-  // No craft config loaded (pinned by the J key) - just the main rotor line
+  // No craft config loaded (pinned by the L key) - just the main rotor line
   const ratios = this._rotorGearRatios ?? {};
 
   const lines = [
@@ -1568,7 +1568,7 @@ GraphSpectrumPlot._drawRotorRpmLines = function (
 /**
  * SHIFT-hover: draws the hovered frequency (1st harmonic) plus its 2nd through 8th harmonics,
  * each labelled with its harmonic number, Hz and RPM value and stacked vertically, so the user
- * can line them up against peaks in the spectrum. Also used for the pinned fundamental (N key),
+ * can line them up against peaks in the spectrum. Also used for the pinned fundamental (K key),
  * where fundamentalLabel is appended to the 1st harmonic's label.
  */
 GraphSpectrumPlot._drawHarmonicLines = function (

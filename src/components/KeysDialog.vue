@@ -75,8 +75,8 @@ const layout = [
       title: "Spectrum Analyser",
       data: [
         { keys: ["A"], action: "Toggle analyser display" },
-        { keys: ["N"], action: "Show harmonics of the average headspeed" },
-        { keys: ["J"], action: "Show Main/Tail/Motor rpm at the average headspeed" },
+        { keys: ["K"], action: "Show harmonics of the average headspeed" },
+        { keys: ["L"], action: "Show Main/Tail/Motor rpm at the average headspeed" },
         { keys: ["Shift"], action: "Show frequency under mouse" },
         { keys: ["Ctrl"], action: "Show the Main/Tail/Motor rpm if a craft config is loaded" },
       ],
@@ -93,7 +93,7 @@ const layout = [
         { keys: ["G"], action: "QuickGrid — hide all grids" },
         { keys: ["T"], action: "Toggle field values table" },
         { keys: ["C"], action: "Toggle configuration dump" },
-        { keys: ["B"], action: "Headspeed information (avg / min / max)" },
+        { keys: ["J"], action: "Toggle headspeed information (avg / min / max)" },
       ],
     },
     {

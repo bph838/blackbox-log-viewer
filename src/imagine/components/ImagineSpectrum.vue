@@ -79,7 +79,7 @@
 
       <span class="ml-auto text-xs text-dimmed">
         <template v-if="zoomed">Drag or scroll to move around · </template>Hold Shift for harmonics, Ctrl for rotor lines ·
-        <span title="Show the harmonics (N) or the main / tail / motor rotor lines (J) of the average headspeed over the analysed range. Press again to hide.">N / J at avg headspeed</span>
+        <span title="Show the harmonics (K) or the main / tail / motor rotor lines (L) of the average headspeed over the analysed range. Press again to hide.">K / L at avg headspeed</span>
       </span>
     </div>
 
@@ -780,8 +780,8 @@ function onKeyDown(e) {
   if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.repeat) return;
   const t = e.target;
   if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-  if (e.code === "KeyN") togglePin("harmonics");
-  else if (e.code === "KeyJ") togglePin("gearRatio");
+  if (e.code === "KeyK") togglePin("harmonics");
+  else if (e.code === "KeyL") togglePin("gearRatio");
   else return;
   e.preventDefault();
 }
