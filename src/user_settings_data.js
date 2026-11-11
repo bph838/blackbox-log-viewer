@@ -83,9 +83,6 @@ export const defaultUserSettings = {
   analyser: { left: "2%", top: "60%", size: "35%" },
   analyser_legend: { left: "88%", top: "7%", width: "10%" },
   stepResponse: { left: "55%", top: "57%", size: "40%" },
-  // The piro wobble window: left/top place its top-left corner; size is its side, as a % of the
-  // graph's height.
-  piroWobble: { left: "38%", top: "5%", size: "45%" },
   map: { left: "2%", top: "5%", size: "35%" },
   watermark: { left: "3%", top: "90%", size: "100%", transparency: "100%", logo: null },
   // AI Analysis Settings — used by the Tuning Log's "AI Analysis" feature (see tuning_ai.js).

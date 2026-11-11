@@ -61,8 +61,10 @@ const axisOptions = computed(() => [
 
 const toggleStyle = computed(() => {
   const { left, top, size } = graphStore.craftLayout;
+  // While the piro wobble plot widens the craft window, the button goes to its far right.
+  const width = graphStore.piroWobbleVisible ? size * 2 : size;
   return {
-    left: `${left + size - BUTTON_SIZE - INSET}px`,
+    left: `${left + width - BUTTON_SIZE - INSET}px`,
     top: `${top + INSET}px`,
   };
 });

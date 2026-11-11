@@ -239,21 +239,27 @@ html.has-sticks #stickCanvas {
   z-index: 10;
 }
 
-/* The piro wobble window (graph_piro_wobble.js) - grapher.js positions it and shows it (.visible)
-   while a piro section (P key) is on screen. */
+/* The piro wobble plot (graph_piro_wobble.js): the right half of the craft window, which
+   grapher.js widens (.visible on it, .piro-joined on #craftCanvas) while a piro section (P key) is
+   on screen. It shares the craft's backdrop, so the two read as one window. */
 .piro-wobble {
   position: absolute;
-  z-index: 10;
   display: none;
   pointer-events: none;
 }
 
-.piro-wobble.visible {
+html.has-craft .piro-wobble.visible {
   display: block;
 }
 
 #piroWobbleCanvas {
   display: block;
+  background-color: #89898973;
+  border-radius: 0 12px 12px 0;
+}
+
+#craftCanvas.piro-joined {
+  border-radius: 12px 0 0 12px;
 }
 
 /* This filters change the color of a black png image. For new colors check: https://codepen.io/sosuke/pen/Pjoqqp */

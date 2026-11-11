@@ -631,7 +631,6 @@ const positionRows = computed(() => {
     { label: "Analyser", obj: local.value.analyser, topKey: "top", leftKey: "left", sizeKey: "size" },
     { label: "Anlsr legend", obj: local.value.analyser_legend, topKey: "top", leftKey: "left", sizeKey: "width", sizeLabel: "W" },
     { label: "Step response", obj: local.value.stepResponse, topKey: "top", leftKey: "left", sizeKey: "size" },
-    { label: "Piro wobble", obj: local.value.piroWobble, topKey: "top", leftKey: "left", sizeKey: "size" },
     { label: "Map", obj: local.value.map, topKey: "top", leftKey: "left", sizeKey: "size" },
   ];
   if (local.value.drawWatermark) {

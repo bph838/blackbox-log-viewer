@@ -1,6 +1,6 @@
-// The piro wobble window: a top-down plot of where the bottom of the heli's mast swings through
-// the piro section (P key, see piro_wobble.js), drawn on its own 2D canvas like the analyser and
-// step response windows. grapher.js shows it while the section is on screen.
+// The piro wobble plot: a top-down view of where the bottom of the heli's mast swings through the
+// piro section (P key, see piro_wobble.js), on its own 2D canvas. grapher.js places it as the
+// right half of the craft window, which it widens while the section is on screen.
 //
 // The plot is in the craft view's frame (right = the viewer's right, up = away from the viewer),
 // matching the blue mast line on the 3D heli: the dot is where the bottom of that line has swung
@@ -92,7 +92,7 @@ export function PiroWobblePlot(flightLog, canvas) {
     ctx.clearRect(0, 0, w, h);
     if (!hasAttitude) return;
 
-    // Text grows with the window up to a point, so the enlarged window gets a bigger plot rather
+    // Text grows with the plot up to a point, so the enlarged craft gets a bigger plot rather
     // than bigger writing.
     const font = Math.min(13, Math.max(9, Math.round(w / 30)));
     const headerH = font * 1.9;
@@ -124,12 +124,7 @@ export function PiroWobblePlot(flightLog, canvas) {
       ctx.restore();
     };
 
-    // Background - the same solid grey and rounded corners as the craft window (#craftCanvas in
-    // main.css: #89898973, 12px radius)
-    ctx.fillStyle = "rgba(137, 137, 137, 0.45)";
-    ctx.beginPath();
-    ctx.roundRect(0, 0, w, h, 12);
-    ctx.fill();
+    // The backdrop is the craft window's, from CSS (#piroWobbleCanvas in main.css).
 
     label("Piro wobble", font * 0.5, headerH / 2, "left");
 

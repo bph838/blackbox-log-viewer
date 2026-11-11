@@ -901,8 +901,8 @@ export function FlightLogGrapher(
   }
 
   /**
-   *  The piro wobble window: shown while the piro section is on screen (its start marked and
-   *  any part of it inside the graph window), hidden otherwise.
+   *  The piro wobble plot: the craft window widens to show it beside the craft while the piro
+   *  section is on screen (its start marked and any part of it inside the graph window).
    */
   function drawPiroWobble(frame) {
     if (!piroWobble) {
@@ -911,11 +911,16 @@ export function FlightLogGrapher(
     const start = graphStore.piroStart;
     const end = graphStore.piroEnd;
     const onScreen =
+      graphStore.hasCraft &&
       start != null &&
       piroWobble.hasData() &&
       start <= windowEndTime &&
       (end ?? Math.max(start, windowCenterTime)) >= windowStartTime;
-    piroWobbleCanvas.parentElement.classList.toggle("visible", onScreen);
+    if (graphStore.piroWobbleVisible !== onScreen) {
+      graphStore.piroWobbleVisible = onScreen;
+      piroWobbleCanvas.parentElement.classList.toggle("visible", onScreen);
+      craftCanvas.classList.toggle("piro-joined", onScreen);
+    }
     if (onScreen) {
       const facing = (options.craft && CRAFT_FACING_OFFSETS[options.craft.facing]) || 0;
       piroWobble.draw({ start, end }, windowCenterTime, frame, facing);
@@ -1016,26 +1021,6 @@ export function FlightLogGrapher(
       0,
     )}px`;
 
-    if (piroWobble) {
-      const pw = options.piroWobble ?? { left: "38%", top: "5%", size: "45%" };
-      // Doubled when enlarged with its size toggle, but never bigger than the graph.
-      const side = Math.min(
-        ((canvas.height * Number.parseInt(pw.size, 10)) / 100) * (graphStore.piroWobbleEnlarged ? 2 : 1),
-        canvas.width,
-        canvas.height,
-      );
-      piroWobble.resize(side);
-      const wrapper = piroWobbleCanvas.parentElement;
-      wrapper.style.left = `${Math.min(
-        (canvas.width * Number.parseInt(pw.left, 10)) / 100,
-        canvas.width - side,
-      )}px`;
-      wrapper.style.top = `${Math.min(
-        (canvas.height * Number.parseInt(pw.top, 10)) / 100,
-        canvas.height - side,
-      )}px`;
-    }
-
     // Double size when enlarged with the craft's size toggle, but never bigger than the graph.
     const craftScale = graphStore.craftEnlarged ? 2 : 1;
     const craftSize = Math.min(
@@ -1064,6 +1049,14 @@ export function FlightLogGrapher(
       top: Number.parseFloat(craftCanvas.style.top) || 0,
       size: craftSize,
     };
+
+    // The piro wobble plot sits in the craft window, as a second square to the craft's right.
+    if (piroWobble) {
+      piroWobble.resize(craftSize);
+      const wrapper = piroWobbleCanvas.parentElement;
+      wrapper.style.left = `${graphStore.craftLayout.left + craftSize}px`;
+      wrapper.style.top = `${graphStore.craftLayout.top}px`;
+    }
 
     if (analyser != null) analyser.resize();
 
