@@ -1018,8 +1018,9 @@ export function FlightLogGrapher(
 
     if (piroWobble) {
       const pw = options.piroWobble ?? { left: "38%", top: "5%", size: "45%" };
+      // Doubled when enlarged with its size toggle, but never bigger than the graph.
       const side = Math.min(
-        (canvas.height * Number.parseInt(pw.size, 10)) / 100,
+        ((canvas.height * Number.parseInt(pw.size, 10)) / 100) * (graphStore.piroWobbleEnlarged ? 2 : 1),
         canvas.width,
         canvas.height,
       );

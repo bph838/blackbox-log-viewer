@@ -77,6 +77,8 @@ export const useGraphStore = defineStore("graph", () => {
   // of null with a start means the section has been started but not finished.
   const piroStart = ref(null);
   const piroEnd = ref(null);
+  // The piro wobble window shown at double its configured size.
+  const piroWobbleEnlarged = ref(false);
   const seekBarMode = ref("avgThrottle");
 
   // Callbacks registered by main.js
@@ -159,6 +161,16 @@ export const useGraphStore = defineStore("graph", () => {
     craftAxisReference.value = null;
     invalidateGraph.value?.();
   }
+
+  function togglePiroWobbleEnlarged() {
+    piroWobbleEnlarged.value = !piroWobbleEnlarged.value;
+    prefs.set("piroWobbleEnlarged", piroWobbleEnlarged.value);
+    updateCanvasSize.value?.();
+  }
+
+  prefs.get("piroWobbleEnlarged", (value) => {
+    piroWobbleEnlarged.value = !!value;
+  });
 
   prefs.get("craftEnlarged", (value) => {
     craftEnlarged.value = !!value;
@@ -281,6 +293,8 @@ export const useGraphStore = defineStore("graph", () => {
     markerTime,
     piroStart,
     piroEnd,
+    piroWobbleEnlarged,
+    togglePiroWobbleEnlarged,
     seekBarMode,
     invalidateGraph,
     updateCanvasSize,

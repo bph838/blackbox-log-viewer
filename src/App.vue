@@ -94,6 +94,9 @@
       <Teleport to="#vue-stepresponse">
         <StepResponseAnalyser />
       </Teleport>
+      <Teleport to="#piroWobble">
+        <PiroWobbleSizeToggle />
+      </Teleport>
       <Teleport to="#vue-legend-panel">
         <LegendPanel />
       </Teleport>
@@ -176,6 +179,7 @@ import HeadspeedInfoDialog from "./components/HeadspeedInfoDialog.vue";
 import CraftSizeToggle from "./components/CraftSizeToggle.vue";
 import SpectrumAnalyser from "./components/SpectrumAnalyser.vue";
 import StepResponseAnalyser from "./components/StepResponseAnalyser.vue";
+import PiroWobbleSizeToggle from "./components/PiroWobbleSizeToggle.vue";
 import LegendPanel from "./components/LegendPanel.vue";
 import FieldValuesPanel from "./components/FieldValuesPanel.vue";
 import ConfigurationPanel from "./components/ConfigurationPanel.vue";

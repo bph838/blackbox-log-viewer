@@ -19,7 +19,6 @@ const RING_DEGREES = [2, 4, 6];
 const CLAMP = 1.15; // Leans beyond the outer ring are pinned just outside it.
 const TRAIL_RGB = "128, 177, 211";
 const DOT_COLOR = "#ffed6f";
-const SECTION_COLOR = "rgba(80, 160, 255, 0.95)";
 const TRAIL_FADE_US = 4e6; // The trail fades over this long, down to TRAIL_MIN_ALPHA.
 const TRAIL_MIN_ALPHA = 0.25;
 const OPEN_SECTION_LOOKAHEAD_US = 5e6;
@@ -93,7 +92,9 @@ export function PiroWobblePlot(flightLog, canvas) {
     ctx.clearRect(0, 0, w, h);
     if (!hasAttitude) return;
 
-    const font = Math.max(9, Math.round(w / 26));
+    // Text grows with the window up to a point, so the enlarged window gets a bigger plot rather
+    // than bigger writing.
+    const font = Math.min(13, Math.max(9, Math.round(w / 30)));
     const headerH = font * 1.9;
     const trim = trimSuggestion(section);
     const footerH = font * (2.2 + 1.3 * trim.length);
@@ -107,45 +108,46 @@ export function PiroWobblePlot(flightLog, canvas) {
       const s = r > radius * CLAMP ? (radius * CLAMP) / r : 1;
       return [cx - x * k * s, cy + y * k * s];
     };
+    // Text drawn like the step response's labels: white Verdana with a black outline.
+    const label = (text, x, y, align, scale = 1, color = null) => {
+      ctx.save();
+      ctx.font = `${Math.round(font * scale)}px Verdana, Arial, sans-serif`;
+      ctx.textAlign = align;
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "black";
+      ctx.shadowBlur = 3;
+      ctx.strokeStyle = "black";
+      ctx.lineWidth = 2;
+      ctx.strokeText(text, x, y, w - x - font * 0.5);
+      ctx.fillStyle = color || "rgba(255,255,255,0.9)";
+      ctx.fillText(text, x, y, w - x - font * 0.5);
+      ctx.restore();
+    };
 
-    // Background
-    ctx.fillStyle = "rgba(20, 24, 30, 0.82)";
+    // Background - the same solid grey and rounded corners as the craft window (#craftCanvas in
+    // main.css: #89898973, 12px radius)
+    ctx.fillStyle = "rgba(137, 137, 137, 0.45)";
     ctx.beginPath();
-    ctx.roundRect(0, 0, w, h, 10);
+    ctx.roundRect(0, 0, w, h, 12);
     ctx.fill();
-    ctx.strokeStyle = "rgba(80, 160, 255, 0.5)";
-    ctx.lineWidth = 1;
-    ctx.stroke();
 
-    // Header
-    ctx.font = `bold ${font}px sans-serif`;
-    ctx.textBaseline = "middle";
-    ctx.textAlign = "left";
-    ctx.fillStyle = SECTION_COLOR;
-    ctx.fillText("Piro wobble", font * 0.7, headerH / 2);
-    ctx.font = `${Math.round(font * 0.8)}px sans-serif`;
-    ctx.textAlign = "right";
-    ctx.fillStyle = "#999";
-    ctx.fillText("mast bottom, seen from above", w - font * 0.7, headerH / 2);
+    label("Piro wobble", font * 0.5, headerH / 2, "left");
 
     // Rings and crosshair
-    ctx.strokeStyle = "rgba(170, 170, 170, 0.5)";
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(cx - radius, cy);
     ctx.lineTo(cx + radius, cy);
     ctx.moveTo(cx, cy - radius);
     ctx.lineTo(cx, cy + radius);
     ctx.stroke();
-    ctx.font = `${Math.round(font * 0.8)}px sans-serif`;
-    ctx.fillStyle = "#aaa";
-    ctx.textAlign = "left";
     for (const deg of RING_DEGREES) {
       const r = deg * k;
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillText(`${deg}°`, cx + r * Math.SQRT1_2 + 2, cy + r * Math.SQRT1_2 + 2);
+      label(`${deg}°`, cx + r * Math.SQRT1_2 + 2, cy + r * Math.SQRT1_2 + 2, "left", 0.8);
     }
 
     // Trail up to the cursor
@@ -182,18 +184,10 @@ export function PiroWobblePlot(flightLog, canvas) {
     }
 
     // Footer
-    ctx.textAlign = "left";
-    ctx.font = `${Math.round(font * 0.85)}px sans-serif`;
-    ctx.fillStyle = "#ddd";
     const footerTop = h - footerH;
-    ctx.fillText(
-      `${nowText}${nowText ? " · " : ""}max ${maxLean.toFixed(1)}°`,
-      font * 0.7,
-      footerTop + font * 1.0,
-    );
+    label(`${nowText}${nowText ? " · " : ""}max ${maxLean.toFixed(1)}°`, font * 0.5, footerTop + font, "left");
     trim.forEach((line, i) => {
-      ctx.fillStyle = line.warn ? "#f0a050" : SECTION_COLOR;
-      ctx.fillText(line.text, font * 0.7, footerTop + font * (2.3 + 1.3 * i), w - font * 1.4);
+      label(line.text, font * 0.5, footerTop + font * (2.3 + 1.3 * i), "left", 1, line.warn ? "orange" : null);
     });
   };
 }
