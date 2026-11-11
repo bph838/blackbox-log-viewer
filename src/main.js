@@ -156,6 +156,8 @@ function BlackboxLogViewer() {
     setVideoInTime(false);
     setVideoOutTime(false);
     clearIsolation();
+    graphStore.piroStart = null;
+    graphStore.piroEnd = null;
     const autoTrimmed = applyAutoTrim(logStore.flightLog, userSettings);
 
     graphStore.activeGraphConfig.adaptGraphs(logStore.flightLog, graphStore.graphConfig);

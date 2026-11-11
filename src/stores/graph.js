@@ -73,6 +73,10 @@ export const useGraphStore = defineStore("graph", () => {
   // draws, which sets it to the time shown then.
   const craftAxisReference = ref(null);
   const markerTime = ref(0);
+  // Piro section (P key, see piro_wobble.js): log times in microseconds, null when not set. An end
+  // of null with a start means the section has been started but not finished.
+  const piroStart = ref(null);
+  const piroEnd = ref(null);
   const seekBarMode = ref("avgThrottle");
 
   // Callbacks registered by main.js
@@ -275,6 +279,8 @@ export const useGraphStore = defineStore("graph", () => {
     stepResponseShiftActive,
     isFullscreen,
     markerTime,
+    piroStart,
+    piroEnd,
     seekBarMode,
     invalidateGraph,
     updateCanvasSize,

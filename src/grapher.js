@@ -14,6 +14,7 @@ import { Craft2D } from "./craft_2d";
 import { Craft3D } from "./craft_3d";
 import { Craft3DHeli, heliModelHasAttitude } from "./craft_3d_heli";
 import { createAxisMotion, hasAxisMotion } from "./craft_axis_motion";
+import { isInPiroSection } from "./piro_wobble";
 import { FlightLogAnalyser } from "./graph_spectrum";
 import { FlightLogStepResponse } from "./graph_stepresponse";
 import { GraphConfig } from "./graph_config";
@@ -896,6 +897,47 @@ export function FlightLogGrapher(
     canvasContext.restore();
   }
 
+  /**
+   *  Tint the piro section (P key) blue and mark its edges. While only its start is set, the tint
+   *  runs up to the cursor.
+   */
+  function drawPiroRegion() {
+    const start = graphStore.piroStart;
+    if (start == null) {
+      return;
+    }
+    const end = graphStore.piroEnd ?? Math.max(start, windowCenterTime);
+    if (end < windowStartTime || start > windowEndTime) {
+      return;
+    }
+    const startX = Math.max(timeToCanvasX(start), 0);
+    const endX = Math.min(timeToCanvasX(end), canvas.width);
+
+    canvasContext.save();
+    canvasContext.fillStyle = "rgba(64, 140, 255, 0.14)";
+    canvasContext.fillRect(startX, 0, endX - startX, canvas.height);
+
+    canvasContext.strokeStyle = "rgba(80, 160, 255, 0.95)";
+    canvasContext.lineWidth = 2;
+    canvasContext.setLineDash(graphStore.piroEnd == null ? [4, 4] : []);
+    const edges = graphStore.piroEnd == null ? [start] : [start, end];
+    for (const edge of edges) {
+      const x = timeToCanvasX(edge);
+      if (x >= 0 && x <= canvas.width) {
+        canvasContext.beginPath();
+        canvasContext.moveTo(x, 0);
+        canvasContext.lineTo(x, canvas.height);
+        canvasContext.stroke();
+      }
+    }
+    canvasContext.setLineDash([]);
+    canvasContext.fillStyle = "rgba(80, 160, 255, 0.95)";
+    canvasContext.font = `${drawingParams.fontSizeEventLabel}pt ${DEFAULT_FONT_FACE}`;
+    canvasContext.textAlign = "left";
+    canvasContext.fillText("Piro", startX + 4, canvas.height - 6);
+    canvasContext.restore();
+  }
+
   function computeDrawingParameters() {
     const fontSizeBase = Math.max(8, canvas.height / 60),
       newParams = {
@@ -1114,7 +1156,11 @@ export function FlightLogGrapher(
             if (graphStore.craftAxisReference === null) graphStore.craftAxisReference = windowCenterTime;
             isolated = { axis, degrees: axisMotion.at(windowCenterTime, axis, graphStore.craftAxisReference) };
           }
-          craft3D.render(centerFrame, flightLog.getMainFieldIndexes(), isolated);
+          const piroSection = { start: graphStore.piroStart, end: graphStore.piroEnd };
+          const piro = !isolated && isInPiroSection(piroSection, windowCenterTime)
+            ? { ...piroSection, time: windowCenterTime }
+            : null;
+          craft3D.render(centerFrame, flightLog.getMainFieldIndexes(), isolated, piro);
         } else if (craft2D) {
           craft2D.render(centerFrame, flightLog.getMainFieldIndexes());
         }
@@ -1149,6 +1195,7 @@ export function FlightLogGrapher(
 
     drawInOutRegion();
     drawIsolatedRegion();
+    drawPiroRegion();
   };
 
   this.refreshGraphConfig = function () {

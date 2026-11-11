@@ -114,6 +114,8 @@ const layout = [
       data: [
         { keys: ["M"], action: "Toggle marker at current time" },
         { keys: ["Alt", "M"], action: "Smart Sync at marker position" },
+        { keys: ["P"], action: "Mark PIRO section start, then end (3D heli shows mast wobble)" },
+        { keys: ["Shift", "P"], action: "Clear PIRO section" },
         { keys: ["I"], action: "Set IN point" },
         { keys: ["O"], action: "Set OUT point" },
         { keys: ["Ctrl", "I"], action: "Set ISOLATE start (within IN/OUT)" },

@@ -4,6 +4,7 @@ import { setIsolateInTime, setIsolateOutTime } from "./isolation.js";
 import { GraphSpectrumPlot } from "./graph_spectrum_plot.js";
 import { HeadspeedStats } from "./headspeed_stats.js";
 import { useCraftConfigStore } from "./stores/craftConfig.js";
+import { nextPiroSection } from "./piro_wobble.js";
 
 /**
  * Create a keydown event handler for the document.
@@ -144,6 +145,23 @@ export function createKeydownHandler(ctx) {
     e.preventDefault();
   }
 
+  // P marks the start of a piro section, then its end; Shift+P clears it.
+  function handleKeyPiro(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) {
+      return;
+    }
+    const section = e.shiftKey
+      ? { start: null, end: null }
+      : nextPiroSection(
+          { start: graphStore.piroStart, end: graphStore.piroEnd },
+          logStore.currentBlackboxTime,
+        );
+    graphStore.piroStart = section.start;
+    graphStore.piroEnd = section.end;
+    invalidateGraph();
+    e.preventDefault();
+  }
+
   function handleKeyConfig(e, shifted) {
     if (!shifted) {
       appStore.headerDialogOpen = false;
@@ -249,6 +267,7 @@ export function createKeydownHandler(ctx) {
     KeyI: handleKeyVideoIn,
     KeyO: handleKeyVideoOut,
     KeyM: handleKeyMarker,
+    KeyP: handleKeyPiro,
     KeyC: handleKeyConfig,
     KeyA(e, shifted) {
       handleAnalyserKey(shifted);
