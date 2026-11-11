@@ -7,13 +7,12 @@
 
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { buildPiroTrace, mastLean, traceCountAt } from "./piro_wobble.js";
 
 const MODEL_URL = "/resources/models/bell_cw.gltf";
 
 // Extra yaw (in radians) added on top of the log's real-time yaw so the model's on-screen
 // "zero yaw" pose matches the user's chosen initial facing direction.
-const CRAFT_FACING_OFFSETS = {
+export const CRAFT_FACING_OFFSETS = {
   forward: 0,
   left: Math.PI / 2,
   right: -Math.PI / 2,
@@ -65,41 +64,10 @@ const PIRO_ROTOR_HEAD_Y = 27;
 const PIRO_MAST_LENGTH = 110;
 const PIRO_MAST_RADIUS = 1.2;
 const PIRO_MAST_COLOR = 0x5aa9ff;
-// The lean plot under the mast: where the bottom end of the mast swings to - the opposite way to
-// the rotor head's lean on both axes, so the dot follows the end of the blue line (right = the
-// viewer's right, up = away from the viewer) - magnified so the outer ring is
-// PIRO_PLOT_MAX_DEGREES of lean.
-const PIRO_PLOT_RADIUS = 38;
-const PIRO_PLOT_MAX_DEGREES = 6;
-const PIRO_PLOT_RING_DEGREES = [2, 4, 6];
-const PIRO_PLOT_CLAMP = 1.2; // Leans beyond the outer ring are pinned just outside it.
-const PIRO_TRAIL_COLOR = new THREE.Color(0x80b1d3);
-const PIRO_DOT_COLOR = 0xffed6f;
-const PIRO_TRAIL_FADE_US = 4e6; // The trail fades over this long, down to PIRO_TRAIL_MIN_ALPHA.
-const PIRO_TRAIL_MIN_ALPHA = 0.25;
-const PIRO_OPEN_SECTION_LOOKAHEAD_US = 5e6;
 const PIRO_RENDER_ORDER = 1000;
 
 function overlayMaterial(Material, params) {
   return new Material({ transparent: true, depthTest: false, depthWrite: false, ...params });
-}
-
-function makeLabel(text) {
-  const c = document.createElement("canvas");
-  c.width = 64;
-  c.height = 32;
-  const ctx = c.getContext("2d");
-  ctx.font = "bold 22px sans-serif";
-  ctx.fillStyle = "#cccccc";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, 32, 16);
-  const texture = new THREE.CanvasTexture(c);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(overlayMaterial(THREE.SpriteMaterial, { map: texture }));
-  sprite.scale.set(12, 6, 1);
-  sprite.renderOrder = PIRO_RENDER_ORDER;
-  return sprite;
 }
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
@@ -176,133 +144,22 @@ export function Craft3DHeli(flightLog, canvas, facing) {
   piroMast.renderOrder = PIRO_RENDER_ORDER + 1;
   piroMast.visible = false;
 
-  // True vertical from the rotor head, to compare the mast against, and the lean plot at its foot.
-  const piroWorld = new THREE.Group();
-  piroWorld.visible = false;
-  scene.add(piroWorld);
-  const plotY = PIRO_ROTOR_HEAD_Y - PIRO_MAST_LENGTH;
-  const unitsPerDegree = PIRO_PLOT_RADIUS / PIRO_PLOT_MAX_DEGREES;
-  const greyLine = overlayMaterial(THREE.LineBasicMaterial, { color: 0xaaaaaa, opacity: 0.55 });
-
-  piroWorld.add(
-    new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0, PIRO_ROTOR_HEAD_Y, 0),
-        new THREE.Vector3(0, plotY, 0),
-      ]),
-      greyLine,
-    ),
+  // True vertical from the rotor head, to compare the mast against. The lean itself is plotted in
+  // the piro wobble window (graph_piro_wobble.js).
+  const piroVertical = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, PIRO_ROTOR_HEAD_Y, 0),
+      new THREE.Vector3(0, PIRO_ROTOR_HEAD_Y - PIRO_MAST_LENGTH, 0),
+    ]),
+    overlayMaterial(THREE.LineBasicMaterial, { color: 0xaaaaaa, opacity: 0.55 }),
   );
-  const plot = new THREE.Group();
-  plot.position.y = plotY;
-  piroWorld.add(plot);
-  const plotBackground = new THREE.Mesh(
-    new THREE.CircleGeometry(PIRO_PLOT_RADIUS * 1.08, 48),
-    overlayMaterial(THREE.MeshBasicMaterial, { color: 0x000000, opacity: 0.45 }),
-  );
-  plot.add(plotBackground);
-  for (const degrees of PIRO_PLOT_RING_DEGREES) {
-    const r = degrees * unitsPerDegree;
-    const ring = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(
-        Array.from({ length: 64 }, (_, i) => {
-          const a = (i / 64) * Math.PI * 2;
-          return new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, 0);
-        }),
-      ),
-      greyLine,
-    );
-    plot.add(ring);
-    const label = makeLabel(`${degrees}°`);
-    label.position.set(r * Math.SQRT1_2 + 4, -r * Math.SQRT1_2 - 2, 0);
-    plot.add(label);
-  }
-  plot.add(
-    new THREE.LineSegments(
-      new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(-PIRO_PLOT_RADIUS, 0, 0),
-        new THREE.Vector3(PIRO_PLOT_RADIUS, 0, 0),
-        new THREE.Vector3(0, -PIRO_PLOT_RADIUS, 0),
-        new THREE.Vector3(0, PIRO_PLOT_RADIUS, 0),
-      ]),
-      greyLine,
-    ),
-  );
+  piroVertical.renderOrder = PIRO_RENDER_ORDER;
+  piroVertical.visible = false;
+  scene.add(piroVertical);
 
-  const trailGeometry = new THREE.BufferGeometry();
-  const piroTrail = new THREE.Line(
-    trailGeometry,
-    overlayMaterial(THREE.LineBasicMaterial, { vertexColors: true }),
-  );
-  plot.add(piroTrail);
-  const piroDot = new THREE.Mesh(
-    new THREE.CircleGeometry(2.4, 20),
-    overlayMaterial(THREE.MeshBasicMaterial, { color: PIRO_DOT_COLOR }),
-  );
-  plot.add(piroDot);
-  plot.traverse((object) => {
-    object.renderOrder = PIRO_RENDER_ORDER;
-  });
-  piroDot.renderOrder = PIRO_RENDER_ORDER + 2;
-
-  // x, y: the rotor head's lean (mastLean). The bottom of the mast swings the other way.
-  const plotPoint = (x, y) => {
-    const r = Math.hypot(x, y) * unitsPerDegree;
-    const limit = PIRO_PLOT_RADIUS * PIRO_PLOT_CLAMP;
-    const scale = r > limit ? limit / r : 1;
-    return [-x * unitsPerDegree * scale, -y * unitsPerDegree * scale];
-  };
-
-  // The lean through the section, rebuilt when the section changes - or, while it's still open,
-  // when playback runs past what's been built.
-  let piroTrace = null;
-  let piroTraceKey = null;
-  let piroTraceEnd = 0;
-
-  const updatePiroTrail = (piro, yawOffset) => {
-    const open = piro.end == null;
-    const key = `${piro.start}|${piro.end}|${yawOffset}`;
-    if (key !== piroTraceKey || (open && piro.time > piroTraceEnd)) {
-      piroTraceEnd = open ? piro.time + PIRO_OPEN_SECTION_LOOKAHEAD_US : piro.end;
-      piroTrace = buildPiroTrace(flightLog, piro.start, piroTraceEnd, yawOffset);
-      piroTraceKey = key;
-      const n = piroTrace.times.length;
-      const positions = new Float32Array(n * 3);
-      for (let i = 0; i < n; i++) {
-        const [px, py] = plotPoint(piroTrace.x[i], piroTrace.y[i]);
-        positions[i * 3] = px;
-        positions[i * 3 + 1] = py;
-      }
-      trailGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-      trailGeometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array(n * 4), 4));
-    }
-
-    const count = traceCountAt(piroTrace.times, piro.time);
-    const colors = trailGeometry.getAttribute("color");
-    if (colors) {
-      for (let i = 0; i < count; i++) {
-        const age = piro.time - piroTrace.times[i];
-        const alpha = Math.max(PIRO_TRAIL_MIN_ALPHA, 1 - age / PIRO_TRAIL_FADE_US);
-        colors.array[i * 4] = PIRO_TRAIL_COLOR.r;
-        colors.array[i * 4 + 1] = PIRO_TRAIL_COLOR.g;
-        colors.array[i * 4 + 2] = PIRO_TRAIL_COLOR.b;
-        colors.array[i * 4 + 3] = alpha;
-      }
-      colors.needsUpdate = true;
-    }
-    trailGeometry.setDrawRange(0, count);
-  };
-
-  // roll/pitch/yaw are the model's rotations as shown (yaw including yawOffset, the facing).
-  const updatePiro = (piro, roll, pitch, yaw, yawOffset) => {
-    const show = !!piro;
-    piroMast.visible = show;
-    piroWorld.visible = show;
-    if (!show) return;
-    updatePiroTrail(piro, yawOffset);
-    const lean = mastLean(roll, pitch, yaw);
-    const [px, py] = plotPoint(lean.x, lean.y);
-    piroDot.position.set(px, py, 0);
+  const updatePiro = (piro) => {
+    piroMast.visible = !!piro;
+    piroVertical.visible = !!piro;
   };
 
   const loader = new GLTFLoader();
@@ -353,7 +210,7 @@ export function Craft3DHeli(flightLog, canvas, facing) {
     model.rotation.x = x;
     modelWrapper.rotation.y = y + yawOffset;
     model.rotation.z = z;
-    updatePiro(piro, z, x, y + yawOffset, yawOffset);
+    updatePiro(piro);
     
     if (collectiveDisc && typeof collectiveRaw === "number") {
       const isNegative = collectiveRaw < 0;

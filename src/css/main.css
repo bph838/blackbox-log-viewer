@@ -239,6 +239,23 @@ html.has-sticks #stickCanvas {
   z-index: 10;
 }
 
+/* The piro wobble window (graph_piro_wobble.js) - grapher.js positions it and shows it (.visible)
+   while a piro section (P key) is on screen. */
+.piro-wobble {
+  position: absolute;
+  z-index: 10;
+  display: none;
+  pointer-events: none;
+}
+
+.piro-wobble.visible {
+  display: block;
+}
+
+#piroWobbleCanvas {
+  display: block;
+}
+
 /* This filters change the color of a black png image. For new colors check: https://codepen.io/sosuke/pen/Pjoqqp */
 .isBF #mapContainer .icon {
   filter: invert(36%) sepia(28%) saturate(3957%) hue-rotate(28deg)

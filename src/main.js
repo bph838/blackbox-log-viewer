@@ -150,6 +150,7 @@ function BlackboxLogViewer() {
       analyserCanvas,
       stepResponseCanvas,
       userSettings,
+      document.getElementById("piroWobbleCanvas"),
     );
     graphStore.graph = graph;
 

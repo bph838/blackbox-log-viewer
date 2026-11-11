@@ -12,7 +12,8 @@ import {
 } from "./flightlog_fielddefs";
 import { Craft2D } from "./craft_2d";
 import { Craft3D } from "./craft_3d";
-import { Craft3DHeli, heliModelHasAttitude } from "./craft_3d_heli";
+import { Craft3DHeli, heliModelHasAttitude, CRAFT_FACING_OFFSETS } from "./craft_3d_heli";
+import { PiroWobblePlot } from "./graph_piro_wobble";
 import { createAxisMotion, hasAxisMotion } from "./craft_axis_motion";
 import { analysePiroTrim, formatPiroTrim, isInPiroSection } from "./piro_wobble";
 import { FlightLogAnalyser } from "./graph_spectrum";
@@ -33,6 +34,7 @@ export function FlightLogGrapher(
   analyserCanvas,
   stepResponseCanvas,
   options,
+  piroWobbleCanvas = null /* only the live view has one - not the video export */,
 ) {
   const graphStore = useGraphStore();
   const workspaceStore = useWorkspaceStore();
@@ -90,6 +92,7 @@ export function FlightLogGrapher(
     analyser = null /* define a new spectrum analyser */,
     stepResponse = null /* define a new step response graph */,
     watermarkLogo /* Watermark feature */;
+  const piroWobble = piroWobbleCanvas ? new PiroWobblePlot(flightLog, piroWobbleCanvas) : null;
   this.onSeek = null;
 
   this.getAnalyser = function () {
@@ -897,6 +900,28 @@ export function FlightLogGrapher(
     canvasContext.restore();
   }
 
+  /**
+   *  The piro wobble window: shown while the piro section is on screen (its start marked and
+   *  any part of it inside the graph window), hidden otherwise.
+   */
+  function drawPiroWobble(frame) {
+    if (!piroWobble) {
+      return;
+    }
+    const start = graphStore.piroStart;
+    const end = graphStore.piroEnd;
+    const onScreen =
+      start != null &&
+      piroWobble.hasData() &&
+      start <= windowEndTime &&
+      (end ?? Math.max(start, windowCenterTime)) >= windowStartTime;
+    piroWobbleCanvas.parentElement.classList.toggle("visible", onScreen);
+    if (onScreen) {
+      const facing = (options.craft && CRAFT_FACING_OFFSETS[options.craft.facing]) || 0;
+      piroWobble.draw({ start, end }, windowCenterTime, frame, facing);
+    }
+  }
+
   // The piro section's trim suggestion, worked out once per section.
   let piroLabelKey = null, piroLabelText = "Piro";
   function piroLabel(start, end) {
@@ -991,6 +1016,25 @@ export function FlightLogGrapher(
       0,
     )}px`;
 
+    if (piroWobble) {
+      const pw = options.piroWobble ?? { left: "38%", top: "5%", size: "45%" };
+      const side = Math.min(
+        (canvas.height * Number.parseInt(pw.size, 10)) / 100,
+        canvas.width,
+        canvas.height,
+      );
+      piroWobble.resize(side);
+      const wrapper = piroWobbleCanvas.parentElement;
+      wrapper.style.left = `${Math.min(
+        (canvas.width * Number.parseInt(pw.left, 10)) / 100,
+        canvas.width - side,
+      )}px`;
+      wrapper.style.top = `${Math.min(
+        (canvas.height * Number.parseInt(pw.top, 10)) / 100,
+        canvas.height - side,
+      )}px`;
+    }
+
     // Double size when enlarged with the craft's size toggle, but never bigger than the graph.
     const craftScale = graphStore.craftEnlarged ? 2 : 1;
     const craftSize = Math.min(
@@ -1051,6 +1095,7 @@ export function FlightLogGrapher(
       windowEndTime,
     );
     let startFrameIndex, i, j;
+    let piroFrame = null; // The frame at the cursor, for the piro wobble window
 
     if (chunks.length) {
       //Find the first sample that lies inside the window
@@ -1147,6 +1192,7 @@ export function FlightLogGrapher(
 
       // Draw details at the current time
       const centerFrame = flightLog.getSmoothedFrameAtTime(windowCenterTime);
+      piroFrame = centerFrame;
 
       if (centerFrame) {
         if (options.drawSticks) {
@@ -1210,6 +1256,7 @@ export function FlightLogGrapher(
     drawInOutRegion();
     drawIsolatedRegion();
     drawPiroRegion();
+    drawPiroWobble(piroFrame);
   };
 
   this.refreshGraphConfig = function () {
