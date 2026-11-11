@@ -65,8 +65,10 @@ const PIRO_ROTOR_HEAD_Y = 27;
 const PIRO_MAST_LENGTH = 110;
 const PIRO_MAST_RADIUS = 1.2;
 const PIRO_MAST_COLOR = 0x5aa9ff;
-// The lean plot under the mast: the lean seen from above (right = right, up = away from the
-// viewer), magnified so the outer ring is PIRO_PLOT_MAX_DEGREES of lean.
+// The lean plot under the mast: where the bottom end of the mast swings to - the opposite way to
+// the rotor head's lean on both axes, so the dot follows the end of the blue line (right = the
+// viewer's right, up = away from the viewer) - magnified so the outer ring is
+// PIRO_PLOT_MAX_DEGREES of lean.
 const PIRO_PLOT_RADIUS = 38;
 const PIRO_PLOT_MAX_DEGREES = 6;
 const PIRO_PLOT_RING_DEGREES = [2, 4, 6];
@@ -243,11 +245,12 @@ export function Craft3DHeli(flightLog, canvas, facing) {
   });
   piroDot.renderOrder = PIRO_RENDER_ORDER + 2;
 
+  // x, y: the rotor head's lean (mastLean). The bottom of the mast swings the other way.
   const plotPoint = (x, y) => {
     const r = Math.hypot(x, y) * unitsPerDegree;
     const limit = PIRO_PLOT_RADIUS * PIRO_PLOT_CLAMP;
     const scale = r > limit ? limit / r : 1;
-    return [x * unitsPerDegree * scale, y * unitsPerDegree * scale];
+    return [-x * unitsPerDegree * scale, -y * unitsPerDegree * scale];
   };
 
   // The lean through the section, rebuilt when the section changes - or, while it's still open,
