@@ -14,7 +14,7 @@ import { Craft2D } from "./craft_2d";
 import { Craft3D } from "./craft_3d";
 import { Craft3DHeli, heliModelHasAttitude } from "./craft_3d_heli";
 import { createAxisMotion, hasAxisMotion } from "./craft_axis_motion";
-import { isInPiroSection } from "./piro_wobble";
+import { analysePiroTrim, formatPiroTrim, isInPiroSection } from "./piro_wobble";
 import { FlightLogAnalyser } from "./graph_spectrum";
 import { FlightLogStepResponse } from "./graph_stepresponse";
 import { GraphConfig } from "./graph_config";
@@ -897,6 +897,20 @@ export function FlightLogGrapher(
     canvasContext.restore();
   }
 
+  // The piro section's trim suggestion, worked out once per section.
+  let piroLabelKey = null, piroLabelText = "Piro";
+  function piroLabel(start, end) {
+    if (end == null) {
+      return "Piro (press P to end)";
+    }
+    const key = `${start}|${end}`;
+    if (key !== piroLabelKey) {
+      piroLabelKey = key;
+      piroLabelText = formatPiroTrim(analysePiroTrim(flightLog, start, end));
+    }
+    return piroLabelText;
+  }
+
   /**
    *  Tint the piro section (P key) blue and mark its edges. While only its start is set, the tint
    *  runs up to the cursor.
@@ -934,7 +948,7 @@ export function FlightLogGrapher(
     canvasContext.fillStyle = "rgba(80, 160, 255, 0.95)";
     canvasContext.font = `${drawingParams.fontSizeEventLabel}pt ${DEFAULT_FONT_FACE}`;
     canvasContext.textAlign = "left";
-    canvasContext.fillText("Piro", startX + 4, canvas.height - 6);
+    canvasContext.fillText(piroLabel(start, graphStore.piroEnd), startX + 4, canvas.height - 6);
     canvasContext.restore();
   }
 

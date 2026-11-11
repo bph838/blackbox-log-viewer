@@ -110,3 +110,104 @@ export function traceCountAt(times, time) {
   }
   return lo;
 }
+
+// A pilot holding cyclic through the piro puts that stick into the average too; above this mean
+// roll/pitch setpoint (deg/s) the trim suggestion is flagged as unreliable.
+const PIRO_STICK_WARN_DEG_S = 15;
+
+/**
+ * Swashplate trim suggestion from a piro section.
+ *
+ * mixer[0]/mixer[1] are the roll/pitch mixer inputs (x1000), in the heli's own frame, and the
+ * firmware adds swash_trim on top of them. Averaged over whole turns, anything fixed in the world
+ * (wind, drift) rotates through every direction and cancels, leaving the correction the controller
+ * holds steadily against the heli itself - an off-level swash (plus the tilt the tail thrust needs
+ * at this headspeed). Moving that into the trims lets the controller sit near zero, so the
+ * piro stays clean. Assumes the default +100% mixer input rates for roll and pitch (1.0 = 100%).
+ *
+ * @returns {{ok: boolean, reason?: string, revolutions: number, rollTrim?: number, pitchTrim?: number,
+ *   stickDegS?: number, stickWarning?: boolean}} trims in % to ADD to the current Roll/Pitch trim
+ */
+export function analysePiroTrim(flightLog, start, end) {
+  const timeIndex = FlightLogParser.prototype.FLIGHT_LOG_FIELD_INDEX_TIME;
+  const idx = (name) => flightLog.getMainFieldIndexByName(name);
+  const yawIndex = idx("attitude[2]");
+  const mixRoll = idx("mixer[0]");
+  const mixPitch = idx("mixer[1]");
+  const spRoll = idx("setpoint[0]");
+  const spPitch = idx("setpoint[1]");
+  if ([yawIndex, mixRoll, mixPitch].some((i) => typeof i !== "number")) {
+    return { ok: false, reason: "log has no mixer/attitude fields", revolutions: 0 };
+  }
+
+  // Unwrapped yaw (decidegrees) and the samples, so the average can stop at the last whole turn.
+  const yaw = [], roll = [], pitch = [], stick = [];
+  let prevRaw = null, unwrapped = 0;
+  let last = -Infinity;
+  for (const chunk of flightLog.getChunksInTimeRange(start, end)) {
+    for (const frame of chunk.frames || []) {
+      const time = frame[timeIndex];
+      if (time < start || time > end || time <= last) continue;
+      last = time;
+      const raw = frame[yawIndex];
+      if (prevRaw !== null) {
+        let d = raw - prevRaw;
+        if (d > 1800) d -= 3600;
+        else if (d < -1800) d += 3600;
+        unwrapped += d;
+      }
+      prevRaw = raw;
+      yaw.push(unwrapped);
+      roll.push(frame[mixRoll]);
+      pitch.push(frame[mixPitch]);
+      stick.push(
+        typeof spRoll === "number" && typeof spPitch === "number"
+          ? Math.hypot(frame[spRoll], frame[spPitch])
+          : 0,
+      );
+    }
+  }
+
+  const turnsAt = (i) => Math.abs(yaw[i]) / 3600;
+  const n = yaw.length;
+  const revolutions = n ? turnsAt(n - 1) : 0;
+  const whole = Math.floor(revolutions);
+  if (whole < 1) {
+    return { ok: false, reason: "needs at least one full turn", revolutions };
+  }
+  let count = 0;
+  while (count < n && turnsAt(count) < whole) count++;
+  count = Math.min(n, count + 1);
+
+  let sumRoll = 0, sumPitch = 0, sumStick = 0;
+  for (let i = 0; i < count; i++) {
+    sumRoll += roll[i];
+    sumPitch += pitch[i];
+    sumStick += stick[i];
+  }
+  // mixer x1000 = input; input 1.0 = 100%, so the mean / 10 is in %.
+  const stickDegS = sumStick / count;
+  return {
+    ok: true,
+    revolutions,
+    wholeRevolutions: whole,
+    rollTrim: sumRoll / count / 10,
+    pitchTrim: sumPitch / count / 10,
+    stickDegS,
+    stickWarning: stickDegS > PIRO_STICK_WARN_DEG_S,
+  };
+}
+
+/**
+ * One line for the graph, e.g. "Piro 3.2 turns · Roll trim +0.6% · Pitch trim −0.3%".
+ */
+export function formatPiroTrim(result) {
+  if (!result) return "Piro";
+  if (!result.ok) return `Piro: ${result.reason}`;
+  const pct = (v) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}%`;
+  let text =
+    `Piro ${result.revolutions.toFixed(1)} turns · add Roll trim ${pct(result.rollTrim)}` +
+    ` · Pitch trim ${pct(result.pitchTrim)}`;
+  if (result.stickWarning) text += ` · cyclic stick moved (${result.stickDegS.toFixed(0)}°/s avg) - unreliable`;
+  return text;
+}

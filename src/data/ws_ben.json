@@ -1867,147 +1867,9 @@
             }
         ]
     },
-    {
-        "title": "Tracking",
+     {
+        "title": "Piro Wobble",
         "graphConfig": [
-            {
-                "label": "Roll",
-                "height": 1,
-                "fields": [
-                    {
-                        "name": "setpoint[0]",
-                        "smoothing": 0,
-                        "curve": {
-                            "power": 0.25,
-                            "MinMax": {
-                                "min": -347,
-                                "max": 347
-                            }
-                        },
-                        "default": {
-                            "smoothing": 0,
-                            "power": 0.25,
-                            "MinMax": {
-                                "min": -347,
-                                "max": 347
-                            }
-                        },
-                        "color": "#fb8072",
-                        "lineWidth": 1
-                    },
-                    {
-                        "name": "gyroADC[0]",
-                        "smoothing": 3000,
-                        "curve": {
-                            "power": 0.25,
-                            "MinMax": {
-                                "min": -347,
-                                "max": 347
-                            }
-                        },
-                        "default": {
-                            "smoothing": 3000,
-                            "power": 0.25,
-                            "MinMax": {
-                                "min": -347,
-                                "max": 347
-                            }
-                        },
-                        "color": "#8dd3c7",
-                        "lineWidth": 1
-                    },
-                    {
-                        "name": "mixer[0]",
-                        "smoothing": 0,
-                        "curve": {
-                            "power": 1,
-                            "MinMax": {
-                                "min": -7.476,
-                                "max": 7.5
-                            }
-                        },
-                        "default": {
-                            "smoothing": 0,
-                            "power": 1,
-                            "MinMax": {
-                                "min": -7.476,
-                                "max": 7.5
-                            }
-                        },
-                        "color": "#ffffb3",
-                        "lineWidth": 1
-                    }
-                ]
-            },
-            {
-                "label": "Pitch",
-                "height": 1,
-                "fields": [
-                    {
-                        "name": "setpoint[1]",
-                        "smoothing": 0,
-                        "curve": {
-                            "power": 0.25,
-                            "MinMax": {
-                                "min": -347,
-                                "max": 347
-                            }
-                        },
-                        "default": {
-                            "smoothing": 0,
-                            "power": 0.25,
-                            "MinMax": {
-                                "min": -347,
-                                "max": 347
-                            }
-                        },
-                        "color": "#fb8072",
-                        "lineWidth": 1
-                    },
-                    {
-                        "name": "gyroADC[1]",
-                        "smoothing": 3000,
-                        "curve": {
-                            "power": 0.25,
-                            "MinMax": {
-                                "min": -347,
-                                "max": 347
-                            }
-                        },
-                        "default": {
-                            "smoothing": 3000,
-                            "power": 0.25,
-                            "MinMax": {
-                                "min": -347,
-                                "max": 347
-                            }
-                        },
-                        "color": "#8dd3c7",
-                        "lineWidth": 1
-                    },
-                    {
-                        "name": "mixer[1]",
-                        "smoothing": 0,
-                        "curve": {
-                            "power": 1,
-                            "MinMax": {
-                                "min": -7.5,
-                                "max": 7.416
-                            }
-                        },
-                        "default": {
-                            "smoothing": 0,
-                            "power": 1,
-                            "MinMax": {
-                                "min": -7.5,
-                                "max": 7.416
-                            }
-                        },
-                        "color": "#ffffb3",
-                        "lineWidth": 1
-                    }
-                ]
-            },
             {
                 "label": "Yaw",
                 "height": 1,
@@ -2018,16 +1880,16 @@
                         "curve": {
                             "power": 0.25,
                             "MinMax": {
-                                "min": -583,
-                                "max": 583
+                                "min": -536,
+                                "max": 536
                             }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 0.25,
                             "MinMax": {
-                                "min": -583,
-                                "max": 583
+                                "min": -536,
+                                "max": 536
                             }
                         },
                         "color": "#fb8072",
@@ -2039,40 +1901,67 @@
                         "curve": {
                             "power": 0.25,
                             "MinMax": {
-                                "min": -583,
-                                "max": 583
+                                "min": -536,
+                                "max": 536
                             }
                         },
                         "default": {
                             "smoothing": 3000,
                             "power": 0.25,
                             "MinMax": {
-                                "min": -583,
-                                "max": 583
+                                "min": -536,
+                                "max": 536
                             }
                         },
                         "color": "#8dd3c7",
                         "lineWidth": 1
-                    },
+                    }
+                ]
+            },
+            {
+                "label": "Setpoint",
+                "height": 1,
+                "fields": [
                     {
-                        "name": "mixer[2]",
+                        "name": "rcCommands[0]",
                         "smoothing": 0,
                         "curve": {
                             "power": 1,
                             "MinMax": {
-                                "min": 0,
-                                "max": 13.32
+                                "min": -347,
+                                "max": 347
                             }
                         },
                         "default": {
                             "smoothing": 0,
                             "power": 1,
                             "MinMax": {
-                                "min": 0,
-                                "max": 13.32
+                                "min": -612,
+                                "max": 612
                             }
                         },
-                        "color": "#ffffb3",
+                        "color": "#fb8072",
+                        "lineWidth": 1
+                    },
+                    {
+                        "name": "rcCommands[1]",
+                        "smoothing": 0,
+                        "curve": {
+                            "power": 1,
+                            "MinMax": {
+                                "min": -347,
+                                "max": 347
+                            }
+                        },
+                        "default": {
+                            "smoothing": 0,
+                            "power": 1,
+                            "MinMax": {
+                                "min": -612,
+                                "max": 612
+                            }
+                        },
+                        "color": "#8dd3c7",
                         "lineWidth": 1
                     }
                 ]
