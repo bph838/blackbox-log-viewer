@@ -18,10 +18,51 @@ const MAX_DEGREES = 6; // Outer ring.
 const RING_DEGREES = [2, 4, 6];
 const CLAMP = 1.15; // Leans beyond the outer ring are pinned just outside it.
 const TRAIL_RGB = "128, 177, 211";
-const DOT_COLOR = "#ffed6f";
+const ARROW_COLOR = "#ffed6f";
 const TRAIL_FADE_US = 4e6; // The trail fades over this long, down to TRAIL_MIN_ALPHA.
 const TRAIL_MIN_ALPHA = 0.25;
 const OPEN_SECTION_LOOKAHEAD_US = 5e6;
+
+/**
+ * The heli's current position on the plot: an arrow centred on (x, y) pointing where the nose
+ * points. yaw is the model's yaw as shown (wrapper rotation.y, including the facing offset); at
+ * 0 the model shows its tail to the viewer, so the nose points away - up on the plot - and a
+ * positive yaw turns it to the left.
+ */
+export function headingOnPlot(yaw) {
+  return { x: -Math.sin(yaw), y: -Math.cos(yaw) }; // canvas: +x right, +y down
+}
+
+function drawHeadingArrow(ctx, x, y, yaw, length) {
+  const { x: ux, y: uy } = headingOnPlot(yaw);
+  const px = -uy, py = ux; // perpendicular
+  const half = length / 2, wing = length * 0.38;
+  ctx.save();
+  // Tail: a short shaft back from the head's notch, outlined like the head.
+  const tailFrom = half * 0.45, tailTo = half + length * 0.55;
+  ctx.lineCap = "round";
+  for (const [style, width] of [["black", Math.max(4, length * 0.22)], [ARROW_COLOR, Math.max(2, length * 0.13)]]) {
+    ctx.strokeStyle = style;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.moveTo(x - ux * tailFrom, y - uy * tailFrom);
+    ctx.lineTo(x - ux * tailTo, y - uy * tailTo);
+    ctx.stroke();
+  }
+  ctx.lineCap = "butt";
+  ctx.fillStyle = ARROW_COLOR;
+  ctx.strokeStyle = "black";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + ux * half, y + uy * half); // tip
+  ctx.lineTo(x - ux * half + px * wing, y - uy * half + py * wing);
+  ctx.lineTo(x - ux * half * 0.45, y - uy * half * 0.45); // notch
+  ctx.lineTo(x - ux * half - px * wing, y - uy * half - py * wing);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
 
 export function PiroWobblePlot(flightLog, canvas) {
   const ctx = canvas.getContext("2d");
@@ -170,10 +211,7 @@ export function PiroWobblePlot(flightLog, canvas) {
       const r = attitudeToModelRotation(frame[attitude[0]], frame[attitude[1]], frame[attitude[2]], facingOffset);
       const lean = mastLean(r.roll, r.pitch, r.yaw);
       const [dx, dy] = toXY(lean.x, lean.y);
-      ctx.fillStyle = DOT_COLOR;
-      ctx.beginPath();
-      ctx.arc(dx, dy, Math.max(3, font * 0.35), 0, Math.PI * 2);
-      ctx.fill();
+      drawHeadingArrow(ctx, dx, dy, r.yaw, Math.max(12, font * 1.8));
       nowText = `Lean now ${lean.degrees.toFixed(1)}°`;
       maxLean = Math.max(maxLean, lean.degrees);
     }

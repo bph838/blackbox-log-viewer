@@ -129,3 +129,20 @@ describe("analysePiroTrim", () => {
     expect(formatPiroTrim(r)).toContain("unreliable");
   });
 });
+
+describe("headingOnPlot", () => {
+  // The plot's frame is the craft view's: canvas +x = the viewer's right, +y = towards the viewer.
+  // The model's nose is its -z axis (tail to the viewer at zero yaw).
+  it("matches the three.js model's nose direction", async () => {
+    const { headingOnPlot } = await import("./graph_piro_wobble.js");
+    for (const yaw of [0, 0.7, Math.PI / 2, -2.4]) {
+      const wrapper = new THREE.Object3D();
+      wrapper.rotation.y = yaw;
+      wrapper.updateMatrixWorld(true);
+      const nose = new THREE.Vector3(0, 0, -1).transformDirection(wrapper.matrixWorld);
+      const h = headingOnPlot(yaw);
+      expect(h.x).toBeCloseTo(nose.x, 9);
+      expect(h.y).toBeCloseTo(nose.z, 9);
+    }
+  });
+});
